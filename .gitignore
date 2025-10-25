@@ -1,3 +1,5 @@
+.env
+
 # Backend
 backend/.env
 backend/tmp/
