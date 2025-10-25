@@ -1,0 +1,1 @@
+CREATE DATABASE reviews_db;
