@@ -7,6 +7,12 @@ const directus = axios.create({
 	baseURL: DIRECTUS_URL,
 })
 
+const ARTICLE_LIST_FIELDS =
+	'id,title,slug,summary,category,published_at,date_created,featured_image,tags'
+
+const ARTICLE_DETAIL_FIELDS =
+	'id,status,date_created,date_updated,title,slug,summary,featured_image,published_at,category,tags,blocks.id,blocks.collection,blocks.item.id,blocks.item.text,blocks.item.image,blocks.item.video_url,blocks.item.file,blocks.item.title'
+
 const newsService = {
 	// Получить опубликованные статьи с пагинацией
 	getPublishedArticles: async (params = {}) => {
@@ -20,8 +26,7 @@ const newsService = {
 			sort: '-published_at,-date_created',
 			limit,
 			offset: (page - 1) * limit,
-			fields:
-				'id,title,slug,summary,category,author,published_at,date_created,view_count,featured_image,tags',
+			fields: ARTICLE_LIST_FIELDS,
 			meta: 'total_count,filter_count',
 		}
 
@@ -51,8 +56,7 @@ const newsService = {
 				filter: JSON.stringify({ status: { _eq: 'published' } }),
 				sort: '-published_at,-date_created',
 				limit,
-				fields:
-					'id,title,slug,summary,category,author,published_at,date_created,featured_image',
+				fields: ARTICLE_LIST_FIELDS,
 			},
 		})
 		return response.data.data || []
@@ -63,16 +67,15 @@ const newsService = {
 		const response = await directus.get('/items/articles', {
 			params: {
 				filter: JSON.stringify({ status: { _eq: 'published' } }),
-				sort: '-view_count',
+				sort: '-date_created',
 				limit,
-				fields:
-					'id,title,slug,summary,published_at,date_created,view_count,featured_image',
+				fields: ARTICLE_LIST_FIELDS,
 			},
 		})
 		return response.data.data || []
 	},
 
-	// Получить статью по slug
+	// Получить статью по slug вместе с блоками
 	getArticleBySlug: async slug => {
 		const response = await directus.get('/items/articles', {
 			params: {
@@ -81,17 +84,18 @@ const newsService = {
 					status: { _eq: 'published' },
 				}),
 				limit: 1,
-				fields: '*',
+				fields: ARTICLE_DETAIL_FIELDS,
 			},
 		})
+
 		const articles = response.data.data || []
 		if (articles.length === 0) throw new Error('Article not found')
+
 		return articles[0]
 	},
 
-	// Получить связанные статьи (по категории)
+	// Получить связанные статьи
 	getRelatedArticles: async (slug, limit = 3) => {
-		// Сначала получаем текущую статью для категории
 		const current = await newsService.getArticleBySlug(slug)
 
 		const response = await directus.get('/items/articles', {
@@ -101,12 +105,12 @@ const newsService = {
 					slug: { _neq: slug },
 					...(current.category && { category: { _eq: current.category } }),
 				}),
-				sort: '-published_at',
+				sort: '-published_at,-date_created',
 				limit,
-				fields:
-					'id,title,slug,summary,published_at,date_created,featured_image',
+				fields: ARTICLE_LIST_FIELDS,
 			},
 		})
+
 		return response.data.data || []
 	},
 
@@ -115,16 +119,22 @@ const newsService = {
 		const response = await directus.get('/items/articles', {
 			params: {
 				filter: JSON.stringify({ status: { _eq: 'published' } }),
-				groupBy: 'category',
-				aggregate: JSON.stringify({ count: 'id' }),
+				fields: 'category',
+				limit: -1,
 			},
 		})
-		// Извлекаем уникальные категории
+
 		const data = response.data.data || []
-		return data.map(item => item.category).filter(Boolean)
+		return [...new Set(data.map(item => item.category).filter(Boolean))]
 	},
 
-	// Получить URL изображения из Directus
+	// URL ассета Directus
+	getAssetUrl: assetId => {
+		if (!assetId) return null
+		return `${DIRECTUS_URL}/assets/${assetId}`
+	},
+
+	// Для обратной совместимости
 	getImageUrl: imageId => {
 		if (!imageId) return null
 		return `${DIRECTUS_URL}/assets/${imageId}`

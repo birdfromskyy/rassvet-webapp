@@ -11,13 +11,14 @@ import {
 	CircularProgress,
 	Alert,
 	Divider,
+	Link,
 } from '@mui/material'
 import {
 	ArrowBack,
 	CalendarToday,
-	Person,
 	Visibility,
 	Category,
+	Download,
 } from '@mui/icons-material'
 import NewsCard from '../components/NewsCard'
 import newsService from '../services/newsService'
@@ -32,14 +33,12 @@ const NewsDetail = () => {
 	const hasLoadedRef = useRef(false)
 
 	useEffect(() => {
-		// Проверяем, была ли уже загрузка
 		if (!hasLoadedRef.current) {
 			hasLoadedRef.current = true
 			fetchArticle()
 		}
 	}, [slug])
 
-	// Сбрасываем ref при изменении slug
 	useEffect(() => {
 		return () => {
 			hasLoadedRef.current = false
@@ -52,7 +51,6 @@ const NewsDetail = () => {
 			const data = await newsService.getArticleBySlug(slug)
 			setArticle(data)
 
-			// Загружаем связанные статьи
 			const related = await newsService.getRelatedArticles(slug, 3)
 			setRelatedArticles(related)
 		} catch (error) {
@@ -83,6 +81,139 @@ const NewsDetail = () => {
 		return labels[category] || category
 	}
 
+	const getVkEmbedUrl = url => {
+		if (!url) return null
+
+		if (url.includes('video_ext.php')) return url
+
+		const match = url.match(/video-?(\d+)_(\d+)/)
+		if (!match) return null
+
+		const ownerId = `-${match[1]}`
+		const videoId = match[2]
+
+		return `https://vk.com/video_ext.php?oid=${ownerId}&id=${videoId}&hd=2`
+	}
+
+	const renderBlock = (block, index) => {
+		if (!block?.collection || !block?.item) return null
+
+		switch (block.collection) {
+			case 'block_text':
+				return (
+					<Box
+						key={`${block.collection}-${block.id}-${index}`}
+						sx={{
+							mb: 3,
+							'& p': { marginBottom: 2 },
+							'& h2': { marginTop: 3, marginBottom: 2 },
+							'& h3': { marginTop: 2, marginBottom: 1 },
+							'& ul, & ol': { marginLeft: 3, marginBottom: 2 },
+							'& blockquote': {
+								borderLeft: '4px solid',
+								borderColor: 'primary.main',
+								paddingLeft: 2,
+								marginLeft: 0,
+								fontStyle: 'italic',
+							},
+						}}
+						dangerouslySetInnerHTML={{ __html: block.item.text || '' }}
+					/>
+				)
+
+			case 'block_image': {
+				const imageUrl = newsService.getAssetUrl(block.item.image)
+				if (!imageUrl) return null
+
+				return (
+					<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
+						<img
+							src={imageUrl}
+							alt='Изображение новости'
+							style={{
+								width: '100%',
+								height: 'auto',
+								borderRadius: '8px',
+							}}
+						/>
+					</Box>
+				)
+			}
+
+			case 'block_video': {
+				const embedUrl = getVkEmbedUrl(block.item.video_url)
+				if (!embedUrl) {
+					return (
+						<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
+							<Link
+								href={block.item.video_url}
+								target='_blank'
+								rel='noopener noreferrer'
+							>
+								Открыть видео
+							</Link>
+						</Box>
+					)
+				}
+
+				return (
+					<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
+						<Box
+							sx={{
+								position: 'relative',
+								paddingBottom: '56.25%',
+								height: 0,
+								overflow: 'hidden',
+								borderRadius: '8px',
+							}}
+						>
+							<iframe
+								src={embedUrl}
+								title='Видео'
+								allow='autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;'
+								allowFullScreen
+								style={{
+									position: 'absolute',
+									top: 0,
+									left: 0,
+									width: '100%',
+									height: '100%',
+									border: 'none',
+								}}
+							/>
+						</Box>
+					</Box>
+				)
+			}
+
+			case 'block_file': {
+				const fileUrl = newsService.getAssetUrl(block.item.file)
+				if (!fileUrl) return null
+
+				return (
+					<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
+						<Paper variant='outlined' sx={{ p: 2 }}>
+							<Box display='flex' alignItems='center' gap={1}>
+								<Download />
+								<Link
+									href={fileUrl}
+									target='_blank'
+									rel='noopener noreferrer'
+									underline='hover'
+								>
+									{block.item.title || 'Скачать файл'}
+								</Link>
+							</Box>
+						</Paper>
+					</Box>
+				)
+			}
+
+			default:
+				return null
+		}
+	}
+
 	if (loading) {
 		return (
 			<Container sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -109,7 +240,6 @@ const NewsDetail = () => {
 	return (
 		<Container maxWidth='lg' sx={{ mt: 4 }}>
 			<Grid container spacing={3}>
-				{/* Основной контент */}
 				<Grid item xs={12} md={8}>
 					<Paper elevation={3} sx={{ p: 4 }}>
 						<Button
@@ -151,18 +281,10 @@ const NewsDetail = () => {
 									{formatDate(article.published_at || article.date_created)}
 								</Typography>
 							</Box>
-							{article.author && (
-								<Box display='flex' alignItems='center' gap={0.5}>
-									<Person sx={{ fontSize: 18 }} />
-									<Typography variant='body2' color='text.secondary'>
-										{article.author}
-									</Typography>
-								</Box>
-							)}
 							<Box display='flex' alignItems='center' gap={0.5}>
 								<Visibility sx={{ fontSize: 18 }} />
 								<Typography variant='body2' color='text.secondary'>
-									{article.view_count} просмотров
+									{article.view_count || 0} просмотров
 								</Typography>
 							</Box>
 						</Box>
@@ -183,30 +305,9 @@ const NewsDetail = () => {
 
 						<Divider sx={{ my: 3 }} />
 
-						{/* Контент статьи */}
-						<Box
-							className='article-content'
-							dangerouslySetInnerHTML={{ __html: article.content }}
-							sx={{
-								'& p': { marginBottom: 2 },
-								'& h2': { marginTop: 3, marginBottom: 2 },
-								'& h3': { marginTop: 2, marginBottom: 1 },
-								'& img': {
-									maxWidth: '100%',
-									height: 'auto',
-									borderRadius: '8px',
-									margin: '20px 0',
-								},
-								'& ul, & ol': { marginLeft: 3, marginBottom: 2 },
-								'& blockquote': {
-									borderLeft: '4px solid',
-									borderColor: 'primary.main',
-									paddingLeft: 2,
-									marginLeft: 0,
-									fontStyle: 'italic',
-								},
-							}}
-						/>
+						<Box>
+							{article.blocks?.map((block, index) => renderBlock(block, index))}
+						</Box>
 
 						{article.tags && article.tags.length > 0 && (
 							<Box mt={4}>
@@ -228,7 +329,6 @@ const NewsDetail = () => {
 					</Paper>
 				</Grid>
 
-				{/* Боковая панель */}
 				<Grid item xs={12} md={4}>
 					{relatedArticles.length > 0 && (
 						<Paper
