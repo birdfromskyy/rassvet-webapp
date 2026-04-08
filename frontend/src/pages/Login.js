@@ -64,13 +64,11 @@ const Login = ({ onLogin }) => {
 					<Typography component='h1' variant='h5' align='center'>
 						Вход в систему
 					</Typography>
-
 					{error && (
 						<Alert severity='error' sx={{ mt: 2 }}>
 							{error}
 						</Alert>
 					)}
-
 					<Box component='form' onSubmit={handleSubmit} sx={{ mt: 1 }}>
 						<TextField
 							margin='normal'
@@ -105,13 +103,18 @@ const Login = ({ onLogin }) => {
 						>
 							{loading ? 'Вход...' : 'Войти'}
 						</Button>
-						<Box textAlign='center'>
-							<Link to='/register' style={{ textDecoration: 'none' }}>
-								<Typography variant='body2' color='primary'>
-									Нет аккаунта? Зарегистрироваться
-								</Typography>
-							</Link>
-						</Box>
+					</Box>
+					<Box textAlign='center'>
+						<Link to='/forgot-password' style={{ textDecoration: 'none' }}>
+							<Typography variant='body2' color='primary' sx={{ mb: 1 }}>
+								Забыли пароль?
+							</Typography>
+						</Link>
+						<Link to='/register' style={{ textDecoration: 'none' }}>
+							<Typography variant='body2' color='primary'>
+								Нет аккаунта? Зарегистрироваться
+							</Typography>
+						</Link>
 					</Box>
 				</Paper>
 			</Box>

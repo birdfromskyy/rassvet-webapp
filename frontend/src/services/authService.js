@@ -30,6 +30,21 @@ const authService = {
 		const response = await api.get('/me')
 		return response.data
 	},
+
+	forgotPassword: async email => {
+		const response = await api.post('/forgot-password', { email })
+		return response.data
+	},
+
+	resetPassword: async (email, code) => {
+		const response = await api.post('/reset-password', { email, code })
+		return response.data
+	},
+
+	updateProfile: async data => {
+		const response = await api.put('/profile', data)
+		return response.data
+	},
 }
 
 export default authService

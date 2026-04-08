@@ -1,7 +1,18 @@
+# === Секреты ===
 .env
-
-# Backend
+.env.local
+.env.*.local
 backend/.env
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Скрипты с кредами
+directus-init.sh
+
+# === Backend ===
 backend/tmp/
 backend/*.exe
 backend/*.dll
@@ -11,29 +22,32 @@ backend/*.test
 backend/*.out
 backend/vendor/
 
-# Frontend
+# === Frontend ===
 frontend/node_modules/
-frontend/.env
-frontend/.env.local
-frontend/.env.development.local
-frontend/.env.test.local
-frontend/.env.production.local
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/build/
 
-# Database
+# === Database ===
 postgres_data/
 *.sql.backup
 
-# IDE
+# === Logs ===
+*.log
+
+# === IDE ===
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 .DS_Store
+Thumbs.db
 
-# Docker
+# === Docker ===
 .docker/
+
+# === Directus ===
+directus_uploads/
+directus_extensions/

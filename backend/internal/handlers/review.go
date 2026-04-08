@@ -31,6 +31,23 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 
 	userID, _ := c.Get("userID")
 
+	// Проверяем, есть ли у пользователя существующий отзыв
+	var existingReview models.Review
+	err := h.db.Where("user_id = ? AND status IN ?", userID, []models.ReviewStatus{
+		models.StatusPending,
+		models.StatusApproved,
+	}).First(&existingReview).Error
+
+	if err == nil {
+		// У пользователя уже есть активный отзыв
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":        "У вас уже есть отзыв. Вы можете его изменить на странице 'Мои отзывы'",
+			"hasReview":    true,
+			"reviewStatus": existingReview.Status,
+		})
+		return
+	}
+
 	review := models.Review{
 		UserID:      userID.(uint),
 		Rating:      req.Rating,
@@ -50,6 +67,60 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 	})
 }
 
+// Добавляем новый метод для обновления отзыва пользователем
+func (h *ReviewHandler) UpdateMyReview(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	var req CreateReviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var review models.Review
+	if err := h.db.Where("user_id = ?", userID).First(&review).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		return
+	}
+
+	// Обновляем отзыв и меняем статус на pending
+	review.Rating = req.Rating
+	review.Content = req.Content
+	review.IsAnonymous = req.IsAnonymous
+	review.Status = models.StatusPending
+
+	if err := h.db.Save(&review).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update review"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Review updated and sent for moderation",
+		"review":  review,
+	})
+}
+
+// Проверка наличия отзыва у пользователя
+func (h *ReviewHandler) CheckUserReview(c *gin.Context) {
+	userID, _ := c.Get("userID")
+
+	var review models.Review
+	err := h.db.Where("user_id = ?", userID).First(&review).Error
+
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"hasReview": false,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"hasReview": true,
+		"review":    review,
+		"canEdit":   review.Status != models.StatusRejected,
+	})
+}
+
 func (h *ReviewHandler) GetPublishedReviews(c *gin.Context) {
 	var reviews []models.Review
 
@@ -58,11 +129,17 @@ func (h *ReviewHandler) GetPublishedReviews(c *gin.Context) {
 		return
 	}
 
-	// Process author names
+	// Process author names - ИСПРАВЛЯЕМ БАГ С ПЕРВОЙ БУКВОЙ ФАМИЛИИ
 	for i := range reviews {
 		if !reviews[i].IsAnonymous && reviews[i].User.ID != 0 {
 			if reviews[i].User.LastName != "" {
-				reviews[i].AuthorName = reviews[i].User.FirstName + " " + string(reviews[i].User.LastName[0]) + "."
+				// Используем руны для корректной работы с Unicode
+				lastNameRunes := []rune(reviews[i].User.LastName)
+				if len(lastNameRunes) > 0 {
+					reviews[i].AuthorName = reviews[i].User.FirstName + " " + string(lastNameRunes[0]) + "."
+				} else {
+					reviews[i].AuthorName = reviews[i].User.FirstName
+				}
 			} else {
 				reviews[i].AuthorName = reviews[i].User.FirstName
 			}

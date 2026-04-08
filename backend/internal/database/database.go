@@ -26,5 +26,6 @@ func Migrate(db *gorm.DB) {
 		&models.User{},
 		&models.Review{},
 		&models.VerificationCode{},
+		&models.PasswordResetCode{}, // Добавьте эту строку
 	)
 }

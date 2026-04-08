@@ -15,13 +15,19 @@ func main() {
 	// Load config
 	cfg := config.Load()
 
-	// Initialize database
+	// Initialize PostgreSQL
 	db, err := database.Initialize(cfg)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	// Auto migrate
+	// Initialize Redis
+	rdb, err := database.InitializeRedis(cfg)
+	if err != nil {
+		log.Fatal("Failed to connect to redis:", err)
+	}
+
+	// Auto migrate only our models
 	database.Migrate(db)
 
 	// Setup Gin
@@ -37,7 +43,7 @@ func main() {
 	}))
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(db, cfg)
+	authHandler := handlers.NewAuthHandler(db, rdb, cfg)
 	reviewHandler := handlers.NewReviewHandler(db)
 	adminHandler := handlers.NewAdminHandler(db)
 
@@ -46,11 +52,14 @@ func main() {
 	r.POST("/api/login", authHandler.Login)
 	r.POST("/api/verify-email", authHandler.VerifyEmail)
 	r.POST("/api/resend-code", authHandler.ResendCode)
+	r.POST("/api/forgot-password", authHandler.ForgotPassword)
+	r.POST("/api/reset-password", authHandler.ResetPassword)
 
 	// Protected routes
 	protected := r.Group("/api")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
+		protected.PUT("/profile", authHandler.UpdateProfile)
 		protected.POST("/logout", authHandler.Logout)
 		protected.GET("/me", authHandler.GetMe)
 
@@ -58,6 +67,8 @@ func main() {
 		protected.GET("/reviews", reviewHandler.GetPublishedReviews)
 		protected.POST("/reviews", reviewHandler.CreateReview)
 		protected.GET("/my-reviews", reviewHandler.GetMyReviews)
+		protected.GET("/reviews/check", reviewHandler.CheckUserReview)
+		protected.PUT("/reviews/my", reviewHandler.UpdateMyReview)
 
 		// Admin routes
 		admin := protected.Group("/admin")
@@ -72,5 +83,7 @@ func main() {
 		}
 	}
 
-	r.Run(":" + cfg.Port)
+	if err := r.Run(":" + cfg.Port); err != nil {
+		log.Fatal("Failed to start server:", err)
+	}
 }

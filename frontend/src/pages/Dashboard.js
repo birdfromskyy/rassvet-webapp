@@ -15,9 +15,12 @@ import {
 	RateReview as ReviewIcon,
 	AdminPanelSettings as AdminIcon,
 	Logout as LogoutIcon,
+	Newspaper as NewsIcon,
+	Person as PersonIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import authService from '../services/authService'
+import NewsSection from '../components/NewsSection'
 
 const Dashboard = ({ user, onLogout }) => {
 	const navigate = useNavigate()
@@ -47,18 +50,54 @@ const Dashboard = ({ user, onLogout }) => {
 					<Typography variant='h4'>
 						Добро пожаловать, {user?.first_name}!
 					</Typography>
-					<Button
-						variant='outlined'
-						color='error'
-						startIcon={<LogoutIcon />}
-						onClick={handleLogout}
-					>
-						Выйти
-					</Button>
+					<Box display='flex' gap={2}>
+						<Button
+							variant='outlined'
+							startIcon={<PersonIcon />}
+							onClick={() => navigate('/profile')}
+						>
+							Профиль
+						</Button>
+						<Button
+							variant='outlined'
+							color='error'
+							startIcon={<LogoutIcon />}
+							onClick={handleLogout}
+						>
+							Выйти
+						</Button>
+					</Box>
 				</Box>
 
+				{/* Секция новостей */}
+				<NewsSection limit={3} />
+
 				<Grid container spacing={3}>
-					<Grid item xs={12} md={6}>
+					<Grid item xs={12} md={4}>
+						<Card>
+							<CardContent>
+								<Box display='flex' alignItems='center' mb={2}>
+									<NewsIcon sx={{ fontSize: 40, mr: 2, color: 'info.main' }} />
+									<Typography variant='h5'>Новости</Typography>
+								</Box>
+								<Typography variant='body2' color='text.secondary'>
+									Читайте последние новости и обновления
+								</Typography>
+							</CardContent>
+							<CardActions>
+								<Button
+									size='small'
+									variant='contained'
+									color='info'
+									onClick={() => navigate('/news')}
+								>
+									Все новости
+								</Button>
+							</CardActions>
+						</Card>
+					</Grid>
+
+					<Grid item xs={12} md={4}>
 						<Card>
 							<CardContent>
 								<Box display='flex' alignItems='center' mb={2}>
@@ -84,7 +123,7 @@ const Dashboard = ({ user, onLogout }) => {
 					</Grid>
 
 					{user?.role === 'admin' && (
-						<Grid item xs={12} md={6}>
+						<Grid item xs={12} md={4}>
 							<Card>
 								<CardContent>
 									<Box display='flex' alignItems='center' mb={2}>
@@ -94,7 +133,7 @@ const Dashboard = ({ user, onLogout }) => {
 										<Typography variant='h5'>Администрирование</Typography>
 									</Box>
 									<Typography variant='body2' color='text.secondary'>
-										Управление отзывами и модерация
+										Управление контентом и модерация
 									</Typography>
 								</CardContent>
 								<CardActions>
@@ -104,7 +143,18 @@ const Dashboard = ({ user, onLogout }) => {
 										color='secondary'
 										onClick={() => navigate('/admin/reviews')}
 									>
-										Панель администратора
+										Отзывы
+									</Button>
+									<Button
+										size='small'
+										variant='contained'
+										color='secondary'
+										onClick={() =>
+											window.open('http://localhost:8055', '_blank')
+										}
+										sx={{ ml: 1 }}
+									>
+										Статьи
 									</Button>
 								</CardActions>
 							</Card>
