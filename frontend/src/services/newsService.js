@@ -11,7 +11,7 @@ const ARTICLE_LIST_FIELDS =
 	'id,title,slug,summary,category,published_at,date_created,featured_image,tags'
 
 const ARTICLE_DETAIL_FIELDS =
-	'id,status,date_created,date_updated,title,slug,summary,featured_image,published_at,category,tags,blocks.id,blocks.collection,blocks.item.id,blocks.item.text,blocks.item.image,blocks.item.video_url,blocks.item.file,blocks.item.title'
+	'id,status,date_created,date_updated,title,slug,summary,featured_image,published_at,category,tags,blocks.id,blocks.collection,blocks.item.id,blocks.item.text,blocks.item.image,blocks.item.image.id,blocks.item.image.filename_download,blocks.item.video_url,blocks.item.file,blocks.item.file.id,blocks.item.file.filename_download,blocks.item.title'
 
 const newsService = {
 	// Получить опубликованные статьи с пагинацией
@@ -132,6 +132,11 @@ const newsService = {
 	getAssetUrl: assetId => {
 		if (!assetId) return null
 		return `${DIRECTUS_URL}/assets/${assetId}`
+	},
+
+	getAssetDownloadUrl: assetId => {
+		if (!assetId) return null
+		return `${DIRECTUS_URL}/assets/${assetId}?download`
 	},
 
 	// Для обратной совместимости

@@ -122,7 +122,9 @@ const NewsDetail = () => {
 				)
 
 			case 'block_image': {
-				const imageUrl = newsService.getAssetUrl(block.item.image)
+				const imageUrl = newsService.getAssetUrl(
+					block.item.image?.id || block.item.image,
+				)
 				if (!imageUrl) return null
 
 				return (
@@ -187,7 +189,9 @@ const NewsDetail = () => {
 			}
 
 			case 'block_file': {
-				const fileUrl = newsService.getAssetUrl(block.item.file)
+				const fileUrl = newsService.getAssetDownloadUrl(
+					block.item.file?.id || block.item.file,
+				)
 				if (!fileUrl) return null
 
 				return (
@@ -201,7 +205,9 @@ const NewsDetail = () => {
 									rel='noopener noreferrer'
 									underline='hover'
 								>
-									{block.item.title || 'Скачать файл'}
+									{block.item.title ||
+										block.item.file?.filename_download ||
+										'Скачать файл'}
 								</Link>
 							</Box>
 						</Paper>
@@ -281,18 +287,16 @@ const NewsDetail = () => {
 									{formatDate(article.published_at || article.date_created)}
 								</Typography>
 							</Box>
-							<Box display='flex' alignItems='center' gap={0.5}>
-								<Visibility sx={{ fontSize: 18 }} />
-								<Typography variant='body2' color='text.secondary'>
-									{article.view_count || 0} просмотров
-								</Typography>
-							</Box>
 						</Box>
 
-						{newsService.getImageUrl(article.featured_image) && (
+						{newsService.getImageUrl(
+							article.featured_image?.id || article.featured_image,
+						) && (
 							<Box mb={3}>
 								<img
-									src={newsService.getImageUrl(article.featured_image)}
+									src={newsService.getImageUrl(
+										article.featured_image?.id || article.featured_image,
+									)}
 									alt={article.title}
 									style={{
 										width: '100%',
