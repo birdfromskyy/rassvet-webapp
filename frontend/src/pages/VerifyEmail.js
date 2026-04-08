@@ -23,21 +23,27 @@ const VerifyEmail = () => {
 	const autoSentRef = useRef(false)
 
 	useEffect(() => {
-		if (location.state?.email) {
-			setEmail(location.state.email)
-		}
-	}, [location])
+		const params = new URLSearchParams(location.search)
+		const emailFromQuery = params.get('email') || ''
+		setEmail(emailFromQuery)
+	}, [location.search])
 
 	useEffect(() => {
 		const autoSendCode = async () => {
-			if (!location.state?.email || autoSentRef.current) return
+			const params = new URLSearchParams(location.search)
+			const emailFromQuery = params.get('email')
+			const shouldAutoSend = params.get('autoSendCode') === '1'
+
+			if (!emailFromQuery || !shouldAutoSend || autoSentRef.current) {
+				return
+			}
 
 			autoSentRef.current = true
 			setResending(true)
 			setError('')
 
 			try {
-				await authService.resendCode(location.state.email)
+				await authService.resendCode(emailFromQuery)
 				toast.success('Код подтверждения отправлен на почту')
 			} catch (error) {
 				setError(
@@ -49,7 +55,7 @@ const VerifyEmail = () => {
 		}
 
 		autoSendCode()
-	}, [location.state])
+	}, [location.search])
 
 	const handleSubmit = async e => {
 		e.preventDefault()

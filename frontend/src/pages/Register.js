@@ -84,7 +84,7 @@ const Register = () => {
 			const { confirmPassword, ...dataToSend } = formData
 			await authService.register(dataToSend)
 			toast.success('Регистрация успешна! Проверьте email для подтверждения.')
-			navigate('/verify-email', { state: { email: formData.email } })
+			navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`)
 		} catch (error) {
 			if (error.response?.status === 409) {
 				setErrors({ email: 'Пользователь с таким email уже существует' })

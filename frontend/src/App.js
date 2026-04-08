@@ -14,7 +14,6 @@ import PendingReviews from './pages/PendingReviews'
 import News from './pages/News'
 import NewsDetail from './pages/NewsDetail'
 import AdminNews from './pages/AdminNews'
-import AdminArticles from './pages/AdminArticles'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword'
@@ -124,7 +123,6 @@ function App() {
 						<Route path='/admin/reviews' element={<AdminReviews />} />
 						<Route path='/admin/pending-reviews' element={<PendingReviews />} />
 						<Route path='/admin/news' element={<AdminNews />} />
-						<Route path='/admin/articles' element={<AdminArticles />} />
 					</Route>
 				</Route>
 

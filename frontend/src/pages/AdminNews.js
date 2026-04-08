@@ -7,7 +7,9 @@ const AdminNews = () => {
 	const navigate = useNavigate()
 
 	const handleOpenDirectus = () => {
-		window.open('http://localhost:8055/admin/content/articles', '_blank')
+		const directusUrl =
+			process.env.REACT_APP_DIRECTUS_URL || 'http://localhost:8055'
+		window.open(`${directusUrl}/admin/content/articles`, '_blank')
 	}
 
 	return (
@@ -73,16 +75,6 @@ const AdminNews = () => {
 							<li>Измените статус на "Published" для публикации</li>
 							<li>Нажмите "Save" для сохранения</li>
 						</ol>
-					</Box>
-
-					<Box mt={3}>
-						<Typography variant='body2' color='text.secondary'>
-							Учетные данные Directus:
-							<br />
-							Email: admin@example.com
-							<br />
-							Password: admin123
-						</Typography>
 					</Box>
 				</Box>
 			</Paper>

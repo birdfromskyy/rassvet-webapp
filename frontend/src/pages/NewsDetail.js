@@ -167,10 +167,10 @@ const NewsDetail = () => {
 							</Box>
 						</Box>
 
-						{article.image_url && (
+						{newsService.getImageUrl(article.featured_image) && (
 							<Box mb={3}>
 								<img
-									src={article.image_url}
+									src={newsService.getImageUrl(article.featured_image)}
 									alt={article.title}
 									style={{
 										width: '100%',

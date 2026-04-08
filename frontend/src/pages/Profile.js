@@ -107,7 +107,9 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
 				onLogout()
 
 				setTimeout(() => {
-					navigate('/verify-email', { state: { email: response.email } })
+					navigate(
+						`/verify-email?email=${encodeURIComponent(response.email)}&autoSendCode=1`,
+					)
 				}, 1500)
 
 				return

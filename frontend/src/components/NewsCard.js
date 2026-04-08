@@ -1,5 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import newsService from '../services/newsService'
 import {
 	Card,
 	CardMedia,
@@ -49,11 +50,11 @@ const NewsCard = ({ article, variant = 'default' }) => {
 				}}
 				onClick={handleClick}
 			>
-				{article.image_url && (
+				{newsService.getImageUrl(article.featured_image) && (
 					<CardMedia
 						component='img'
 						sx={{ width: 100, height: 100 }}
-						image={article.image_url}
+						image={newsService.getImageUrl(article.featured_image)}
 						alt={article.title}
 					/>
 				)}
@@ -88,11 +89,11 @@ const NewsCard = ({ article, variant = 'default' }) => {
 			}}
 			onClick={handleClick}
 		>
-			{article.image_url && (
+			{newsService.getImageUrl(article.featured_image) && (
 				<CardMedia
 					component='img'
 					height='200'
-					image={article.image_url}
+					image={newsService.getImageUrl(article.featured_image)}
 					alt={article.title}
 				/>
 			)}

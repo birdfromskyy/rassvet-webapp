@@ -150,7 +150,11 @@ const Dashboard = ({ user, onLogout }) => {
 										variant='contained'
 										color='secondary'
 										onClick={() =>
-											window.open('http://localhost:8055', '_blank')
+											window.open(
+												process.env.REACT_APP_DIRECTUS_URL ||
+													'http://localhost:8055',
+												'_blank',
+											)
 										}
 										sx={{ ml: 1 }}
 									>
