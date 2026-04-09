@@ -101,6 +101,10 @@ func main() {
 
 	siteDir := "./static/site"
 
+	r.NoRoute(func(c *gin.Context) {
+		c.File(filepath.Join(siteDir, "404.html"))
+	})
+
 	// Static assets from exported Tilda site
 	r.Static("/css", filepath.Join(siteDir, "css"))
 	r.Static("/js", filepath.Join(siteDir, "js"))

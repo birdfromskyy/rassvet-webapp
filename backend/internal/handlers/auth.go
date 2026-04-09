@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,8 @@ type PendingRegistration struct {
 	MiddleName   string `json:"middle_name"`
 	Code         string `json:"code"`
 }
+
+const verificationCodeCooldown = 60 * time.Second
 
 func NewAuthHandler(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
@@ -59,6 +62,27 @@ type VerifyEmailRequest struct {
 	Code  string `json:"code" binding:"required"`
 }
 
+func verificationCooldownKey(email string) string {
+	return "cooldown:verify:" + strings.ToLower(strings.TrimSpace(email))
+}
+
+func (h *AuthHandler) getVerificationCooldown(ctx context.Context, email string) (time.Duration, error) {
+	ttl, err := h.rdb.TTL(ctx, verificationCooldownKey(email)).Result()
+	if err != nil {
+		return 0, err
+	}
+
+	if ttl > 0 {
+		return ttl, nil
+	}
+
+	return 0, nil
+}
+
+func (h *AuthHandler) setVerificationCooldown(ctx context.Context, email string) error {
+	return h.rdb.Set(ctx, verificationCooldownKey(email), "1", verificationCodeCooldown).Err()
+}
+
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -70,6 +94,22 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	var existingUser models.User
 	if err := h.db.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "User already exists"})
+		return
+	}
+
+	ctx := context.Background()
+
+	cooldown, err := h.getVerificationCooldown(ctx, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check resend cooldown"})
+		return
+	}
+
+	if cooldown > 0 {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":               fmt.Sprintf("Verification code was sent recently. Try again in %d seconds", int(cooldown.Seconds())+1),
+			"retry_after_seconds": int(cooldown.Seconds()) + 1,
+		})
 		return
 	}
 
@@ -98,7 +138,6 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
 	key := "register:" + req.Email
 
 	// Сохраняем в Redis на 15 минут
@@ -112,6 +151,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if err := emailService.SendVerificationCode(req.Email, code); err != nil {
 		_ = h.rdb.Del(ctx, key).Err()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+		return
+	}
+
+	if err := h.setVerificationCooldown(ctx, req.Email); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resend cooldown"})
 		return
 	}
 
@@ -142,8 +186,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Check if verified
-	// Check if verified
 	if !user.IsVerified {
+		ctx := context.Background()
+
+		cooldown, err := h.getVerificationCooldown(ctx, user.Email)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check resend cooldown"})
+			return
+		}
+
+		if cooldown > 0 {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error":               "Email not verified",
+				"message":             fmt.Sprintf("Verification code was sent recently. Try again in %d seconds", int(cooldown.Seconds())+1),
+				"retry_after_seconds": int(cooldown.Seconds()) + 1,
+				"email":               user.Email,
+			})
+			return
+		}
+
 		// Удаляем старые неиспользованные коды для этого email
 		h.db.Where("email = ? AND used = false", user.Email).Delete(&models.VerificationCode{})
 
@@ -165,6 +226,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		emailService := services.NewEmailService(h.cfg)
 		if err := emailService.SendVerificationCode(user.Email, code); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+			return
+		}
+
+		if err := h.setVerificationCooldown(ctx, user.Email); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resend cooldown"})
 			return
 		}
 
@@ -204,6 +270,20 @@ func (h *AuthHandler) ResendCode(c *gin.Context) {
 	}
 
 	ctx := context.Background()
+
+	cooldown, err := h.getVerificationCooldown(ctx, req.Email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check resend cooldown"})
+		return
+	}
+
+	if cooldown > 0 {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":               fmt.Sprintf("Verification code was sent recently. Try again in %d seconds", int(cooldown.Seconds())+1),
+			"retry_after_seconds": int(cooldown.Seconds()) + 1,
+		})
+		return
+	}
 
 	// Сначала проверяем, есть ли пользователь в БД
 	var user models.User
@@ -245,6 +325,11 @@ func (h *AuthHandler) ResendCode(c *gin.Context) {
 			return
 		}
 
+		if err := h.setVerificationCooldown(ctx, req.Email); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resend cooldown"})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{"message": "Verification code sent"})
 		return
 	}
@@ -277,6 +362,11 @@ func (h *AuthHandler) ResendCode(c *gin.Context) {
 		emailService := services.NewEmailService(h.cfg)
 		if err := emailService.SendVerificationCode(req.Email, newCode); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+			return
+		}
+
+		if err := h.setVerificationCooldown(ctx, req.Email); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resend cooldown"})
 			return
 		}
 
