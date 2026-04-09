@@ -52,12 +52,28 @@ const Dashboard = ({ user, onLogout }) => {
 					</Typography>
 					<Box display='flex' gap={2}>
 						<Button
+							variant='contained'
+							color='primary'
+							onClick={() =>
+								window.open('http://localhost:8080/main', '_blank')
+							}
+							sx={{
+								borderRadius: '12px',
+								textTransform: 'none',
+								fontWeight: 600,
+							}}
+						>
+							Перейти на сайт
+						</Button>
+
+						<Button
 							variant='outlined'
 							startIcon={<PersonIcon />}
 							onClick={() => navigate('/profile')}
 						>
 							Профиль
 						</Button>
+
 						<Button
 							variant='outlined'
 							color='error'

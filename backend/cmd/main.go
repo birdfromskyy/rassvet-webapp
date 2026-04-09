@@ -6,10 +6,26 @@ import (
 	"backend/internal/handlers"
 	"backend/internal/middleware"
 	"log"
+	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
+
+func serveHTML(siteDir string, fileName string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		fullPath := filepath.Join(siteDir, fileName)
+
+		if _, err := os.Stat(fullPath); err != nil {
+			c.String(http.StatusNotFound, "Page not found")
+			return
+		}
+
+		c.File(fullPath)
+	}
+}
 
 func main() {
 	// Load config
@@ -47,7 +63,7 @@ func main() {
 	reviewHandler := handlers.NewReviewHandler(db)
 	adminHandler := handlers.NewAdminHandler(db)
 
-	// Public routes
+	// Public API routes
 	r.POST("/api/register", authHandler.Register)
 	r.POST("/api/login", authHandler.Login)
 	r.POST("/api/verify-email", authHandler.VerifyEmail)
@@ -55,7 +71,7 @@ func main() {
 	r.POST("/api/forgot-password", authHandler.ForgotPassword)
 	r.POST("/api/reset-password", authHandler.ResetPassword)
 
-	// Protected routes
+	// Protected API routes
 	protected := r.Group("/api")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
@@ -82,6 +98,50 @@ func main() {
 			admin.PUT("/reviews/:id/reject", adminHandler.RejectReview)
 		}
 	}
+
+	siteDir := "./static/site"
+
+	// Static assets from exported Tilda site
+	r.Static("/css", filepath.Join(siteDir, "css"))
+	r.Static("/js", filepath.Join(siteDir, "js"))
+	r.Static("/images", filepath.Join(siteDir, "images"))
+	r.Static("/files", filepath.Join(siteDir, "files"))
+
+	// Static files
+	r.GET("/robots.txt", func(c *gin.Context) {
+		c.File(filepath.Join(siteDir, "robots.txt"))
+	})
+	r.GET("/sitemap.xml", func(c *gin.Context) {
+		c.File(filepath.Join(siteDir, "sitemap.xml"))
+	})
+	r.GET("/favicon.ico", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	r.GET("/reviews", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "http://localhost:3000/reviews")
+	})
+
+	// Public Tilda pages
+	r.GET("/", serveHTML(siteDir, "main.html"))
+	r.GET("/main", serveHTML(siteDir, "main.html"))
+
+	r.GET("/about_services", serveHTML(siteDir, "about_services.html"))
+	r.GET("/available_services", serveHTML(siteDir, "available_services.html"))
+	r.GET("/contacts", serveHTML(siteDir, "contacts.html"))
+	r.GET("/docs", serveHTML(siteDir, "docs.html"))
+	r.GET("/employees", serveHTML(siteDir, "employees.html"))
+	r.GET("/fin_activities", serveHTML(siteDir, "fin_activities.html"))
+	r.GET("/history", serveHTML(siteDir, "history.html"))
+	r.GET("/how_to", serveHTML(siteDir, "how_to.html"))
+	r.GET("/internal_rules", serveHTML(siteDir, "internal_rules.html"))
+	r.GET("/mission", serveHTML(siteDir, "mission.html"))
+	r.GET("/quantity_of_services", serveHTML(siteDir, "quantity_of_services.html"))
+	r.GET("/rating", serveHTML(siteDir, "rating.html"))
+	r.GET("/social_service", serveHTML(siteDir, "social_service.html"))
+	r.GET("/structure", serveHTML(siteDir, "structure.html"))
+	r.GET("/vacancies", serveHTML(siteDir, "vacancies.html"))
+	r.GET("/want_to_help", serveHTML(siteDir, "want_to_help.html"))
 
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatal("Failed to start server:", err)
