@@ -50,4 +50,4 @@ Thumbs.db
 
 # === Directus ===
 directus_uploads/
-directus_extensions/
+directus_extensions/backups/
