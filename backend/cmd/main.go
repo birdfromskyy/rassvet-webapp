@@ -5,6 +5,7 @@ import (
 	"backend/internal/database"
 	"backend/internal/handlers"
 	"backend/internal/middleware"
+	"backend/internal/services"
 	"log"
 	"net/http"
 	"os"
@@ -63,6 +64,15 @@ func main() {
 	reviewHandler := handlers.NewReviewHandler(db)
 	adminHandler := handlers.NewAdminHandler(db)
 
+	subjectHandler := handlers.NewSubjectHandler(db)
+	roomHandler := handlers.NewRoomHandler(db)
+	studentHandler := handlers.NewStudentHandler(db)
+	teacherHandler := handlers.NewTeacherHandler(db)
+	assignmentHandler := handlers.NewAssignmentHandler(db)
+
+	scheduleGenerator := services.NewScheduleGenerator(db)
+	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
+
 	// Public API routes
 	r.POST("/api/register", authHandler.Register)
 	r.POST("/api/login", authHandler.Login)
@@ -90,12 +100,81 @@ func main() {
 		admin := protected.Group("/admin")
 		admin.Use(middleware.AdminMiddleware())
 		{
+			// Existing admin review routes
 			admin.GET("/reviews", adminHandler.GetAllReviews)
 			admin.GET("/reviews/pending", adminHandler.GetPendingReviews)
 			admin.PUT("/reviews/:id", adminHandler.UpdateReview)
 			admin.DELETE("/reviews/:id", adminHandler.DeleteReview)
 			admin.PUT("/reviews/:id/approve", adminHandler.ApproveReview)
 			admin.PUT("/reviews/:id/reject", adminHandler.RejectReview)
+
+			// Subjects
+			admin.GET("/subjects", subjectHandler.GetSubjects)
+			admin.GET("/subjects/:id", subjectHandler.GetSubjectByID)
+			admin.POST("/subjects", subjectHandler.CreateSubject)
+			admin.PUT("/subjects/:id", subjectHandler.UpdateSubject)
+			admin.DELETE("/subjects/:id", subjectHandler.DeleteSubject)
+
+			// Rooms
+			admin.GET("/rooms", roomHandler.GetRooms)
+			admin.GET("/rooms/:id", roomHandler.GetRoomByID)
+			admin.POST("/rooms", roomHandler.CreateRoom)
+			admin.PUT("/rooms/:id", roomHandler.UpdateRoom)
+			admin.DELETE("/rooms/:id", roomHandler.DeleteRoom)
+
+			admin.GET("/rooms/:id/subjects", roomHandler.GetRoomSubjects)
+			admin.PUT("/rooms/:id/subjects", roomHandler.UpdateRoomSubjects)
+
+			// Students
+			admin.GET("/students", studentHandler.GetStudents)
+			admin.GET("/students/:id", studentHandler.GetStudentByID)
+			admin.POST("/students", studentHandler.CreateStudent)
+			admin.PUT("/students/:id", studentHandler.UpdateStudent)
+			admin.DELETE("/students/:id", studentHandler.DeleteStudent)
+
+			admin.GET("/students/:id/availability", studentHandler.GetStudentAvailability)
+			admin.POST("/students/:id/availability", studentHandler.CreateStudentAvailability)
+			admin.PUT("/students/:id/availability/:availabilityId", studentHandler.UpdateStudentAvailability)
+			admin.DELETE("/students/:id/availability/:availabilityId", studentHandler.DeleteStudentAvailability)
+
+			// Teachers
+			admin.GET("/teachers", teacherHandler.GetTeachers)
+			admin.GET("/teachers/:id", teacherHandler.GetTeacherByID)
+			admin.POST("/teachers", teacherHandler.CreateTeacher)
+			admin.PUT("/teachers/:id", teacherHandler.UpdateTeacher)
+			admin.DELETE("/teachers/:id", teacherHandler.DeleteTeacher)
+
+			admin.GET("/teachers/:id/subjects", teacherHandler.GetTeacherSubjects)
+			admin.PUT("/teachers/:id/subjects", teacherHandler.UpdateTeacherSubjects)
+
+			admin.GET("/teachers/:id/availability", teacherHandler.GetTeacherAvailability)
+			admin.POST("/teachers/:id/availability", teacherHandler.CreateTeacherAvailability)
+			admin.PUT("/teachers/:id/availability/:availabilityId", teacherHandler.UpdateTeacherAvailability)
+			admin.DELETE("/teachers/:id/availability/:availabilityId", teacherHandler.DeleteTeacherAvailability)
+
+			// Assignments
+			admin.GET("/assignments", assignmentHandler.GetAssignments)
+			admin.GET("/assignments/:id", assignmentHandler.GetAssignmentByID)
+			admin.GET("/teachers/:id/assignments", assignmentHandler.GetTeacherAssignments)
+			admin.POST("/assignments", assignmentHandler.CreateAssignment)
+			admin.PUT("/assignments/:id", assignmentHandler.UpdateAssignment)
+			admin.DELETE("/assignments/:id", assignmentHandler.DeleteAssignment)
+
+			admin.GET("/assignment-week-overrides", assignmentHandler.GetAssignmentWeekOverrides)
+			admin.POST("/assignments/:id/weekly-override", assignmentHandler.CreateAssignmentWeekOverride)
+			admin.PUT("/assignments/:id/weekly-override/:overrideId", assignmentHandler.UpdateAssignmentWeekOverride)
+			admin.DELETE("/assignments/:id/weekly-override/:overrideId", assignmentHandler.DeleteAssignmentWeekOverride)
+
+			// Schedules
+			admin.GET("/schedules", scheduleHandler.GetScheduleByWeek)
+			admin.GET("/schedules/:id", scheduleHandler.GetScheduleByID)
+			admin.POST("/schedules/generate", scheduleHandler.GenerateSchedule)
+			admin.POST("/schedules/:id/approve", scheduleHandler.ApproveSchedule)
+			admin.POST("/schedules/:id/reset-auto", scheduleHandler.ResetAutoSchedule)
+
+			admin.POST("/schedules/:id/slots", scheduleHandler.CreateScheduleSlot)
+			admin.PUT("/schedules/:id/slots/:slotId", scheduleHandler.UpdateScheduleSlot)
+			admin.DELETE("/schedules/:id/slots/:slotId", scheduleHandler.DeleteScheduleSlot)
 		}
 	}
 
