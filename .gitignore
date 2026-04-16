@@ -8,6 +8,7 @@ frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
+CLAUDE.md
 
 # Скрипты с кредами
 directus-init.sh

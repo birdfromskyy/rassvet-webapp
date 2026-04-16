@@ -176,6 +176,14 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 		return
 	}
 
+	if !isActive {
+		if err := h.db.Model(&student).Update("is_active", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create student"})
+			return
+		}
+		student.IsActive = false
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Student created successfully",
 		"student": student,

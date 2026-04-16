@@ -119,6 +119,16 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 		return
 	}
 
+	// GORM uses DEFAULT for zero bool values even with Select() when field has gorm:"default:true".
+	// Explicitly update is_active to false if needed.
+	if !isActive {
+		if err := h.db.Model(&subject).Update("is_active", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subject"})
+			return
+		}
+		subject.IsActive = false
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Subject created successfully",
 		"subject": subject,

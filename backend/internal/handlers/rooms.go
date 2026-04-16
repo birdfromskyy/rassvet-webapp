@@ -123,6 +123,14 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 		return
 	}
 
+	if !isActive {
+		if err := h.db.Model(&room).Update("is_active", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
+			return
+		}
+		room.IsActive = false
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Room created successfully",
 		"room":    room,

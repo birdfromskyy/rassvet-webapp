@@ -123,6 +123,14 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 		return
 	}
 
+	if !isActive {
+		if err := h.db.Model(&teacher).Update("is_active", false).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher"})
+			return
+		}
+		teacher.IsActive = false
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Teacher created successfully",
 		"teacher": teacher,
