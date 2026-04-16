@@ -118,7 +118,7 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 		Notes:    normalizeOptionalString(req.Notes),
 	}
 
-	if err := h.db.Create(&teacher).Error; err != nil {
+	if err := h.db.Select("FullName", "Phone", "IsActive", "Notes").Create(&teacher).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher"})
 		return
 	}
@@ -184,7 +184,7 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 	})
 }
 
-func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
+func (h *TeacherHandler) DeactivateTeacher(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
@@ -212,6 +212,35 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 		"message": "Teacher deactivated successfully",
 		"teacher": teacher,
 	})
+}
+
+func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.First(&teacher, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		return
+	}
+
+	if err := h.db.Delete(&teacher).Error; err != nil {
+		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить преподавателя: есть связанные назначения или слоты. Сначала деактивируйте."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete teacher"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Teacher deleted successfully"})
 }
 
 func (h *TeacherHandler) GetTeacherSubjects(c *gin.Context) {

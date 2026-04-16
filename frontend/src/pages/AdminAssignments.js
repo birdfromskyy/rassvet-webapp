@@ -29,10 +29,12 @@ import {
 import {
 	Add as AddIcon,
 	Edit as EditIcon,
-	Delete as DeleteIcon,
 	ArrowBack as BackIcon,
 	FilterList as FilterIcon,
+	Pause as PauseIcon,
+	PlayArrow as PlayIcon,
 } from '@mui/icons-material'
+import Tooltip from '@mui/material/Tooltip'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
 
@@ -70,15 +72,16 @@ const AdminAssignments = () => {
 
 	const loadAll = async () => {
 		try {
-			const [studentsData, teachersData, subjectsData] = await Promise.all([
-				scheduleService.getStudents(),
-				scheduleService.getTeachers(),
-				scheduleService.getSubjects(),
-			])
+			const [studentsData, teachersData, subjectsData, assignmentsData] =
+				await Promise.all([
+					scheduleService.getStudents(),
+					scheduleService.getTeachers(),
+					scheduleService.getSubjects(),
+					scheduleService.getAssignments(),
+				])
 			setStudents(studentsData)
 			setTeachers(teachersData)
 			setSubjects(subjectsData)
-			const assignmentsData = await scheduleService.getAssignments()
 			setAssignments(assignmentsData)
 		} catch {
 			toast.error('Ошибка загрузки данных')
@@ -150,18 +153,23 @@ const AdminAssignments = () => {
 		}
 	}
 
-	const removeAssignment = async id => {
-		if (!window.confirm('Удалить назначение?')) return
+	const toggleAssignmentStatus = async a => {
+		const newStatus = a.status === 'active' ? 'paused' : 'active'
 		try {
-			await scheduleService.deleteAssignment(id)
-			toast.success('Назначение удалено')
+			await scheduleService.updateAssignment(a.id, { status: newStatus })
+			toast.success(
+				newStatus === 'paused'
+					? 'Назначение приостановлено'
+					: 'Назначение возобновлено',
+			)
 			loadAssignments()
 		} catch {
-			toast.error('Ошибка удаления')
+			toast.error('Ошибка изменения статуса')
 		}
 	}
 
-	const findName = (arr, id, field) => arr.find(x => x.id === id)?.[field] || '—'
+	const findName = (arr, id, field) =>
+		arr.find(x => x.id === id)?.[field] || '—'
 
 	return (
 		<Container maxWidth='xl' sx={{ mt: 4 }}>
@@ -320,12 +328,8 @@ const AdminAssignments = () => {
 										<TableCell>{a.duration_min} мин</TableCell>
 										<TableCell>
 											<Chip
-												label={
-													a.status === 'active' ? 'Активен' : 'Пауза'
-												}
-												color={
-													a.status === 'active' ? 'success' : 'warning'
-												}
+												label={a.status === 'active' ? 'Активен' : 'Пауза'}
+												color={a.status === 'active' ? 'success' : 'warning'}
 												size='small'
 											/>
 										</TableCell>
@@ -337,14 +341,21 @@ const AdminAssignments = () => {
 											>
 												<EditIcon />
 											</IconButton>
-											<IconButton
-												onClick={() => removeAssignment(a.id)}
-												size='small'
-												color='error'
-												title='Удалить'
+											<Tooltip
+												title={
+													a.status === 'active'
+														? 'Приостановить'
+														: 'Возобновить'
+												}
 											>
-												<DeleteIcon />
-											</IconButton>
+												<IconButton
+													onClick={() => toggleAssignmentStatus(a)}
+													size='small'
+													color={a.status === 'active' ? 'warning' : 'success'}
+												>
+													{a.status === 'active' ? <PauseIcon /> : <PlayIcon />}
+												</IconButton>
+											</Tooltip>
 										</TableCell>
 									</TableRow>
 								))}
@@ -364,7 +375,12 @@ const AdminAssignments = () => {
 			</Paper>
 
 			{/* Edit Dialog */}
-			<Dialog open={editDialog.open} onClose={closeEdit} maxWidth='sm' fullWidth>
+			<Dialog
+				open={editDialog.open}
+				onClose={closeEdit}
+				maxWidth='sm'
+				fullWidth
+			>
 				<DialogTitle>
 					{editDialog.item ? 'Редактировать назначение' : 'Новое назначение'}
 				</DialogTitle>
@@ -375,17 +391,14 @@ const AdminAssignments = () => {
 							<Select
 								value={form.student_id}
 								label='Ученик'
-								onChange={e =>
-									setForm({ ...form, student_id: e.target.value })
-								}
+								onChange={e => setForm({ ...form, student_id: e.target.value })}
 							>
-								{students
-									.filter(s => s.is_active)
-									.map(s => (
-										<MenuItem key={s.id} value={s.id}>
-											{s.full_name}
-										</MenuItem>
-									))}
+								{students.map(s => (
+									<MenuItem key={s.id} value={s.id}>
+										{s.full_name}
+										{!s.is_active ? ' (неактивен)' : ''}
+									</MenuItem>
+								))}
 							</Select>
 						</FormControl>
 						<FormControl fullWidth required>
@@ -393,17 +406,14 @@ const AdminAssignments = () => {
 							<Select
 								value={form.teacher_id}
 								label='Преподаватель'
-								onChange={e =>
-									setForm({ ...form, teacher_id: e.target.value })
-								}
+								onChange={e => setForm({ ...form, teacher_id: e.target.value })}
 							>
-								{teachers
-									.filter(t => t.is_active)
-									.map(t => (
-										<MenuItem key={t.id} value={t.id}>
-											{t.full_name}
-										</MenuItem>
-									))}
+								{teachers.map(t => (
+									<MenuItem key={t.id} value={t.id}>
+										{t.full_name}
+										{!t.is_active ? ' (неактивен)' : ''}
+									</MenuItem>
+								))}
 							</Select>
 						</FormControl>
 						<FormControl fullWidth required>
@@ -411,17 +421,14 @@ const AdminAssignments = () => {
 							<Select
 								value={form.subject_id}
 								label='Предмет'
-								onChange={e =>
-									setForm({ ...form, subject_id: e.target.value })
-								}
+								onChange={e => setForm({ ...form, subject_id: e.target.value })}
 							>
-								{subjects
-									.filter(s => s.is_active)
-									.map(s => (
-										<MenuItem key={s.id} value={s.id}>
-											{s.name}
-										</MenuItem>
-									))}
+								{subjects.map(s => (
+									<MenuItem key={s.id} value={s.id}>
+										{s.name}
+										{!s.is_active ? ' (неактивен)' : ''}
+									</MenuItem>
+								))}
 							</Select>
 						</FormControl>
 						<FormControl fullWidth>

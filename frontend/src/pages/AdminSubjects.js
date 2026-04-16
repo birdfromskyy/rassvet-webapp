@@ -31,6 +31,7 @@ import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
+	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
@@ -95,14 +96,25 @@ const AdminSubjects = () => {
 		}
 	}
 
-	const remove = async id => {
+	const deactivate = async id => {
 		if (!window.confirm('Деактивировать предмет?')) return
 		try {
-			await scheduleService.deleteSubject(id)
+			await scheduleService.deactivateSubject(id)
 			toast.success('Предмет деактивирован')
 			load()
 		} catch {
 			toast.error('Ошибка деактивации')
+		}
+	}
+
+	const remove = async id => {
+		if (!window.confirm('Удалить предмет безвозвратно?')) return
+		try {
+			await scheduleService.deleteSubject(id)
+			toast.success('Предмет удалён')
+			load()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления')
 		}
 	}
 
@@ -171,10 +183,18 @@ const AdminSubjects = () => {
 												<EditIcon />
 											</IconButton>
 											<IconButton
+												onClick={() => deactivate(s.id)}
+												color='warning'
+												size='small'
+												title='Деактивировать'
+											>
+												<DeactivateIcon />
+											</IconButton>
+											<IconButton
 												onClick={() => remove(s.id)}
 												color='error'
 												size='small'
-												title='Деактивировать'
+												title='Удалить'
 											>
 												<DeleteIcon />
 											</IconButton>

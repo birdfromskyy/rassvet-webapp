@@ -32,6 +32,7 @@ import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
+	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 	AccessTime as AvailIcon,
 } from '@mui/icons-material'
@@ -132,14 +133,25 @@ const AdminStudents = () => {
 		}
 	}
 
-	const removeStudent = async id => {
+	const deactivateStudent = async id => {
 		if (!window.confirm('Деактивировать ученика?')) return
 		try {
-			await scheduleService.deleteStudent(id)
+			await scheduleService.deactivateStudent(id)
 			toast.success('Ученик деактивирован')
 			load()
 		} catch {
 			toast.error('Ошибка деактивации')
+		}
+	}
+
+	const removeStudent = async id => {
+		if (!window.confirm('Удалить ученика безвозвратно?')) return
+		try {
+			await scheduleService.deleteStudent(id)
+			toast.success('Ученик удалён')
+			load()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления')
 		}
 	}
 
@@ -267,9 +279,7 @@ const AdminStudents = () => {
 										<TableCell>{s.parent_phone || '—'}</TableCell>
 										<TableCell>
 											<Chip
-												label={
-													s.funding_type === 'paid' ? 'Платный' : 'Бюджет'
-												}
+												label={s.funding_type === 'paid' ? 'Платный' : 'Бюджет'}
 												color={s.funding_type === 'paid' ? 'primary' : 'info'}
 												size='small'
 											/>
@@ -298,10 +308,18 @@ const AdminStudents = () => {
 												<AvailIcon />
 											</IconButton>
 											<IconButton
+												onClick={() => deactivateStudent(s.id)}
+												size='small'
+												color='warning'
+												title='Деактивировать'
+											>
+												<DeactivateIcon />
+											</IconButton>
+											<IconButton
 												onClick={() => removeStudent(s.id)}
 												size='small'
 												color='error'
-												title='Деактивировать'
+												title='Удалить'
 											>
 												<DeleteIcon />
 											</IconButton>
@@ -324,7 +342,12 @@ const AdminStudents = () => {
 			</Paper>
 
 			{/* Edit Dialog */}
-			<Dialog open={editDialog.open} onClose={closeEdit} maxWidth='sm' fullWidth>
+			<Dialog
+				open={editDialog.open}
+				onClose={closeEdit}
+				maxWidth='sm'
+				fullWidth
+			>
 				<DialogTitle>
 					{editDialog.item ? 'Редактировать ученика' : 'Новый ученик'}
 				</DialogTitle>
@@ -340,9 +363,7 @@ const AdminStudents = () => {
 						<TextField
 							label='Телефон родителя'
 							value={form.parent_phone}
-							onChange={e =>
-								setForm({ ...form, parent_phone: e.target.value })
-							}
+							onChange={e => setForm({ ...form, parent_phone: e.target.value })}
 							fullWidth
 						/>
 						<FormControl fullWidth>
@@ -409,10 +430,7 @@ const AdminStudents = () => {
 								</TableHead>
 								<TableBody>
 									{availList.map(a => (
-										<TableRow
-											key={a.id}
-											selected={availEditId === a.id}
-										>
+										<TableRow key={a.id} selected={availEditId === a.id}>
 											<TableCell>{WEEKDAY_FULL[a.weekday]}</TableCell>
 											<TableCell>{a.start_time}</TableCell>
 											<TableCell>{a.end_time}</TableCell>
@@ -448,12 +466,7 @@ const AdminStudents = () => {
 							{availEditId ? 'Редактировать окно' : 'Добавить окно'}
 						</Typography>
 
-						<Box
-							display='flex'
-							gap={2}
-							alignItems='flex-end'
-							flexWrap='wrap'
-						>
+						<Box display='flex' gap={2} alignItems='flex-end' flexWrap='wrap'>
 							<FormControl sx={{ minWidth: 160 }}>
 								<InputLabel>День недели</InputLabel>
 								<Select

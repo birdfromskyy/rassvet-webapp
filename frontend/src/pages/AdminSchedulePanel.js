@@ -86,7 +86,10 @@ const AdminSchedulePanel = () => {
 							Автоматическое формирование расписания занятий
 						</Typography>
 					</Box>
-					<Button startIcon={<BackIcon />} onClick={() => navigate('/dashboard')}>
+					<Button
+						startIcon={<BackIcon />}
+						onClick={() => navigate('/dashboard')}
+					>
 						На главную
 					</Button>
 				</Box>

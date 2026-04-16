@@ -34,6 +34,7 @@ import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
+	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 	School as SubjectsIcon,
 } from '@mui/icons-material'
@@ -142,14 +143,25 @@ const AdminRooms = () => {
 		}
 	}
 
-	const removeRoom = async id => {
+	const deactivateRoom = async id => {
 		if (!window.confirm('Деактивировать кабинет?')) return
 		try {
-			await scheduleService.deleteRoom(id)
+			await scheduleService.deactivateRoom(id)
 			toast.success('Кабинет деактивирован')
 			loadAll()
 		} catch {
 			toast.error('Ошибка деактивации')
+		}
+	}
+
+	const removeRoom = async id => {
+		if (!window.confirm('Удалить кабинет безвозвратно?')) return
+		try {
+			await scheduleService.deleteRoom(id)
+			toast.success('Кабинет удалён')
+			loadAll()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления')
 		}
 	}
 
@@ -226,10 +238,18 @@ const AdminRooms = () => {
 												<SubjectsIcon />
 											</IconButton>
 											<IconButton
+												onClick={() => deactivateRoom(r.id)}
+												size='small'
+												color='warning'
+												title='Деактивировать'
+											>
+												<DeactivateIcon />
+											</IconButton>
+											<IconButton
 												onClick={() => removeRoom(r.id)}
 												size='small'
 												color='error'
-												title='Деактивировать'
+												title='Удалить'
 											>
 												<DeleteIcon />
 											</IconButton>
@@ -252,7 +272,12 @@ const AdminRooms = () => {
 			</Paper>
 
 			{/* Edit Dialog */}
-			<Dialog open={editDialog.open} onClose={closeEdit} maxWidth='sm' fullWidth>
+			<Dialog
+				open={editDialog.open}
+				onClose={closeEdit}
+				maxWidth='sm'
+				fullWidth
+			>
 				<DialogTitle>
 					{editDialog.item ? 'Редактировать кабинет' : 'Новый кабинет'}
 				</DialogTitle>
@@ -321,9 +346,7 @@ const AdminRooms = () => {
 										{selected.map(id => (
 											<Chip
 												key={id}
-												label={
-													allSubjects.find(s => s.id === id)?.name || id
-												}
+												label={allSubjects.find(s => s.id === id)?.name || id}
 												size='small'
 											/>
 										))}
@@ -334,9 +357,7 @@ const AdminRooms = () => {
 									.filter(s => s.is_active)
 									.map(s => (
 										<MenuItem key={s.id} value={s.id}>
-											<Checkbox
-												checked={selectedSubjectIds.includes(s.id)}
-											/>
+											<Checkbox checked={selectedSubjectIds.includes(s.id)} />
 											<ListItemText primary={s.name} />
 										</MenuItem>
 									))}

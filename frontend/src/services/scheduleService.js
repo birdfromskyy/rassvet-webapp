@@ -14,6 +14,9 @@ const scheduleService = {
 		const r = await api.put(`/admin/subjects/${id}`, data)
 		return r.data.subject
 	},
+	deactivateSubject: async id => {
+		await api.patch(`/admin/subjects/${id}/deactivate`)
+	},
 	deleteSubject: async id => {
 		await api.delete(`/admin/subjects/${id}`)
 	},
@@ -30,6 +33,9 @@ const scheduleService = {
 	updateTeacher: async (id, data) => {
 		const r = await api.put(`/admin/teachers/${id}`, data)
 		return r.data.teacher
+	},
+	deactivateTeacher: async id => {
+		await api.patch(`/admin/teachers/${id}/deactivate`)
 	},
 	deleteTeacher: async id => {
 		await api.delete(`/admin/teachers/${id}`)
@@ -76,6 +82,9 @@ const scheduleService = {
 		const r = await api.put(`/admin/rooms/${id}`, data)
 		return r.data.room
 	},
+	deactivateRoom: async id => {
+		await api.patch(`/admin/rooms/${id}/deactivate`)
+	},
 	deleteRoom: async id => {
 		await api.delete(`/admin/rooms/${id}`)
 	},
@@ -102,6 +111,9 @@ const scheduleService = {
 	updateStudent: async (id, data) => {
 		const r = await api.put(`/admin/students/${id}`, data)
 		return r.data.student
+	},
+	deactivateStudent: async id => {
+		await api.patch(`/admin/students/${id}/deactivate`)
 	},
 	deleteStudent: async id => {
 		await api.delete(`/admin/students/${id}`)

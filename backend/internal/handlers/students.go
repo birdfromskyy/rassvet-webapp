@@ -171,7 +171,7 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 		Notes:       normalizeOptionalString(req.Notes),
 	}
 
-	if err := h.db.Create(&student).Error; err != nil {
+	if err := h.db.Select("FullName", "ParentPhone", "FundingType", "IsActive", "Notes").Create(&student).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create student"})
 		return
 	}
@@ -245,7 +245,7 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 	})
 }
 
-func (h *StudentHandler) DeleteStudent(c *gin.Context) {
+func (h *StudentHandler) DeactivateStudent(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
@@ -273,6 +273,35 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 		"message": "Student deactivated successfully",
 		"student": student,
 	})
+}
+
+func (h *StudentHandler) DeleteStudent(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+		return
+	}
+
+	var student models.Student
+	if err := h.db.First(&student, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch student"})
+		return
+	}
+
+	if err := h.db.Delete(&student).Error; err != nil {
+		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить ученика: есть связанные назначения или слоты. Сначала деактивируйте."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete student"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
 }
 
 func (h *StudentHandler) GetStudentAvailability(c *gin.Context) {

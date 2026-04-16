@@ -54,9 +54,21 @@ const WEEKDAY_NAMES = {
 	6: 'Суббота',
 }
 
-const STATUS_COLORS = { draft: 'warning', approved: 'success', archived: 'default' }
-const STATUS_LABELS = { draft: 'Черновик', approved: 'Утверждено', archived: 'Архив' }
-const SLOT_STATUS_COLORS = { scheduled: 'success', moved: 'warning', cancelled: 'error' }
+const STATUS_COLORS = {
+	draft: 'warning',
+	approved: 'success',
+	archived: 'default',
+}
+const STATUS_LABELS = {
+	draft: 'Черновик',
+	approved: 'Утверждено',
+	archived: 'Архив',
+}
+const SLOT_STATUS_COLORS = {
+	scheduled: 'success',
+	moved: 'warning',
+	cancelled: 'error',
+}
 const SLOT_STATUS_LABELS = {
 	scheduled: 'Запланировано',
 	moved: 'Перенесено',
@@ -104,10 +116,16 @@ const AdminSchedule = () => {
 	const [loading, setLoading] = useState(false)
 	const [generating, setGenerating] = useState(false)
 
-	// Reference data for dialogs
+	// Reference data for dialogs and filters
 	const [assignments, setAssignments] = useState([])
 	const [rooms, setRooms] = useState([])
+	const [students, setStudents] = useState([])
+	const [teachers, setTeachers] = useState([])
 	const [refLoaded, setRefLoaded] = useState(false)
+
+	// Slot filters
+	const [filterStudentId, setFilterStudentId] = useState('')
+	const [filterTeacherId, setFilterTeacherId] = useState('')
 
 	// Create slot dialog
 	const [createDialog, setCreateDialog] = useState(false)
@@ -145,10 +163,14 @@ const AdminSchedule = () => {
 		Promise.all([
 			scheduleService.getAssignments({ status: 'active' }),
 			scheduleService.getRooms(),
+			scheduleService.getStudents(),
+			scheduleService.getTeachers(),
 		])
-			.then(([aData, rData]) => {
+			.then(([aData, rData, sData, tData]) => {
 				setAssignments(aData)
 				setRooms(rData.filter(r => r.is_active))
+				setStudents(sData)
+				setTeachers(tData)
 				setRefLoaded(true)
 			})
 			.catch(() => toast.error('Ошибка загрузки справочников'))
@@ -290,10 +312,14 @@ const AdminSchedule = () => {
 		}
 	}
 
-	// Group slots by weekday
+	// Group slots by weekday (with optional student/teacher filter)
 	const slotsByDay = {}
 	if (scheduleData?.slots) {
 		for (const slot of scheduleData.slots) {
+			if (filterStudentId && slot.student_id !== Number(filterStudentId))
+				continue
+			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId))
+				continue
 			if (!slotsByDay[slot.weekday]) slotsByDay[slot.weekday] = []
 			slotsByDay[slot.weekday].push(slot)
 		}
@@ -348,13 +374,7 @@ const AdminSchedule = () => {
 				</Box>
 
 				{/* Action bar */}
-				<Box
-					display='flex'
-					alignItems='center'
-					gap={2}
-					mb={3}
-					flexWrap='wrap'
-				>
+				<Box display='flex' alignItems='center' gap={2} mb={3} flexWrap='wrap'>
 					{schedule && (
 						<Chip
 							label={STATUS_LABELS[schedule.status] || schedule.status}
@@ -405,6 +425,60 @@ const AdminSchedule = () => {
 						</Button>
 					)}
 				</Box>
+
+				{/* Slot filters */}
+				{schedule && (
+					<Paper variant='outlined' sx={{ p: 2, mb: 3 }}>
+						<Grid container spacing={2} alignItems='center'>
+							<Grid item xs={12} sm={4}>
+								<FormControl fullWidth size='small'>
+									<InputLabel>Фильтр по ученику</InputLabel>
+									<Select
+										value={filterStudentId}
+										label='Фильтр по ученику'
+										onChange={e => setFilterStudentId(e.target.value)}
+									>
+										<MenuItem value=''>Все ученики</MenuItem>
+										{students.map(s => (
+											<MenuItem key={s.id} value={s.id}>
+												{s.full_name}
+											</MenuItem>
+										))}
+									</Select>
+								</FormControl>
+							</Grid>
+							<Grid item xs={12} sm={4}>
+								<FormControl fullWidth size='small'>
+									<InputLabel>Фильтр по преподавателю</InputLabel>
+									<Select
+										value={filterTeacherId}
+										label='Фильтр по преподавателю'
+										onChange={e => setFilterTeacherId(e.target.value)}
+									>
+										<MenuItem value=''>Все преподаватели</MenuItem>
+										{teachers.map(t => (
+											<MenuItem key={t.id} value={t.id}>
+												{t.full_name}
+											</MenuItem>
+										))}
+									</Select>
+								</FormControl>
+							</Grid>
+							<Grid item xs={12} sm={4}>
+								<Button
+									size='small'
+									onClick={() => {
+										setFilterStudentId('')
+										setFilterTeacherId('')
+									}}
+									disabled={!filterStudentId && !filterTeacherId}
+								>
+									Сбросить фильтры
+								</Button>
+							</Grid>
+						</Grid>
+					</Paper>
+				)}
 
 				{/* Stats */}
 				{stats && (
@@ -505,13 +579,9 @@ const AdminSchedule = () => {
 													</TableCell>
 													<TableCell>
 														<Chip
-															label={
-																slot.origin === 'auto' ? 'Авто' : 'Ручной'
-															}
+															label={slot.origin === 'auto' ? 'Авто' : 'Ручной'}
 															color={
-																slot.origin === 'auto'
-																	? 'secondary'
-																	: 'primary'
+																slot.origin === 'auto' ? 'secondary' : 'primary'
 															}
 															size='small'
 															variant='outlined'
@@ -520,8 +590,7 @@ const AdminSchedule = () => {
 													<TableCell>
 														<Chip
 															label={
-																SLOT_STATUS_LABELS[slot.status] ||
-																slot.status
+																SLOT_STATUS_LABELS[slot.status] || slot.status
 															}
 															color={
 																SLOT_STATUS_COLORS[slot.status] || 'default'
@@ -780,9 +849,7 @@ const AdminSchedule = () => {
 					</Box>
 				</DialogContent>
 				<DialogActions>
-					<Button
-						onClick={() => setEditDialog({ open: false, slot: null })}
-					>
+					<Button onClick={() => setEditDialog({ open: false, slot: null })}>
 						Отмена
 					</Button>
 					<Button onClick={saveEditSlot} variant='contained'>

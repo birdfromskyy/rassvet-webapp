@@ -114,7 +114,7 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 		IsActive:           isActive,
 	}
 
-	if err := h.db.Create(&subject).Error; err != nil {
+	if err := h.db.Select("Name", "DefaultDurationMin", "IsActive").Create(&subject).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subject"})
 		return
 	}
@@ -190,6 +190,36 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 	})
 }
 
+func (h *SubjectHandler) DeactivateSubject(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject id"})
+		return
+	}
+
+	var subject models.Subject
+	if err := h.db.First(&subject, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Subject not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subject"})
+		return
+	}
+
+	subject.IsActive = false
+
+	if err := h.db.Save(&subject).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deactivate subject"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Subject deactivated successfully",
+		"subject": subject,
+	})
+}
+
 func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
@@ -207,16 +237,14 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		return
 	}
 
-	// Мягкое удаление через деактивацию
-	subject.IsActive = false
-
-	if err := h.db.Save(&subject).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deactivate subject"})
+	if err := h.db.Delete(&subject).Error; err != nil {
+		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть связанные назначения. Сначала деактивируйте."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete subject"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Subject deactivated successfully",
-		"subject": subject,
-	})
+	c.JSON(http.StatusOK, gin.H{"message": "Subject deleted successfully"})
 }

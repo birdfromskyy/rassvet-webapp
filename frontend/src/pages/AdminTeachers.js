@@ -35,6 +35,7 @@ import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
+	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 	School as SubjectsIcon,
 	AccessTime as AvailIcon,
@@ -146,14 +147,25 @@ const AdminTeachers = () => {
 		}
 	}
 
-	const removeTeacher = async id => {
+	const deactivateTeacher = async id => {
 		if (!window.confirm('Деактивировать преподавателя?')) return
 		try {
-			await scheduleService.deleteTeacher(id)
+			await scheduleService.deactivateTeacher(id)
 			toast.success('Преподаватель деактивирован')
 			loadAll()
 		} catch {
 			toast.error('Ошибка деактивации')
+		}
+	}
+
+	const removeTeacher = async id => {
+		if (!window.confirm('Удалить преподавателя безвозвратно?')) return
+		try {
+			await scheduleService.deleteTeacher(id)
+			toast.success('Преподаватель удалён')
+			loadAll()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления')
 		}
 	}
 
@@ -336,10 +348,18 @@ const AdminTeachers = () => {
 												<AvailIcon />
 											</IconButton>
 											<IconButton
+												onClick={() => deactivateTeacher(t.id)}
+												size='small'
+												color='warning'
+												title='Деактивировать'
+											>
+												<DeactivateIcon />
+											</IconButton>
+											<IconButton
 												onClick={() => removeTeacher(t.id)}
 												size='small'
 												color='error'
-												title='Деактивировать'
+												title='Удалить'
 											>
 												<DeleteIcon />
 											</IconButton>
@@ -362,7 +382,12 @@ const AdminTeachers = () => {
 			</Paper>
 
 			{/* Edit Dialog */}
-			<Dialog open={editDialog.open} onClose={closeEdit} maxWidth='sm' fullWidth>
+			<Dialog
+				open={editDialog.open}
+				onClose={closeEdit}
+				maxWidth='sm'
+				fullWidth
+			>
 				<DialogTitle>
 					{editDialog.item
 						? 'Редактировать преподавателя'
@@ -419,9 +444,7 @@ const AdminTeachers = () => {
 				maxWidth='sm'
 				fullWidth
 			>
-				<DialogTitle>
-					Предметы: {subjectsDialog.teacher?.full_name}
-				</DialogTitle>
+				<DialogTitle>Предметы: {subjectsDialog.teacher?.full_name}</DialogTitle>
 				<DialogContent>
 					<Box sx={{ mt: 1 }}>
 						<Typography variant='body2' color='text.secondary' gutterBottom>
@@ -439,9 +462,7 @@ const AdminTeachers = () => {
 										{selected.map(id => (
 											<Chip
 												key={id}
-												label={
-													allSubjects.find(s => s.id === id)?.name || id
-												}
+												label={allSubjects.find(s => s.id === id)?.name || id}
 												size='small'
 											/>
 										))}
@@ -452,9 +473,7 @@ const AdminTeachers = () => {
 									.filter(s => s.is_active)
 									.map(s => (
 										<MenuItem key={s.id} value={s.id}>
-											<Checkbox
-												checked={selectedSubjectIds.includes(s.id)}
-											/>
+											<Checkbox checked={selectedSubjectIds.includes(s.id)} />
 											<ListItemText primary={s.name} />
 										</MenuItem>
 									))}
@@ -494,10 +513,7 @@ const AdminTeachers = () => {
 								</TableHead>
 								<TableBody>
 									{availList.map(a => (
-										<TableRow
-											key={a.id}
-											selected={availEditId === a.id}
-										>
+										<TableRow key={a.id} selected={availEditId === a.id}>
 											<TableCell>{WEEKDAY_FULL[a.weekday]}</TableCell>
 											<TableCell>{a.start_time}</TableCell>
 											<TableCell>{a.end_time}</TableCell>
@@ -533,12 +549,7 @@ const AdminTeachers = () => {
 							{availEditId ? 'Редактировать окно' : 'Добавить окно'}
 						</Typography>
 
-						<Box
-							display='flex'
-							gap={2}
-							alignItems='flex-end'
-							flexWrap='wrap'
-						>
+						<Box display='flex' gap={2} alignItems='flex-end' flexWrap='wrap'>
 							<FormControl sx={{ minWidth: 160 }}>
 								<InputLabel>День недели</InputLabel>
 								<Select

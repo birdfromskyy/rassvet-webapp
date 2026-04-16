@@ -118,7 +118,7 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 		Notes:    notes,
 	}
 
-	if err := h.db.Create(&room).Error; err != nil {
+	if err := h.db.Select("Name", "IsActive", "Notes").Create(&room).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
 		return
 	}
@@ -191,7 +191,7 @@ func (h *RoomHandler) UpdateRoom(c *gin.Context) {
 	})
 }
 
-func (h *RoomHandler) DeleteRoom(c *gin.Context) {
+func (h *RoomHandler) DeactivateRoom(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid room id"})
@@ -219,6 +219,35 @@ func (h *RoomHandler) DeleteRoom(c *gin.Context) {
 		"message": "Room deactivated successfully",
 		"room":    room,
 	})
+}
+
+func (h *RoomHandler) DeleteRoom(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid room id"})
+		return
+	}
+
+	var room models.Room
+	if err := h.db.First(&room, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch room"})
+		return
+	}
+
+	if err := h.db.Delete(&room).Error; err != nil {
+		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить кабинет: есть связанные слоты расписания. Сначала деактивируйте."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete room"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Room deleted successfully"})
 }
 
 func (h *RoomHandler) GetRoomSubjects(c *gin.Context) {

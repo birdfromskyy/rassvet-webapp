@@ -207,7 +207,9 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 		Preload("Student").
 		Preload("Teacher").
 		Preload("Subject").
-		Where("status = ?", models.AssignmentStatusActive).
+		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
+		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
+		Where("assignments.status = ?", models.AssignmentStatusActive).
 		Find(&assignments).Error; err != nil {
 		return nil, fmt.Errorf("failed to load assignments: %w", err)
 	}

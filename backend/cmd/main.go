@@ -53,7 +53,7 @@ func main() {
 	// CORS configuration
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
@@ -113,6 +113,7 @@ func main() {
 			admin.GET("/subjects/:id", subjectHandler.GetSubjectByID)
 			admin.POST("/subjects", subjectHandler.CreateSubject)
 			admin.PUT("/subjects/:id", subjectHandler.UpdateSubject)
+			admin.PATCH("/subjects/:id/deactivate", subjectHandler.DeactivateSubject)
 			admin.DELETE("/subjects/:id", subjectHandler.DeleteSubject)
 
 			// Rooms
@@ -120,6 +121,7 @@ func main() {
 			admin.GET("/rooms/:id", roomHandler.GetRoomByID)
 			admin.POST("/rooms", roomHandler.CreateRoom)
 			admin.PUT("/rooms/:id", roomHandler.UpdateRoom)
+			admin.PATCH("/rooms/:id/deactivate", roomHandler.DeactivateRoom)
 			admin.DELETE("/rooms/:id", roomHandler.DeleteRoom)
 
 			admin.GET("/rooms/:id/subjects", roomHandler.GetRoomSubjects)
@@ -130,6 +132,7 @@ func main() {
 			admin.GET("/students/:id", studentHandler.GetStudentByID)
 			admin.POST("/students", studentHandler.CreateStudent)
 			admin.PUT("/students/:id", studentHandler.UpdateStudent)
+			admin.PATCH("/students/:id/deactivate", studentHandler.DeactivateStudent)
 			admin.DELETE("/students/:id", studentHandler.DeleteStudent)
 
 			admin.GET("/students/:id/availability", studentHandler.GetStudentAvailability)
@@ -142,6 +145,7 @@ func main() {
 			admin.GET("/teachers/:id", teacherHandler.GetTeacherByID)
 			admin.POST("/teachers", teacherHandler.CreateTeacher)
 			admin.PUT("/teachers/:id", teacherHandler.UpdateTeacher)
+			admin.PATCH("/teachers/:id/deactivate", teacherHandler.DeactivateTeacher)
 			admin.DELETE("/teachers/:id", teacherHandler.DeleteTeacher)
 
 			admin.GET("/teachers/:id/subjects", teacherHandler.GetTeacherSubjects)
