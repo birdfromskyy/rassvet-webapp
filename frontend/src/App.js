@@ -14,6 +14,13 @@ import PendingReviews from './pages/PendingReviews'
 import News from './pages/News'
 import NewsDetail from './pages/NewsDetail'
 import AdminNews from './pages/AdminNews'
+import AdminSchedulePanel from './pages/AdminSchedulePanel'
+import AdminSubjects from './pages/AdminSubjects'
+import AdminTeachers from './pages/AdminTeachers'
+import AdminStudents from './pages/AdminStudents'
+import AdminRooms from './pages/AdminRooms'
+import AdminAssignments from './pages/AdminAssignments'
+import AdminSchedule from './pages/AdminSchedule'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword'
@@ -123,6 +130,13 @@ function App() {
 						<Route path='/admin/reviews' element={<AdminReviews />} />
 						<Route path='/admin/pending-reviews' element={<PendingReviews />} />
 						<Route path='/admin/news' element={<AdminNews />} />
+						<Route path='/admin/schedule' element={<AdminSchedulePanel />} />
+						<Route path='/admin/schedule/subjects' element={<AdminSubjects />} />
+						<Route path='/admin/schedule/teachers' element={<AdminTeachers />} />
+						<Route path='/admin/schedule/students' element={<AdminStudents />} />
+						<Route path='/admin/schedule/rooms' element={<AdminRooms />} />
+						<Route path='/admin/schedule/assignments' element={<AdminAssignments />} />
+						<Route path='/admin/schedule/weekly' element={<AdminSchedule />} />
 					</Route>
 				</Route>
 
