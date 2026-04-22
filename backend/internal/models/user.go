@@ -39,12 +39,3 @@ type VerificationCode struct {
 	Used      bool      `gorm:"default:false"`
 }
 
-type PasswordResetCode struct {
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	Email     string    `gorm:"not null"`
-	Code      string    `gorm:"not null"`
-	ExpiresAt time.Time `gorm:"not null"`
-	Used      bool      `gorm:"default:false"`
-	Attempts  int       `gorm:"default:0"`
-}

@@ -36,7 +36,6 @@ func Migrate(db *gorm.DB) {
 		&models.User{},
 		&models.Review{},
 		&models.VerificationCode{},
-		&models.PasswordResetCode{},
 
 		// Schedule module models
 		&models.Subject{},

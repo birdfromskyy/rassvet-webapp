@@ -34,6 +34,11 @@ type PendingRegistration struct {
 	Code         string `json:"code"`
 }
 
+type PendingPasswordReset struct {
+	Code     string `json:"code"`
+	Attempts int    `json:"attempts"`
+}
+
 const verificationCodeCooldown = 60 * time.Second
 
 func NewAuthHandler(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *AuthHandler {
@@ -487,6 +492,10 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	})
 }
 
+func passwordResetKey(email string) string {
+	return "password_reset:" + strings.ToLower(strings.TrimSpace(email))
+}
+
 func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required,email"`
@@ -505,27 +514,27 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Удаляем старые неиспользованные коды
-	h.db.Where("email = ? AND used = false", req.Email).Delete(&models.PasswordResetCode{})
+	ctx := context.Background()
 
-	// Генерируем новый код
+	// Генерируем новый код и сохраняем в Redis (перезаписывает предыдущий, если был)
 	code := fmt.Sprintf("%06d", rand.Intn(1000000))
-	resetCode := models.PasswordResetCode{
-		Email:     req.Email,
-		Code:      code,
-		ExpiresAt: time.Now().Add(15 * time.Minute),
-		Attempts:  0,
+	pending := PendingPasswordReset{Code: code, Attempts: 0}
+
+	data, err := json.Marshal(pending)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare reset data"})
+		return
 	}
 
-	if err := h.db.Create(&resetCode).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create reset code"})
+	if err := h.rdb.Set(ctx, passwordResetKey(req.Email), data, 15*time.Minute).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save reset code"})
 		return
 	}
 
 	// Отправляем email
 	emailService := services.NewEmailService(h.cfg)
-	err := emailService.SendPasswordResetCode(req.Email, code)
-	if err != nil {
+	if err := emailService.SendPasswordResetCode(req.Email, code); err != nil {
+		_ = h.rdb.Del(ctx, passwordResetKey(req.Email)).Err()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send email"})
 		return
 	}
@@ -544,31 +553,45 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Находим код
-	var resetCode models.PasswordResetCode
-	if err := h.db.Where("email = ? AND code = ? AND used = false", req.Email, req.Code).First(&resetCode).Error; err != nil {
-		// Увеличиваем счетчик попыток для всех кодов этого email
-		h.db.Model(&models.PasswordResetCode{}).
-			Where("email = ? AND used = false", req.Email).
-			Update("attempts", gorm.Expr("attempts + 1"))
+	ctx := context.Background()
+	key := passwordResetKey(req.Email)
 
+	raw, err := h.rdb.Get(ctx, key).Result()
+	if err == redis.Nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
 		return
 	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load reset data"})
+		return
+	}
 
-	// Проверяем количество попыток
-	if resetCode.Attempts >= 5 {
+	var pending PendingPasswordReset
+	if err := json.Unmarshal([]byte(raw), &pending); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse reset data"})
+		return
+	}
+
+	if pending.Attempts >= 5 {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many attempts. Please request a new code"})
 		return
 	}
 
-	// Проверяем срок действия
-	if time.Now().After(resetCode.ExpiresAt) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Code has expired"})
+	if pending.Code != req.Code {
+		pending.Attempts++
+		if updated, err := json.Marshal(pending); err == nil {
+			h.rdb.Set(ctx, key, updated, redis.KeepTTL)
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
 		return
 	}
 
-	// Генерируем новый пароль
+	var user models.User
+	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
 	newPassword := generateRandomPassword()
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
@@ -576,24 +599,16 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
-	// Обновляем пароль пользователя
-	var user models.User
-	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+	user.Password = string(hashedPassword)
+	if err := h.db.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 		return
 	}
 
-	user.Password = string(hashedPassword)
-	h.db.Save(&user)
+	_ = h.rdb.Del(ctx, key).Err()
 
-	// Помечаем код как использованный
-	resetCode.Used = true
-	h.db.Save(&resetCode)
-
-	// Отправляем новый пароль на email
 	emailService := services.NewEmailService(h.cfg)
-	err = emailService.SendNewPassword(req.Email, newPassword)
-	if err != nil {
+	if err := emailService.SendNewPassword(req.Email, newPassword); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send new password"})
 		return
 	}
