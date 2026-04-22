@@ -272,8 +272,8 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 
 	slot := models.ScheduleSlot{
 		ScheduleID:   uint(scheduleID),
-		AssignmentID: req.AssignmentID,
-		StudentID:    req.StudentID,
+		AssignmentID: &req.AssignmentID,
+		StudentID:    &req.StudentID,
 		TeacherID:    req.TeacherID,
 		SubjectID:    req.SubjectID,
 		RoomID:       req.RoomID,
@@ -449,6 +449,11 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		Preload("Subject").
 		Preload("Room").
 		Preload("Assignment").
+		Preload("GroupLesson").
+		Preload("GroupLesson.Enrollments").
+		Preload("GroupLesson.Enrollments.Student").
+		Preload("Exclusions").
+		Preload("Exclusions.Student").
 		Where("schedule_id = ?", schedule.ID).
 		Order("weekday ASC, start_time ASC, id ASC").
 		Find(&slots).Error; err != nil {
@@ -462,6 +467,7 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		Preload("Student").
 		Preload("Subject").
 		Preload("Assignment").
+		Preload("GroupLesson").
 		Where("schedule_id = ?", schedule.ID).
 		Order("id ASC").
 		Find(&issues).Error; err != nil {
@@ -551,4 +557,102 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 	}
 
 	return nil
+}
+
+// ========== SLOT EXCLUSIONS (для групповых слотов) ==========
+
+func (h *ScheduleHandler) AddSlotExclusion(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	slotID, err := strconv.Atoi(c.Param("slotId"))
+	if err != nil || slotID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		return
+	}
+
+	var req struct {
+		StudentID uint `json:"student_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var slot models.ScheduleSlot
+	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).First(&slot).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule slot not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule slot"})
+		return
+	}
+
+	if slot.SlotType != models.SlotTypeGroup {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Исключение возможно только для групповых слотов"})
+		return
+	}
+
+	exclusion := models.ScheduleSlotExclusion{
+		ScheduleSlotID: slot.ID,
+		StudentID:      req.StudentID,
+	}
+
+	if err := h.db.Create(&exclusion).Error; err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Ученик уже исключён из этого занятия"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create exclusion"})
+		return
+	}
+
+	h.db.Preload("Student").First(&exclusion, exclusion.ID)
+	c.JSON(http.StatusCreated, gin.H{"message": "Ученик исключён из занятия", "exclusion": exclusion})
+}
+
+func (h *ScheduleHandler) RemoveSlotExclusion(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	slotID, err := strconv.Atoi(c.Param("slotId"))
+	if err != nil || slotID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		return
+	}
+
+	studentID, err := strconv.Atoi(c.Param("studentId"))
+	if err != nil || studentID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+		return
+	}
+
+	var slot models.ScheduleSlot
+	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).First(&slot).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule slot not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule slot"})
+		return
+	}
+
+	result := h.db.Where("schedule_slot_id = ? AND student_id = ?", slot.ID, studentID).Delete(&models.ScheduleSlotExclusion{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove exclusion"})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Exclusion not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Исключение снято"})
 }

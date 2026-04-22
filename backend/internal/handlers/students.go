@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -77,6 +78,10 @@ func isValidTimeHHMM(value string) bool {
 
 func isStartBeforeEnd(start, end string) bool {
 	return start < end
+}
+
+func parseDate(value string) (time.Time, error) {
+	return time.Parse("2006-01-02", value)
 }
 
 func normalizeOptionalString(value *string) *string {

@@ -59,14 +59,22 @@ const scheduleService = {
 		return r.data.availability
 	},
 	updateTeacherAvailability: async (id, availId, data) => {
-		const r = await api.put(
-			`/admin/teachers/${id}/availability/${availId}`,
-			data,
-		)
+		const r = await api.put(`/admin/teachers/${id}/availability/${availId}`, data)
 		return r.data.availability
 	},
 	deleteTeacherAvailability: async (id, availId) => {
 		await api.delete(`/admin/teachers/${id}/availability/${availId}`)
+	},
+	getTeacherRooms: async id => {
+		const r = await api.get(`/admin/teachers/${id}/rooms`)
+		return r.data.teacher_rooms || []
+	},
+	updateTeacherRooms: async (id, roomIds, isStrict) => {
+		const r = await api.put(`/admin/teachers/${id}/rooms`, {
+			room_ids: roomIds,
+			is_strict: isStrict,
+		})
+		return r.data.teacher_rooms || []
 	},
 
 	// ========== ROOMS ==========
@@ -127,10 +135,7 @@ const scheduleService = {
 		return r.data.availability
 	},
 	updateStudentAvailability: async (id, availId, data) => {
-		const r = await api.put(
-			`/admin/students/${id}/availability/${availId}`,
-			data,
-		)
+		const r = await api.put(`/admin/students/${id}/availability/${availId}`, data)
 		return r.data.availability
 	},
 	deleteStudentAvailability: async (id, availId) => {
@@ -162,23 +167,58 @@ const scheduleService = {
 		return r.data.overrides || r.data || []
 	},
 	createWeekOverride: async (assignmentId, data) => {
-		const r = await api.post(
-			`/admin/assignments/${assignmentId}/weekly-override`,
-			data,
-		)
+		const r = await api.post(`/admin/assignments/${assignmentId}/weekly-override`, data)
 		return r.data
 	},
 	updateWeekOverride: async (assignmentId, overrideId, data) => {
-		const r = await api.put(
-			`/admin/assignments/${assignmentId}/weekly-override/${overrideId}`,
-			data,
-		)
+		const r = await api.put(`/admin/assignments/${assignmentId}/weekly-override/${overrideId}`, data)
 		return r.data
 	},
 	deleteWeekOverride: async (assignmentId, overrideId) => {
-		await api.delete(
-			`/admin/assignments/${assignmentId}/weekly-override/${overrideId}`,
-		)
+		await api.delete(`/admin/assignments/${assignmentId}/weekly-override/${overrideId}`)
+	},
+
+	// ========== GROUP LESSONS ==========
+	getGroupLessons: async (filters = {}) => {
+		const r = await api.get('/admin/group-lessons', { params: filters })
+		return r.data.group_lessons || []
+	},
+	getGroupLessonById: async id => {
+		const r = await api.get(`/admin/group-lessons/${id}`)
+		return r.data.group_lesson
+	},
+	createGroupLesson: async data => {
+		const r = await api.post('/admin/group-lessons', data)
+		return r.data.group_lesson
+	},
+	updateGroupLesson: async (id, data) => {
+		const r = await api.put(`/admin/group-lessons/${id}`, data)
+		return r.data.group_lesson
+	},
+	deleteGroupLesson: async id => {
+		await api.delete(`/admin/group-lessons/${id}`)
+	},
+	getGroupEnrollments: async id => {
+		const r = await api.get(`/admin/group-lessons/${id}/enrollments`)
+		return r.data.enrollments || []
+	},
+	addGroupEnrollment: async (id, studentId) => {
+		const r = await api.post(`/admin/group-lessons/${id}/enrollments`, { student_id: studentId })
+		return r.data.enrollment
+	},
+	removeGroupEnrollment: async (id, studentId) => {
+		await api.delete(`/admin/group-lessons/${id}/enrollments/${studentId}`)
+	},
+	getGroupWeekOverrides: async id => {
+		const r = await api.get(`/admin/group-lessons/${id}/week-overrides`)
+		return r.data.overrides || []
+	},
+	createGroupWeekOverride: async (id, data) => {
+		const r = await api.post(`/admin/group-lessons/${id}/week-overrides`, data)
+		return r.data.override
+	},
+	deleteGroupWeekOverride: async (id, overrideId) => {
+		await api.delete(`/admin/group-lessons/${id}/week-overrides/${overrideId}`)
 	},
 
 	// ========== SCHEDULES ==========
@@ -213,14 +253,20 @@ const scheduleService = {
 		return r.data
 	},
 	updateSlot: async (scheduleId, slotId, data) => {
-		const r = await api.put(
-			`/admin/schedules/${scheduleId}/slots/${slotId}`,
-			data,
-		)
+		const r = await api.put(`/admin/schedules/${scheduleId}/slots/${slotId}`, data)
 		return r.data
 	},
 	deleteSlot: async (scheduleId, slotId) => {
 		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}`)
+	},
+	addSlotExclusion: async (scheduleId, slotId, studentId) => {
+		const r = await api.post(`/admin/schedules/${scheduleId}/slots/${slotId}/exclusions`, {
+			student_id: studentId,
+		})
+		return r.data
+	},
+	removeSlotExclusion: async (scheduleId, slotId, studentId) => {
+		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}/exclusions/${studentId}`)
 	},
 }
 

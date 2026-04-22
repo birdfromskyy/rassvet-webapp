@@ -23,17 +23,26 @@ func Initialize(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) {
+	// Make previously NOT NULL columns nullable before AutoMigrate
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN assignment_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN student_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN assignment_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN student_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN teacher_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN subject_id DROP NOT NULL")
+
 	err := db.AutoMigrate(
-		// Старые модели
+		// Auth models
 		&models.User{},
 		&models.Review{},
 		&models.VerificationCode{},
 		&models.PasswordResetCode{},
 
-		// Новые модели расписания
+		// Schedule module models
 		&models.Subject{},
 		&models.Teacher{},
 		&models.TeacherSubject{},
+		&models.TeacherRoom{},
 		&models.Room{},
 		&models.RoomSubject{},
 		&models.Student{},
@@ -41,8 +50,12 @@ func Migrate(db *gorm.DB) {
 		&models.TeacherAvailability{},
 		&models.Assignment{},
 		&models.AssignmentWeekOverride{},
+		&models.GroupLesson{},
+		&models.GroupLessonEnrollment{},
+		&models.GroupLessonWeekOverride{},
 		&models.Schedule{},
 		&models.ScheduleSlot{},
+		&models.ScheduleSlotExclusion{},
 		&models.ScheduleGenerationIssue{},
 	)
 

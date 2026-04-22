@@ -39,6 +39,7 @@ import {
 	ArrowBack as BackIcon,
 	School as SubjectsIcon,
 	AccessTime as AvailIcon,
+	MeetingRoom as RoomIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -84,18 +85,26 @@ const AdminTeachers = () => {
 	const [availForm, setAvailForm] = useState(EMPTY_AVAIL)
 	const [availEditId, setAvailEditId] = useState(null)
 
+	// Rooms dialog
+	const [roomsDialog, setRoomsDialog] = useState({ open: false, teacher: null })
+	const [allRooms, setAllRooms] = useState([])
+	const [selectedRoomIds, setSelectedRoomIds] = useState([])
+	const [roomsIsStrict, setRoomsIsStrict] = useState(false)
+
 	useEffect(() => {
 		loadAll()
 	}, [])
 
 	const loadAll = async () => {
 		try {
-			const [teachersData, subjectsData] = await Promise.all([
+			const [teachersData, subjectsData, roomsData] = await Promise.all([
 				scheduleService.getTeachers(),
 				scheduleService.getSubjects(),
+				scheduleService.getRooms(),
 			])
 			setTeachers(teachersData)
 			setAllSubjects(subjectsData)
+			setAllRooms(roomsData)
 		} catch {
 			toast.error('Ошибка загрузки данных')
 		} finally {
@@ -190,6 +199,34 @@ const AdminTeachers = () => {
 			)
 			toast.success('Предметы преподавателя обновлены')
 			closeSubjects()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка сохранения')
+		}
+	}
+
+	// ── Rooms handlers ────────────────────────────────
+	const openRooms = async teacher => {
+		try {
+			const data = await scheduleService.getTeacherRooms(teacher.id)
+			setSelectedRoomIds(data.map(tr => tr.room_id))
+			setRoomsIsStrict(data.length > 0 ? data[0].is_strict : false)
+			setRoomsDialog({ open: true, teacher })
+		} catch {
+			toast.error('Ошибка загрузки кабинетов')
+		}
+	}
+
+	const closeRooms = () => setRoomsDialog({ open: false, teacher: null })
+
+	const saveRooms = async () => {
+		try {
+			await scheduleService.updateTeacherRooms(
+				roomsDialog.teacher.id,
+				selectedRoomIds,
+				roomsIsStrict,
+			)
+			toast.success('Кабинеты преподавателя обновлены')
+			closeRooms()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка сохранения')
 		}
@@ -346,6 +383,14 @@ const AdminTeachers = () => {
 												title='Рабочее время'
 											>
 												<AvailIcon />
+											</IconButton>
+											<IconButton
+												onClick={() => openRooms(t)}
+												size='small'
+												color='info'
+												title='Кабинеты'
+											>
+												<RoomIcon />
 											</IconButton>
 											<IconButton
 												onClick={() => deactivateTeacher(t.id)}
@@ -606,6 +651,72 @@ const AdminTeachers = () => {
 				</DialogContent>
 				<DialogActions>
 					<Button onClick={closeAvail}>Закрыть</Button>
+				</DialogActions>
+			</Dialog>
+			{/* Rooms Dialog */}
+			<Dialog
+				open={roomsDialog.open}
+				onClose={closeRooms}
+				maxWidth='sm'
+				fullWidth
+			>
+				<DialogTitle>Кабинеты: {roomsDialog.teacher?.full_name}</DialogTitle>
+				<DialogContent>
+					<Box sx={{ mt: 1 }}>
+						<Typography variant='body2' color='text.secondary' gutterBottom>
+							Выберите кабинеты, в которых работает преподаватель:
+						</Typography>
+						<FormControl fullWidth sx={{ mt: 1 }}>
+							<InputLabel>Кабинеты</InputLabel>
+							<Select
+								multiple
+								value={selectedRoomIds}
+								onChange={e => setSelectedRoomIds(e.target.value)}
+								input={<OutlinedInput label='Кабинеты' />}
+								renderValue={selected => (
+									<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+										{selected.map(id => (
+											<Chip
+												key={id}
+												label={allRooms.find(r => r.id === id)?.name || id}
+												size='small'
+											/>
+										))}
+									</Box>
+								)}
+							>
+								{allRooms
+									.filter(r => r.is_active)
+									.map(r => (
+										<MenuItem key={r.id} value={r.id}>
+											<Checkbox checked={selectedRoomIds.includes(r.id)} />
+											<ListItemText primary={r.name} />
+										</MenuItem>
+									))}
+							</Select>
+						</FormControl>
+						<FormControlLabel
+							control={
+								<Switch
+									checked={roomsIsStrict}
+									onChange={e => setRoomsIsStrict(e.target.checked)}
+								/>
+							}
+							label='Строгая привязка (работает только в указанных кабинетах)'
+							sx={{ mt: 2 }}
+						/>
+						{roomsIsStrict && (
+							<Typography variant='caption' color='warning.main' display='block' sx={{ mt: 0.5 }}>
+								При строгой привязке алгоритм не поставит занятие, если все указанные кабинеты заняты.
+							</Typography>
+						)}
+					</Box>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={closeRooms}>Отмена</Button>
+					<Button onClick={saveRooms} variant='contained'>
+						Сохранить
+					</Button>
 				</DialogActions>
 			</Dialog>
 		</Container>

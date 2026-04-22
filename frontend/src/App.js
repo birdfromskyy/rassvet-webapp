@@ -21,6 +21,7 @@ import AdminStudents from './pages/AdminStudents'
 import AdminRooms from './pages/AdminRooms'
 import AdminAssignments from './pages/AdminAssignments'
 import AdminSchedule from './pages/AdminSchedule'
+import AdminGroupLessons from './pages/AdminGroupLessons'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword'
@@ -136,6 +137,7 @@ function App() {
 						<Route path='/admin/schedule/students' element={<AdminStudents />} />
 						<Route path='/admin/schedule/rooms' element={<AdminRooms />} />
 						<Route path='/admin/schedule/assignments' element={<AdminAssignments />} />
+						<Route path='/admin/schedule/group-lessons' element={<AdminGroupLessons />} />
 						<Route path='/admin/schedule/weekly' element={<AdminSchedule />} />
 					</Route>
 				</Route>

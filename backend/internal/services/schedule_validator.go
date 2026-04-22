@@ -90,23 +90,37 @@ func (v *ScheduleValidator) HasTeacherConflict(
 	return false
 }
 
+// HasStudentConflict проверяет конфликт ученика с учётом индивидуальных и групповых слотов.
 func (v *ScheduleValidator) HasStudentConflict(
 	studentID uint,
 	weekday int,
 	startTime string,
 	endTime string,
 	existingSlots []models.ScheduleSlot,
+	enrollments []models.GroupLessonEnrollment,
 ) bool {
 	for _, slot := range existingSlots {
-		if slot.StudentID != studentID {
-			continue
-		}
 		if slot.Weekday != weekday {
 			continue
 		}
 		if slot.Status == models.ScheduleSlotStatusCancelled {
 			continue
 		}
+
+		if slot.SlotType == models.SlotTypeGroup {
+			// Ученик участвует в групповом занятии, если он записан в группу
+			if slot.GroupLessonID == nil {
+				continue
+			}
+			if !isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
+				continue
+			}
+		} else {
+			if slot.StudentID == nil || *slot.StudentID != studentID {
+				continue
+			}
+		}
+
 		if timesOverlap(startTime, endTime, slot.StartTime, slot.EndTime) {
 			return true
 		}
@@ -144,7 +158,30 @@ func (v *ScheduleValidator) ViolatesSameDayRule(
 	existingSlots []models.ScheduleSlot,
 ) bool {
 	for _, slot := range existingSlots {
-		if slot.AssignmentID != assignmentID {
+		if slot.AssignmentID == nil || *slot.AssignmentID != assignmentID {
+			continue
+		}
+		if slot.Weekday != weekday {
+			continue
+		}
+		if slot.Status == models.ScheduleSlotStatusCancelled {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func (v *ScheduleValidator) ViolatesSameDayRuleForGroup(
+	groupLessonID uint,
+	weekday int,
+	existingSlots []models.ScheduleSlot,
+) bool {
+	for _, slot := range existingSlots {
+		if slot.SlotType != models.SlotTypeGroup {
+			continue
+		}
+		if slot.GroupLessonID == nil || *slot.GroupLessonID != groupLessonID {
 			continue
 		}
 		if slot.Weekday != weekday {
@@ -165,11 +202,9 @@ func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 	startTime string,
 	endTime string,
 	existingSlots []models.ScheduleSlot,
+	enrollments []models.GroupLessonEnrollment,
 ) bool {
 	for _, slot := range existingSlots {
-		if slot.StudentID != studentID {
-			continue
-		}
 		if slot.SubjectID != subjectID {
 			continue
 		}
@@ -180,9 +215,20 @@ func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 			continue
 		}
 
-		// Нельзя ставить такой же предмет подряд или почти подряд
-		// Например:
-		// 10:00-10:30 и 10:35-11:05
+		// Проверяем принадлежность ученика слоту
+		if slot.SlotType == models.SlotTypeGroup {
+			if slot.GroupLessonID == nil {
+				continue
+			}
+			if !isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
+				continue
+			}
+		} else {
+			if slot.StudentID == nil || *slot.StudentID != studentID {
+				continue
+			}
+		}
+
 		if isImmediatelyAdjacent(slot.EndTime, startTime) ||
 			isImmediatelyAdjacent(endTime, slot.StartTime) ||
 			timesOverlap(startTime, endTime, slot.StartTime, slot.EndTime) {
@@ -221,6 +267,15 @@ func (v *ScheduleValidator) ApplyBreakBuffer(
 	return minutesToHHMM(bufferedStart), minutesToHHMM(bufferedEnd)
 }
 
+func isStudentEnrolledInGroup(studentID uint, groupLessonID uint, enrollments []models.GroupLessonEnrollment) bool {
+	for _, e := range enrollments {
+		if e.GroupLessonID == groupLessonID && e.StudentID == studentID {
+			return true
+		}
+	}
+	return false
+}
+
 func timesOverlap(startA, endA, startB, endB string) bool {
 	return startA < endB && startB < endA
 }
@@ -235,6 +290,15 @@ func isImmediatelyAdjacent(endA, startB string) bool {
 
 	diff := startBMin - endAMin
 	return diff >= 0 && diff <= 10
+}
+
+func gapMinutes(endA, startB string) int {
+	endAMin := hhmmToMinutes(endA)
+	startBMin := hhmmToMinutes(startB)
+	if endAMin < 0 || startBMin < 0 {
+		return -1
+	}
+	return startBMin - endAMin
 }
 
 func hhmmToMinutes(value string) int {

@@ -575,3 +575,102 @@ func (h *TeacherHandler) DeleteTeacherAvailability(c *gin.Context) {
 		"message": "Teacher availability deleted successfully",
 	})
 }
+
+// ========== TEACHER ROOMS ==========
+
+type UpdateTeacherRoomsRequest struct {
+	RoomIDs  []uint `json:"room_ids" binding:"required"`
+	IsStrict bool   `json:"is_strict"`
+}
+
+func (h *TeacherHandler) GetTeacherRooms(c *gin.Context) {
+	teacherID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || teacherID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.First(&teacher, teacherID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		return
+	}
+
+	var teacherRooms []models.TeacherRoom
+	if err := h.db.Preload("Room").Where("teacher_id = ?", teacherID).Find(&teacherRooms).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher rooms"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"teacher_id":    teacher.ID,
+		"teacher_name":  teacher.FullName,
+		"teacher_rooms": teacherRooms,
+	})
+}
+
+func (h *TeacherHandler) UpdateTeacherRooms(c *gin.Context) {
+	teacherID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || teacherID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.First(&teacher, teacherID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		return
+	}
+
+	var req UpdateTeacherRoomsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tx := h.db.Begin()
+
+	if err := tx.Where("teacher_id = ?", teacherID).Delete(&models.TeacherRoom{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear teacher rooms"})
+		return
+	}
+
+	if len(req.RoomIDs) > 0 {
+		teacherRooms := make([]models.TeacherRoom, 0, len(req.RoomIDs))
+		for _, roomID := range req.RoomIDs {
+			teacherRooms = append(teacherRooms, models.TeacherRoom{
+				TeacherID: uint(teacherID),
+				RoomID:    roomID,
+				IsStrict:  req.IsStrict,
+			})
+		}
+		if err := tx.Create(&teacherRooms).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save teacher rooms"})
+			return
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	var updatedRooms []models.TeacherRoom
+	h.db.Preload("Room").Where("teacher_id = ?", teacherID).Find(&updatedRooms)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Кабинеты преподавателя обновлены",
+		"teacher_id":    teacher.ID,
+		"teacher_rooms": updatedRooms,
+	})
+}

@@ -12,6 +12,7 @@ type Teacher struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	Subjects         []TeacherSubject          `json:"subjects,omitempty" gorm:"foreignKey:TeacherID"`
+	Rooms            []TeacherRoom             `json:"rooms,omitempty" gorm:"foreignKey:TeacherID"`
 	Availability     []TeacherAvailability     `json:"availability,omitempty" gorm:"foreignKey:TeacherID"`
 	Assignments      []Assignment              `json:"assignments,omitempty" gorm:"foreignKey:TeacherID"`
 	ScheduleSlots    []ScheduleSlot            `json:"schedule_slots,omitempty" gorm:"foreignKey:TeacherID"`

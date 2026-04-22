@@ -18,6 +18,7 @@ import {
 	MeetingRoom as RoomIcon,
 	Assignment as AssignmentIcon,
 	CalendarMonth as ScheduleIcon,
+	Groups as GroupIcon,
 	ArrowBack as BackIcon,
 } from '@mui/icons-material'
 
@@ -31,7 +32,7 @@ const MODULES = [
 	},
 	{
 		title: 'Преподаватели',
-		description: 'Преподаватели, их предметы и рабочее время',
+		description: 'Преподаватели, их предметы, кабинеты и рабочее время',
 		icon: TeacherIcon,
 		color: 'secondary',
 		path: '/admin/schedule/teachers',
@@ -56,6 +57,13 @@ const MODULES = [
 		icon: AssignmentIcon,
 		color: 'warning',
 		path: '/admin/schedule/assignments',
+	},
+	{
+		title: 'Групповые занятия',
+		description: 'Группы учеников с общим преподавателем и предметом',
+		icon: GroupIcon,
+		color: 'secondary',
+		path: '/admin/schedule/group-lessons',
 	},
 	{
 		title: 'Расписание',

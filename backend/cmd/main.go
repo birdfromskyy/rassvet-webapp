@@ -69,6 +69,7 @@ func main() {
 	studentHandler := handlers.NewStudentHandler(db)
 	teacherHandler := handlers.NewTeacherHandler(db)
 	assignmentHandler := handlers.NewAssignmentHandler(db)
+	groupLessonHandler := handlers.NewGroupLessonHandler(db)
 
 	scheduleGenerator := services.NewScheduleGenerator(db)
 	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
@@ -160,6 +161,7 @@ func main() {
 			admin.GET("/assignments", assignmentHandler.GetAssignments)
 			admin.GET("/assignments/:id", assignmentHandler.GetAssignmentByID)
 			admin.GET("/teachers/:id/assignments", assignmentHandler.GetTeacherAssignments)
+
 			admin.POST("/assignments", assignmentHandler.CreateAssignment)
 			admin.PUT("/assignments/:id", assignmentHandler.UpdateAssignment)
 			admin.DELETE("/assignments/:id", assignmentHandler.DeleteAssignment)
@@ -179,6 +181,27 @@ func main() {
 			admin.POST("/schedules/:id/slots", scheduleHandler.CreateScheduleSlot)
 			admin.PUT("/schedules/:id/slots/:slotId", scheduleHandler.UpdateScheduleSlot)
 			admin.DELETE("/schedules/:id/slots/:slotId", scheduleHandler.DeleteScheduleSlot)
+			admin.POST("/schedules/:id/slots/:slotId/exclusions", scheduleHandler.AddSlotExclusion)
+			admin.DELETE("/schedules/:id/slots/:slotId/exclusions/:studentId", scheduleHandler.RemoveSlotExclusion)
+
+			// Group lessons
+			admin.GET("/group-lessons", groupLessonHandler.GetGroupLessons)
+			admin.GET("/group-lessons/:id", groupLessonHandler.GetGroupLessonByID)
+			admin.POST("/group-lessons", groupLessonHandler.CreateGroupLesson)
+			admin.PUT("/group-lessons/:id", groupLessonHandler.UpdateGroupLesson)
+			admin.DELETE("/group-lessons/:id", groupLessonHandler.DeleteGroupLesson)
+
+			admin.GET("/group-lessons/:id/enrollments", groupLessonHandler.GetEnrollments)
+			admin.POST("/group-lessons/:id/enrollments", groupLessonHandler.AddEnrollment)
+			admin.DELETE("/group-lessons/:id/enrollments/:studentId", groupLessonHandler.RemoveEnrollment)
+
+			admin.GET("/group-lessons/:id/week-overrides", groupLessonHandler.GetWeekOverrides)
+			admin.POST("/group-lessons/:id/week-overrides", groupLessonHandler.CreateWeekOverride)
+			admin.DELETE("/group-lessons/:id/week-overrides/:overrideId", groupLessonHandler.DeleteWeekOverride)
+
+			// Teacher rooms
+			admin.GET("/teachers/:id/rooms", teacherHandler.GetTeacherRooms)
+			admin.PUT("/teachers/:id/rooms", teacherHandler.UpdateTeacherRooms)
 		}
 	}
 

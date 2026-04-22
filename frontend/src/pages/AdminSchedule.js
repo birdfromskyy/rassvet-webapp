@@ -29,6 +29,12 @@ import {
 	AccordionDetails,
 	Grid,
 	Alert,
+	Tooltip,
+	Divider,
+	List,
+	ListItem,
+	ListItemText,
+	ListItemSecondaryAction,
 } from '@mui/material'
 import {
 	ArrowBack as BackIcon,
@@ -41,6 +47,8 @@ import {
 	Refresh as ResetIcon,
 	AutoAwesome as GenerateIcon,
 	ExpandMore as ExpandIcon,
+	PersonOff as ExcludeIcon,
+	PersonAdd as IncludeIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -91,6 +99,14 @@ const EMPTY_EDIT_FORM = {
 	status: 'scheduled',
 }
 
+// Row background colors: green=group, red=paid individual, blue=budget individual
+const getSlotBgColor = (slot, students) => {
+	if (slot.slot_type === 'group') return 'rgba(76,175,80,0.10)'
+	const student = students.find(s => s.id === slot.student_id) || slot.student
+	if (student?.funding_type === 'paid') return 'rgba(244,67,54,0.10)'
+	return 'rgba(33,150,243,0.10)'
+}
+
 const getMonday = date => {
 	const d = new Date(date)
 	const day = d.getDay()
@@ -126,6 +142,7 @@ const AdminSchedule = () => {
 	// Slot filters
 	const [filterStudentId, setFilterStudentId] = useState('')
 	const [filterTeacherId, setFilterTeacherId] = useState('')
+	const [filterFundingType, setFilterFundingType] = useState('')
 
 	// Create slot dialog
 	const [createDialog, setCreateDialog] = useState(false)
@@ -312,16 +329,62 @@ const AdminSchedule = () => {
 		}
 	}
 
-	// Group slots by weekday (with optional student/teacher filter)
+	const handleExcludeStudent = async (slot, studentId) => {
+		try {
+			await scheduleService.addSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
+			toast.success('Ученик исключён из занятия')
+			// Reload and update editDialog slot
+			const data = await scheduleService.getScheduleByWeek(weekStartISO)
+			setScheduleData(data)
+			const updatedSlot = data.slots?.find(s => s.id === slot.id)
+			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка')
+		}
+	}
+
+	const handleIncludeStudent = async (slot, studentId) => {
+		try {
+			await scheduleService.removeSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
+			toast.success('Ученик возвращён в занятие')
+			const data = await scheduleService.getScheduleByWeek(weekStartISO)
+			setScheduleData(data)
+			const updatedSlot = data.slots?.find(s => s.id === slot.id)
+			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка')
+		}
+	}
+
+	// Group slots by weekday with filters
 	const slotsByDay = {}
 	if (scheduleData?.slots) {
 		for (const slot of scheduleData.slots) {
-			if (filterStudentId && slot.student_id !== Number(filterStudentId))
-				continue
-			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId))
-				continue
+			if (filterStudentId) {
+				if (slot.slot_type === 'group') {
+					const enrolled = slot.group_lesson?.enrollments?.some(
+						e => e.student_id === Number(filterStudentId),
+					)
+					if (!enrolled) continue
+				} else {
+					if (slot.student_id !== Number(filterStudentId)) continue
+				}
+			}
+			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId)) continue
+			if (filterFundingType) {
+				if (slot.slot_type === 'group') {
+					// group slots are not filtered by funding type
+				} else {
+					const student = students.find(s => s.id === slot.student_id) || slot.student
+					if (student?.funding_type !== filterFundingType) continue
+				}
+			}
 			if (!slotsByDay[slot.weekday]) slotsByDay[slot.weekday] = []
 			slotsByDay[slot.weekday].push(slot)
+		}
+		// Sort each day by start_time
+		for (const day of Object.keys(slotsByDay)) {
+			slotsByDay[day].sort((a, b) => a.start_time.localeCompare(b.start_time))
 		}
 	}
 
@@ -428,14 +491,14 @@ const AdminSchedule = () => {
 
 				{/* Slot filters */}
 				{schedule && (
-					<Paper variant='outlined' sx={{ p: 2, mb: 3 }}>
+					<Paper variant='outlined' sx={{ p: 2, mb: 2 }}>
 						<Grid container spacing={2} alignItems='center'>
-							<Grid item xs={12} sm={4}>
+							<Grid item xs={12} sm={3}>
 								<FormControl fullWidth size='small'>
-									<InputLabel>Фильтр по ученику</InputLabel>
+									<InputLabel>Ученик</InputLabel>
 									<Select
 										value={filterStudentId}
-										label='Фильтр по ученику'
+										label='Ученик'
 										onChange={e => setFilterStudentId(e.target.value)}
 									>
 										<MenuItem value=''>Все ученики</MenuItem>
@@ -447,12 +510,12 @@ const AdminSchedule = () => {
 									</Select>
 								</FormControl>
 							</Grid>
-							<Grid item xs={12} sm={4}>
+							<Grid item xs={12} sm={3}>
 								<FormControl fullWidth size='small'>
-									<InputLabel>Фильтр по преподавателю</InputLabel>
+									<InputLabel>Преподаватель</InputLabel>
 									<Select
 										value={filterTeacherId}
-										label='Фильтр по преподавателю'
+										label='Преподаватель'
 										onChange={e => setFilterTeacherId(e.target.value)}
 									>
 										<MenuItem value=''>Все преподаватели</MenuItem>
@@ -464,19 +527,50 @@ const AdminSchedule = () => {
 									</Select>
 								</FormControl>
 							</Grid>
-							<Grid item xs={12} sm={4}>
+							<Grid item xs={12} sm={3}>
+								<FormControl fullWidth size='small'>
+									<InputLabel>Финансирование</InputLabel>
+									<Select
+										value={filterFundingType}
+										label='Финансирование'
+										onChange={e => setFilterFundingType(e.target.value)}
+									>
+										<MenuItem value=''>Все</MenuItem>
+										<MenuItem value='paid'>Платники</MenuItem>
+										<MenuItem value='budget'>Бюджетники</MenuItem>
+									</Select>
+								</FormControl>
+							</Grid>
+							<Grid item xs={12} sm={3}>
 								<Button
 									size='small'
 									onClick={() => {
 										setFilterStudentId('')
 										setFilterTeacherId('')
+										setFilterFundingType('')
 									}}
-									disabled={!filterStudentId && !filterTeacherId}
+									disabled={!filterStudentId && !filterTeacherId && !filterFundingType}
 								>
 									Сбросить фильтры
 								</Button>
 							</Grid>
 						</Grid>
+
+						{/* Color legend */}
+						<Box display='flex' gap={2} mt={1.5} flexWrap='wrap'>
+							<Box display='flex' alignItems='center' gap={0.5}>
+								<Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'rgba(244,67,54,0.25)' }} />
+								<Typography variant='caption'>Платник (индив.)</Typography>
+							</Box>
+							<Box display='flex' alignItems='center' gap={0.5}>
+								<Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'rgba(33,150,243,0.25)' }} />
+								<Typography variant='caption'>Бюджетник (индив.)</Typography>
+							</Box>
+							<Box display='flex' alignItems='center' gap={0.5}>
+								<Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'rgba(76,175,80,0.25)' }} />
+								<Typography variant='caption'>Групповое занятие</Typography>
+							</Box>
+						</Box>
 					</Paper>
 				)}
 
@@ -550,23 +644,34 @@ const AdminSchedule = () => {
 										<TableHead>
 											<TableRow>
 												<TableCell>Время</TableCell>
-												<TableCell>Ученик</TableCell>
+												<TableCell>Ученик / Группа</TableCell>
 												<TableCell>Преподаватель</TableCell>
 												<TableCell>Предмет</TableCell>
 												<TableCell>Кабинет</TableCell>
-												<TableCell>Тип</TableCell>
+												<TableCell>Происхождение</TableCell>
 												<TableCell>Статус</TableCell>
 												<TableCell align='center'>Действия</TableCell>
 											</TableRow>
 										</TableHead>
 										<TableBody>
 											{daySlots.map(slot => (
-												<TableRow key={slot.id}>
+												<TableRow
+													key={slot.id}
+													sx={{ bgcolor: getSlotBgColor(slot, students) }}
+												>
 													<TableCell>
 														{slot.start_time}–{slot.end_time}
 													</TableCell>
 													<TableCell>
-														{slot.student?.full_name || slot.student_id}
+														{slot.slot_type === 'group'
+															? <><strong>{slot.group_lesson?.name || '—'}</strong>
+																{' '}
+																<Typography component='span' variant='caption' color='text.secondary'>
+																	({slot.group_lesson?.enrollments?.length || 0} уч.)
+																</Typography>
+															</>
+															: (slot.student?.full_name || slot.student_id)
+														}
 													</TableCell>
 													<TableCell>
 														{slot.teacher?.full_name || slot.teacher_id}
@@ -580,21 +685,15 @@ const AdminSchedule = () => {
 													<TableCell>
 														<Chip
 															label={slot.origin === 'auto' ? 'Авто' : 'Ручной'}
-															color={
-																slot.origin === 'auto' ? 'secondary' : 'primary'
-															}
+															color={slot.origin === 'auto' ? 'secondary' : 'primary'}
 															size='small'
 															variant='outlined'
 														/>
 													</TableCell>
 													<TableCell>
 														<Chip
-															label={
-																SLOT_STATUS_LABELS[slot.status] || slot.status
-															}
-															color={
-																SLOT_STATUS_COLORS[slot.status] || 'default'
-															}
+															label={SLOT_STATUS_LABELS[slot.status] || slot.status}
+															color={SLOT_STATUS_COLORS[slot.status] || 'default'}
 															size='small'
 														/>
 													</TableCell>
@@ -645,7 +744,7 @@ const AdminSchedule = () => {
 									<TableHead>
 										<TableRow>
 											<TableCell>Код причины</TableCell>
-											<TableCell>Ученик</TableCell>
+											<TableCell>Ученик / Группа</TableCell>
 											<TableCell>Преподаватель</TableCell>
 											<TableCell>Предмет</TableCell>
 											<TableCell>Сообщение</TableCell>
@@ -663,13 +762,15 @@ const AdminSchedule = () => {
 													/>
 												</TableCell>
 												<TableCell>
-													{issue.student?.full_name || issue.student_id}
+													{issue.group_lesson_id
+														? `Группа: ${issue.group_lesson?.name || issue.group_lesson_id}`
+														: (issue.student?.full_name || issue.student_id || '—')}
 												</TableCell>
 												<TableCell>
-													{issue.teacher?.full_name || issue.teacher_id}
+													{issue.teacher?.full_name || issue.teacher_id || '—'}
 												</TableCell>
 												<TableCell>
-													{issue.subject?.name || issue.subject_id}
+													{issue.subject?.name || issue.subject_id || '—'}
 												</TableCell>
 												<TableCell>{issue.message}</TableCell>
 											</TableRow>
@@ -779,7 +880,11 @@ const AdminSchedule = () => {
 				maxWidth='sm'
 				fullWidth
 			>
-				<DialogTitle>Редактировать слот</DialogTitle>
+				<DialogTitle>
+					{editDialog.slot?.slot_type === 'group'
+						? `Групповое занятие: ${editDialog.slot?.group_lesson?.name || ''}`
+						: 'Редактировать слот'}
+				</DialogTitle>
 				<DialogContent>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
 						<FormControl fullWidth>
@@ -846,6 +951,69 @@ const AdminSchedule = () => {
 								<MenuItem value='cancelled'>Отменено</MenuItem>
 							</Select>
 						</FormControl>
+
+						{/* Group slot: enrollment + exclusion management */}
+						{editDialog.slot?.slot_type === 'group' && (
+							<>
+								<Divider />
+								<Typography variant='subtitle2'>
+									Состав группы на это занятие
+								</Typography>
+								{(!editDialog.slot.group_lesson?.enrollments ||
+									editDialog.slot.group_lesson.enrollments.length === 0) && (
+									<Typography variant='body2' color='text.secondary'>
+										В группе нет учеников
+									</Typography>
+								)}
+								<List dense disablePadding>
+									{(editDialog.slot.group_lesson?.enrollments || []).map(enr => {
+										const isExcluded = editDialog.slot.exclusions?.some(
+											ex => ex.student_id === enr.student_id,
+										)
+										return (
+											<ListItem key={enr.id} disableGutters>
+												<ListItemText
+													primary={enr.student?.full_name || enr.student_id}
+													secondary={isExcluded ? 'Исключён из этого занятия' : 'Присутствует'}
+													primaryTypographyProps={{
+														sx: isExcluded
+															? { textDecoration: 'line-through', color: 'text.secondary' }
+															: {},
+													}}
+												/>
+												<ListItemSecondaryAction>
+													{isExcluded ? (
+														<Tooltip title='Вернуть на занятие'>
+															<IconButton
+																size='small'
+																color='success'
+																onClick={() =>
+																	handleIncludeStudent(editDialog.slot, enr.student_id)
+																}
+															>
+																<IncludeIcon fontSize='small' />
+															</IconButton>
+														</Tooltip>
+													) : (
+														<Tooltip title='Исключить из занятия'>
+															<IconButton
+																size='small'
+																color='warning'
+																onClick={() =>
+																	handleExcludeStudent(editDialog.slot, enr.student_id)
+																}
+															>
+																<ExcludeIcon fontSize='small' />
+															</IconButton>
+														</Tooltip>
+													)}
+												</ListItemSecondaryAction>
+											</ListItem>
+										)
+									})}
+								</List>
+							</>
+						)}
 					</Box>
 				</DialogContent>
 				<DialogActions>
