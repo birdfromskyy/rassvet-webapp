@@ -51,6 +51,7 @@ const WEEKDAY_FULL = {
 	4: 'Четверг',
 	5: 'Пятница',
 	6: 'Суббота',
+	7: 'Воскресенье',
 }
 
 const EMPTY_TEACHER = {

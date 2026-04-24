@@ -16,7 +16,7 @@ import {
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
 
-const WEEKDAYS = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']
+const WEEKDAYS = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
 const AdminGroupLessons = () => {
 	const navigate = useNavigate()

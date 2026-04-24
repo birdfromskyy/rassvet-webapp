@@ -60,6 +60,7 @@ const WEEKDAY_NAMES = {
 	4: 'Четверг',
 	5: 'Пятница',
 	6: 'Суббота',
+	7: 'Воскресенье',
 }
 
 const STATUS_COLORS = {
@@ -142,6 +143,7 @@ const AdminSchedule = () => {
 	// Slot filters
 	const [filterStudentId, setFilterStudentId] = useState('')
 	const [filterTeacherId, setFilterTeacherId] = useState('')
+	const [filterRoomId, setFilterRoomId] = useState('')
 	const [filterFundingType, setFilterFundingType] = useState('')
 
 	// Create slot dialog
@@ -371,6 +373,7 @@ const AdminSchedule = () => {
 				}
 			}
 			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId)) continue
+			if (filterRoomId && slot.room_id !== Number(filterRoomId)) continue
 			if (filterFundingType) {
 				if (slot.slot_type === 'group') {
 					// group slots are not filtered by funding type
@@ -529,6 +532,23 @@ const AdminSchedule = () => {
 							</Grid>
 							<Grid item xs={12} sm={3}>
 								<FormControl fullWidth size='small'>
+									<InputLabel>Кабинет</InputLabel>
+									<Select
+										value={filterRoomId}
+										label='Кабинет'
+										onChange={e => setFilterRoomId(e.target.value)}
+									>
+										<MenuItem value=''>Все кабинеты</MenuItem>
+										{rooms.map(r => (
+											<MenuItem key={r.id} value={r.id}>
+												{r.name}
+											</MenuItem>
+										))}
+									</Select>
+								</FormControl>
+							</Grid>
+							<Grid item xs={12} sm={3}>
+								<FormControl fullWidth size='small'>
 									<InputLabel>Финансирование</InputLabel>
 									<Select
 										value={filterFundingType}
@@ -547,9 +567,10 @@ const AdminSchedule = () => {
 									onClick={() => {
 										setFilterStudentId('')
 										setFilterTeacherId('')
+										setFilterRoomId('')
 										setFilterFundingType('')
 									}}
-									disabled={!filterStudentId && !filterTeacherId && !filterFundingType}
+									disabled={!filterStudentId && !filterTeacherId && !filterRoomId && !filterFundingType}
 								>
 									Сбросить фильтры
 								</Button>

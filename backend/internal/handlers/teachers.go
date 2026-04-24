@@ -440,7 +440,7 @@ func (h *TeacherHandler) CreateTeacherAvailability(c *gin.Context) {
 	}
 
 	if !isValidWeekday(req.Weekday) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 6"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 7"})
 		return
 	}
 
@@ -504,7 +504,7 @@ func (h *TeacherHandler) UpdateTeacherAvailability(c *gin.Context) {
 
 	if req.Weekday != nil {
 		if !isValidWeekday(*req.Weekday) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 6"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 7"})
 			return
 		}
 		availability.Weekday = *req.Weekday

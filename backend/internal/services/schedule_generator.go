@@ -503,7 +503,7 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 		return candidates
 	}
 
-	for weekday := 1; weekday <= 6; weekday++ {
+	for weekday := 1; weekday <= 7; weekday++ {
 		teacherWindows := g.filterTeacherAvailability(task.TeacherID, weekday, ctx.TeacherAvailability)
 		studentWindows := g.filterStudentAvailability(task.StudentID, weekday, ctx.StudentAvailability)
 
@@ -782,7 +782,7 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 		return candidates
 	}
 
-	for weekday := 1; weekday <= 6; weekday++ {
+	for weekday := 1; weekday <= 7; weekday++ {
 		teacherWindows := g.filterTeacherAvailability(task.TeacherID, weekday, ctx.TeacherAvailability)
 		if len(teacherWindows) == 0 {
 			continue

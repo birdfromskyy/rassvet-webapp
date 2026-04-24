@@ -241,7 +241,7 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 	}
 
 	if !isValidWeekday(req.Weekday) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 6"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 7"})
 		return
 	}
 
@@ -346,7 +346,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 
 	if req.Weekday != nil {
 		if !isValidWeekday(*req.Weekday) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 6"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 7"})
 			return
 		}
 		slot.Weekday = *req.Weekday

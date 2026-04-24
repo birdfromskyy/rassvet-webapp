@@ -24,7 +24,7 @@ type ScheduleSlot struct {
 	TeacherID     uint   `json:"teacher_id" gorm:"not null;index:idx_schedule_teacher_weekday"`
 	SubjectID     uint   `json:"subject_id" gorm:"not null"`
 	RoomID        uint   `json:"room_id" gorm:"not null;index:idx_schedule_room_weekday"`
-	Weekday       int    `json:"weekday" gorm:"not null;index:idx_schedule_weekday"` // 1=Mon ... 6=Sat
+	Weekday       int    `json:"weekday" gorm:"not null;index:idx_schedule_weekday"` // 1=Mon ... 7=Sun
 	StartTime     string `json:"start_time" gorm:"type:varchar(5);not null"`         // HH:MM
 	EndTime       string `json:"end_time" gorm:"type:varchar(5);not null"`           // HH:MM
 	Origin        string `json:"origin" gorm:"type:varchar(20);not null;default:'auto'"`
