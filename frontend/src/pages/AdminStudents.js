@@ -27,14 +27,16 @@ import {
 	Select,
 	MenuItem,
 	Divider,
+	Tooltip,
 } from '@mui/material'
 import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
-	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 	AccessTime as AvailIcon,
+	Pause as PauseIcon,
+	PlayArrow as PlayIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -134,14 +136,18 @@ const AdminStudents = () => {
 		}
 	}
 
-	const deactivateStudent = async id => {
-		if (!window.confirm('Деактивировать ученика?')) return
+	const toggleStudentActive = async student => {
 		try {
-			await scheduleService.deactivateStudent(id)
-			toast.success('Ученик деактивирован')
+			if (student.is_active) {
+				await scheduleService.deactivateStudent(student.id)
+				toast.success('Ученик деактивирован')
+			} else {
+				await scheduleService.updateStudent(student.id, { is_active: true })
+				toast.success('Ученик активирован')
+			}
 			load()
 		} catch {
-			toast.error('Ошибка деактивации')
+			toast.error('Ошибка изменения статуса')
 		}
 	}
 
@@ -281,7 +287,7 @@ const AdminStudents = () => {
 										<TableCell>
 											<Chip
 												label={s.funding_type === 'paid' ? 'Платный' : 'Бюджет'}
-												color={s.funding_type === 'paid' ? 'primary' : 'info'}
+												color={s.funding_type === 'paid' ? 'error' : 'success'}
 												size='small'
 											/>
 										</TableCell>
@@ -308,14 +314,15 @@ const AdminStudents = () => {
 											>
 												<AvailIcon />
 											</IconButton>
-											<IconButton
-												onClick={() => deactivateStudent(s.id)}
-												size='small'
-												color='warning'
-												title='Деактивировать'
-											>
-												<DeactivateIcon />
-											</IconButton>
+											<Tooltip title={s.is_active ? 'Деактивировать' : 'Активировать'}>
+												<IconButton
+													onClick={() => toggleStudentActive(s)}
+													size='small'
+													color={s.is_active ? 'warning' : 'success'}
+												>
+													{s.is_active ? <PauseIcon /> : <PlayIcon />}
+												</IconButton>
+											</Tooltip>
 											<IconButton
 												onClick={() => removeStudent(s.id)}
 												size='small'

@@ -30,16 +30,18 @@ import {
 	Checkbox,
 	ListItemText,
 	Divider,
+	Tooltip,
 } from '@mui/material'
 import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
-	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 	School as SubjectsIcon,
 	AccessTime as AvailIcon,
 	MeetingRoom as RoomIcon,
+	Pause as PauseIcon,
+	PlayArrow as PlayIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -157,14 +159,18 @@ const AdminTeachers = () => {
 		}
 	}
 
-	const deactivateTeacher = async id => {
-		if (!window.confirm('Деактивировать преподавателя?')) return
+	const toggleTeacherActive = async teacher => {
 		try {
-			await scheduleService.deactivateTeacher(id)
-			toast.success('Преподаватель деактивирован')
+			if (teacher.is_active) {
+				await scheduleService.deactivateTeacher(teacher.id)
+				toast.success('Преподаватель деактивирован')
+			} else {
+				await scheduleService.updateTeacher(teacher.id, { is_active: true })
+				toast.success('Преподаватель активирован')
+			}
 			loadAll()
 		} catch {
-			toast.error('Ошибка деактивации')
+			toast.error('Ошибка изменения статуса')
 		}
 	}
 
@@ -393,14 +399,15 @@ const AdminTeachers = () => {
 											>
 												<RoomIcon />
 											</IconButton>
-											<IconButton
-												onClick={() => deactivateTeacher(t.id)}
-												size='small'
-												color='warning'
-												title='Деактивировать'
-											>
-												<DeactivateIcon />
-											</IconButton>
+											<Tooltip title={t.is_active ? 'Деактивировать' : 'Активировать'}>
+												<IconButton
+													onClick={() => toggleTeacherActive(t)}
+													size='small'
+													color={t.is_active ? 'warning' : 'success'}
+												>
+													{t.is_active ? <PauseIcon /> : <PlayIcon />}
+												</IconButton>
+											</Tooltip>
 											<IconButton
 												onClick={() => removeTeacher(t.id)}
 												size='small'

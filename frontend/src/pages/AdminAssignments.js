@@ -65,10 +65,23 @@ const AdminAssignments = () => {
 
 	const [editDialog, setEditDialog] = useState({ open: false, item: null })
 	const [form, setForm] = useState(EMPTY_ASSIGNMENT)
+	const [teacherSubjectIds, setTeacherSubjectIds] = useState([])
 
 	useEffect(() => {
 		loadAll()
 	}, [])
+
+	useEffect(() => {
+		if (!form.teacher_id) {
+			setTeacherSubjectIds([])
+			return
+		}
+		scheduleService.getTeacherSubjects(form.teacher_id).then(data => {
+			setTeacherSubjectIds(data.map(ts => ts.subject_id))
+		}).catch(() => {
+			setTeacherSubjectIds([])
+		})
+	}, [form.teacher_id])
 
 	const loadAll = async () => {
 		try {
@@ -406,7 +419,7 @@ const AdminAssignments = () => {
 							<Select
 								value={form.teacher_id}
 								label='Преподаватель'
-								onChange={e => setForm({ ...form, teacher_id: e.target.value })}
+								onChange={e => setForm({ ...form, teacher_id: e.target.value, subject_id: '' })}
 							>
 								{teachers.map(t => (
 									<MenuItem key={t.id} value={t.id}>
@@ -423,7 +436,10 @@ const AdminAssignments = () => {
 								label='Предмет'
 								onChange={e => setForm({ ...form, subject_id: e.target.value })}
 							>
-								{subjects.map(s => (
+								{(teacherSubjectIds.length > 0
+									? subjects.filter(s => teacherSubjectIds.includes(s.id))
+									: subjects
+								).map(s => (
 									<MenuItem key={s.id} value={s.id}>
 										{s.name}
 										{!s.is_active ? ' (неактивен)' : ''}

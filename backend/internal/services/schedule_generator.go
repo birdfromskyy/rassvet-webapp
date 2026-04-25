@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -152,7 +153,7 @@ func (g *ScheduleGenerator) GenerateSchedule(weekStartDate time.Time, generatedB
 		candidates := g.GetCandidateSlots(task, ctx)
 
 		if len(candidates) == 0 {
-			if err := g.SaveGenerationIssue(schedule.ID, task, "NO_CANDIDATE", "Не удалось найти подходящий слот для занятия"); err != nil {
+			if err := g.SaveGenerationIssue(schedule.ID, task, "NO_CANDIDATE", g.DiagnoseNoCandidates(task, ctx)); err != nil {
 				return nil, err
 			}
 			continue
@@ -176,7 +177,7 @@ func (g *ScheduleGenerator) GenerateSchedule(weekStartDate time.Time, generatedB
 		candidates := g.GetGroupCandidateSlots(task, ctx)
 
 		if len(candidates) == 0 {
-			if err := g.SaveGroupGenerationIssue(schedule.ID, task, "NO_CANDIDATE", "Не удалось найти слот для группового занятия"); err != nil {
+			if err := g.SaveGroupGenerationIssue(schedule.ID, task, "NO_CANDIDATE", g.DiagnoseNoGroupCandidates(task, ctx)); err != nil {
 				return nil, err
 			}
 			continue
@@ -233,7 +234,7 @@ func (g *ScheduleGenerator) ResetAutoSchedule(scheduleID uint, generatedByUserID
 		candidates := g.GetCandidateSlots(task, ctx)
 
 		if len(candidates) == 0 {
-			if err := g.SaveGenerationIssue(schedule.ID, task, "NO_CANDIDATE", "Не удалось найти подходящий слот для занятия"); err != nil {
+			if err := g.SaveGenerationIssue(schedule.ID, task, "NO_CANDIDATE", g.DiagnoseNoCandidates(task, ctx)); err != nil {
 				return nil, err
 			}
 			continue
@@ -255,7 +256,7 @@ func (g *ScheduleGenerator) ResetAutoSchedule(scheduleID uint, generatedByUserID
 		candidates := g.GetGroupCandidateSlots(task, ctx)
 
 		if len(candidates) == 0 {
-			if err := g.SaveGroupGenerationIssue(schedule.ID, task, "NO_CANDIDATE", "Не удалось найти слот для группового занятия"); err != nil {
+			if err := g.SaveGroupGenerationIssue(schedule.ID, task, "NO_CANDIDATE", g.DiagnoseNoGroupCandidates(task, ctx)); err != nil {
 				return nil, err
 			}
 			continue
@@ -1318,4 +1319,147 @@ func sameDate(a, b time.Time) bool {
 	return a.Year() == b.Year() &&
 		a.Month() == b.Month() &&
 		a.Day() == b.Day()
+}
+
+func formatWeekdays(days []int) string {
+	names := map[int]string{1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"}
+	parts := make([]string, 0, len(days))
+	for _, d := range days {
+		parts = append(parts, names[d])
+	}
+	return strings.Join(parts, ", ")
+}
+
+func (g *ScheduleGenerator) teacherAvailableDays(teacherID uint, ctx *GenerationContext) []int {
+	var days []int
+	for wd := 1; wd <= 7; wd++ {
+		if len(g.filterTeacherAvailability(teacherID, wd, ctx.TeacherAvailability)) > 0 {
+			days = append(days, wd)
+		}
+	}
+	return days
+}
+
+func (g *ScheduleGenerator) studentAvailableDays(studentID uint, ctx *GenerationContext) []int {
+	var days []int
+	for wd := 1; wd <= 7; wd++ {
+		if len(g.filterStudentAvailability(studentID, wd, ctx.StudentAvailability)) > 0 {
+			days = append(days, wd)
+		}
+	}
+	return days
+}
+
+func (g *ScheduleGenerator) DiagnoseNoCandidates(task WeeklyTask, ctx *GenerationContext) string {
+	allSubjectRooms := g.getAllowedRoomIDs(task.SubjectID, ctx.RoomSubjects)
+	if len(allSubjectRooms) == 0 {
+		return fmt.Sprintf("Нет кабинетов для предмета «%s» — добавьте кабинет с поддержкой этого предмета", task.SubjectName)
+	}
+	if _, ok := ctx.StrictTeacherRoomMap[task.TeacherID]; ok {
+		if len(g.resolveAllowedRoomsForTeacher(task.TeacherID, task.SubjectID, ctx)) == 0 {
+			return fmt.Sprintf("Кабинеты строгой привязки преподавателя «%s» не настроены для предмета «%s»", task.TeacherName, task.SubjectName)
+		}
+	}
+
+	teacherDays := g.teacherAvailableDays(task.TeacherID, ctx)
+	if len(teacherDays) == 0 {
+		return fmt.Sprintf("У преподавателя «%s» не задано рабочее время ни на один день недели", task.TeacherName)
+	}
+
+	studentDays := g.studentAvailableDays(task.StudentID, ctx)
+	if len(studentDays) == 0 {
+		return fmt.Sprintf("У ученика «%s» не указана доступность ни на один день недели", task.StudentName)
+	}
+
+	intersectionExists := false
+	durationFits := false
+	for wd := 1; wd <= 7; wd++ {
+		teacherWindows := g.filterTeacherAvailability(task.TeacherID, wd, ctx.TeacherAvailability)
+		studentWindows := g.filterStudentAvailability(task.StudentID, wd, ctx.StudentAvailability)
+		for _, tw := range teacherWindows {
+			for _, sw := range studentWindows {
+				start, end, ok := intersectWindows(tw.StartTime, tw.EndTime, sw.StartTime, sw.EndTime)
+				if !ok {
+					continue
+				}
+				intersectionExists = true
+				if hhmmToMinutes(end)-hhmmToMinutes(start) >= task.DurationMin {
+					durationFits = true
+				}
+			}
+		}
+	}
+
+	if !intersectionExists {
+		return fmt.Sprintf("Нет пересечений по времени: преподаватель «%s» работает в [%s], ученик «%s» доступен в [%s]",
+			task.TeacherName, formatWeekdays(teacherDays), task.StudentName, formatWeekdays(studentDays))
+	}
+	if !durationFits {
+		return fmt.Sprintf("Общее доступное окно короче длительности занятия %d мин (преподаватель «%s», ученик «%s»)",
+			task.DurationMin, task.TeacherName, task.StudentName)
+	}
+
+	return "Все возможные временные слоты заняты конфликтующими занятиями (преподаватель, ученик или кабинет недоступны)"
+}
+
+func (g *ScheduleGenerator) DiagnoseNoGroupCandidates(task GroupWeeklyTask, ctx *GenerationContext) string {
+	allSubjectRooms := g.getAllowedRoomIDs(task.SubjectID, ctx.RoomSubjects)
+	if len(allSubjectRooms) == 0 {
+		return fmt.Sprintf("Нет кабинетов для предмета «%s» — добавьте кабинет с поддержкой этого предмета", task.SubjectName)
+	}
+	if _, ok := ctx.StrictTeacherRoomMap[task.TeacherID]; ok {
+		if len(g.resolveAllowedRoomsForTeacher(task.TeacherID, task.SubjectID, ctx)) == 0 {
+			return fmt.Sprintf("Кабинеты строгой привязки преподавателя «%s» не настроены для предмета «%s»", task.TeacherName, task.SubjectName)
+		}
+	}
+
+	teacherDays := g.teacherAvailableDays(task.TeacherID, ctx)
+	if len(teacherDays) == 0 {
+		return fmt.Sprintf("У преподавателя «%s» не задано рабочее время ни на один день недели", task.TeacherName)
+	}
+
+	for _, studentID := range task.EnrolledStudentIDs {
+		if len(g.studentAvailableDays(studentID, ctx)) == 0 {
+			name := fmt.Sprintf("ID:%d", studentID)
+			for _, a := range ctx.Assignments {
+				if a.StudentID == studentID {
+					name = a.Student.FullName
+					break
+				}
+			}
+			return fmt.Sprintf("Ученик «%s» из группы не имеет указанной доступности ни на один день", name)
+		}
+	}
+
+	hasGroupIntersection := false
+	for wd := 1; wd <= 7; wd++ {
+		teacherWindows := g.filterTeacherAvailability(task.TeacherID, wd, ctx.TeacherAvailability)
+		if len(teacherWindows) == 0 {
+			continue
+		}
+		studentIntersection := g.getStudentsAvailabilityIntersection(task.EnrolledStudentIDs, wd, ctx.StudentAvailability)
+		if len(studentIntersection) == 0 {
+			continue
+		}
+		for _, tw := range teacherWindows {
+			for _, si := range studentIntersection {
+				if _, _, ok := intersectWindows(tw.StartTime, tw.EndTime, si[0], si[1]); ok {
+					hasGroupIntersection = true
+					break
+				}
+			}
+			if hasGroupIntersection {
+				break
+			}
+		}
+		if hasGroupIntersection {
+			break
+		}
+	}
+
+	if !hasGroupIntersection {
+		return fmt.Sprintf("Нет общего времени для всех учеников группы и преподавателя «%s» ни в один день недели — проверьте доступность каждого ученика", task.TeacherName)
+	}
+
+	return "Все возможные временные слоты заняты конфликтующими занятиями (преподаватель, кто-то из учеников группы или кабинет недоступны)"
 }

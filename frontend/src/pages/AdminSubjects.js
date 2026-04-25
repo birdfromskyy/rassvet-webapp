@@ -26,13 +26,15 @@ import {
 	FormControlLabel,
 	Chip,
 	CircularProgress,
+	Tooltip,
 } from '@mui/material'
 import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
-	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
+	Pause as PauseIcon,
+	PlayArrow as PlayIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -96,14 +98,18 @@ const AdminSubjects = () => {
 		}
 	}
 
-	const deactivate = async id => {
-		if (!window.confirm('Деактивировать предмет?')) return
+	const toggleSubjectActive = async subject => {
 		try {
-			await scheduleService.deactivateSubject(id)
-			toast.success('Предмет деактивирован')
+			if (subject.is_active) {
+				await scheduleService.deactivateSubject(subject.id)
+				toast.success('Предмет деактивирован')
+			} else {
+				await scheduleService.updateSubject(subject.id, { is_active: true })
+				toast.success('Предмет активирован')
+			}
 			load()
 		} catch {
-			toast.error('Ошибка деактивации')
+			toast.error('Ошибка изменения статуса')
 		}
 	}
 
@@ -182,14 +188,15 @@ const AdminSubjects = () => {
 											>
 												<EditIcon />
 											</IconButton>
-											<IconButton
-												onClick={() => deactivate(s.id)}
-												color='warning'
-												size='small'
-												title='Деактивировать'
-											>
-												<DeactivateIcon />
-											</IconButton>
+											<Tooltip title={s.is_active ? 'Деактивировать' : 'Активировать'}>
+												<IconButton
+													onClick={() => toggleSubjectActive(s)}
+													color={s.is_active ? 'warning' : 'success'}
+													size='small'
+												>
+													{s.is_active ? <PauseIcon /> : <PlayIcon />}
+												</IconButton>
+											</Tooltip>
 											<IconButton
 												onClick={() => remove(s.id)}
 												color='error'

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
 	Container,
@@ -35,6 +35,9 @@ import {
 	ListItem,
 	ListItemText,
 	ListItemSecondaryAction,
+	TableSortLabel,
+	Checkbox,
+	FormControlLabel,
 } from '@mui/material'
 import {
 	ArrowBack as BackIcon,
@@ -146,6 +149,15 @@ const AdminSchedule = () => {
 	const [filterRoomId, setFilterRoomId] = useState('')
 	const [filterFundingType, setFilterFundingType] = useState('')
 
+	// Issue filters
+	const [filterIssueStudentId, setFilterIssueStudentId] = useState('')
+	const [filterIssueTeacherId, setFilterIssueTeacherId] = useState('')
+	const [filterIssueFundingType, setFilterIssueFundingType] = useState('')
+
+	// Issue sorting
+	const [issueSortBy, setIssueSortBy] = useState('student')
+	const [issueSortDir, setIssueSortDir] = useState('asc')
+
 	// Create slot dialog
 	const [createDialog, setCreateDialog] = useState(false)
 	const [slotForm, setSlotForm] = useState(EMPTY_SLOT_FORM)
@@ -153,6 +165,10 @@ const AdminSchedule = () => {
 	// Edit slot dialog
 	const [editDialog, setEditDialog] = useState({ open: false, slot: null })
 	const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM)
+
+	// Conflict warning dialog
+	const [conflictDialog, setConflictDialog] = useState({ open: false, conflicts: [], deleteConflicts: true })
+	const pendingSlotAction = useRef(null)
 
 	const weekStartISO = formatDateISO(weekStart)
 
@@ -265,16 +281,8 @@ const AdminSchedule = () => {
 		setCreateDialog(true)
 	}
 
-	const createSlot = async () => {
-		if (!slotForm.assignment_id || !slotForm.room_id) {
-			toast.error('Выберите назначение и кабинет')
-			return
-		}
+	const doCreateSlot = async () => {
 		const assignment = assignments.find(a => a.id === slotForm.assignment_id)
-		if (!assignment) {
-			toast.error('Назначение не найдено')
-			return
-		}
 		try {
 			await scheduleService.createSlot(scheduleData.schedule.id, {
 				assignment_id: slotForm.assignment_id,
@@ -294,6 +302,25 @@ const AdminSchedule = () => {
 		}
 	}
 
+	const createSlot = async () => {
+		if (!slotForm.assignment_id || !slotForm.room_id) {
+			toast.error('Выберите назначение и кабинет')
+			return
+		}
+		const assignment = assignments.find(a => a.id === slotForm.assignment_id)
+		if (!assignment) {
+			toast.error('Назначение не найдено')
+			return
+		}
+		const conflicts = findConflictingSlots(slotForm.weekday, slotForm.start_time, slotForm.end_time)
+		if (conflicts.length > 0) {
+			pendingSlotAction.current = doCreateSlot
+			setConflictDialog({ open: true, conflicts, deleteConflicts: true })
+			return
+		}
+		await doCreateSlot()
+	}
+
 	const openEditSlot = slot => {
 		setEditForm({
 			weekday: slot.weekday,
@@ -305,7 +332,7 @@ const AdminSchedule = () => {
 		setEditDialog({ open: true, slot })
 	}
 
-	const saveEditSlot = async () => {
+	const doSaveEditSlot = async () => {
 		try {
 			await scheduleService.updateSlot(
 				scheduleData.schedule.id,
@@ -318,6 +345,21 @@ const AdminSchedule = () => {
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка обновления')
 		}
+	}
+
+	const saveEditSlot = async () => {
+		const conflicts = findConflictingSlots(
+			editForm.weekday,
+			editForm.start_time,
+			editForm.end_time,
+			editDialog.slot?.id,
+		)
+		if (conflicts.length > 0) {
+			pendingSlotAction.current = doSaveEditSlot
+			setConflictDialog({ open: true, conflicts, deleteConflicts: true })
+			return
+		}
+		await doSaveEditSlot()
 	}
 
 	const deleteSlot = async slotId => {
@@ -353,6 +395,50 @@ const AdminSchedule = () => {
 			setScheduleData(data)
 			const updatedSlot = data.slots?.find(s => s.id === slot.id)
 			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка')
+		}
+	}
+
+	const timeToMinutes = t => {
+		const [h, m] = t.split(':').map(Number)
+		return h * 60 + m
+	}
+
+	const findConflictingSlots = (weekday, startTime, endTime, excludeSlotId = null) => {
+		if (!scheduleData?.slots) return []
+		const start = timeToMinutes(startTime)
+		const end = timeToMinutes(endTime)
+		return scheduleData.slots.filter(s => {
+			if (excludeSlotId && s.id === excludeSlotId) return false
+			if (s.weekday !== weekday) return false
+			const sStart = timeToMinutes(s.start_time)
+			const sEnd = timeToMinutes(s.end_time)
+			return start < sEnd + 5 && end > sStart - 5
+		})
+	}
+
+	const describeConflictingSlot = s => {
+		const time = `${s.start_time}–${s.end_time}`
+		const day = WEEKDAY_NAMES[s.weekday] || s.weekday
+		if (s.slot_type === 'group') {
+			return `${day} ${time}: ${s.group_lesson?.name || 'Группа'} (${s.teacher?.full_name || '—'}, ${s.room?.name || '—'})`
+		}
+		return `${day} ${time}: ${s.student?.full_name || '—'} → ${s.teacher?.full_name || '—'} (${s.subject?.name || '—'}, ${s.room?.name || '—'})`
+	}
+
+	const handleConflictConfirm = async () => {
+		try {
+			if (conflictDialog.deleteConflicts) {
+				for (const s of conflictDialog.conflicts) {
+					await scheduleService.deleteSlot(scheduleData.schedule.id, s.id)
+				}
+			}
+			setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })
+			if (pendingSlotAction.current) {
+				await pendingSlotAction.current()
+				pendingSlotAction.current = null
+			}
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка')
 		}
@@ -752,56 +838,187 @@ const AdminSchedule = () => {
 				)}
 
 				{/* Issues */}
-				{!loading && issues.length > 0 && (
-					<Accordion sx={{ mt: 2 }}>
-						<AccordionSummary expandIcon={<ExpandIcon />}>
-							<Typography color='error.main'>
-								Проблемы при генерации ({issues.length})
-							</Typography>
-						</AccordionSummary>
-						<AccordionDetails>
-							<TableContainer>
-								<Table size='small'>
-									<TableHead>
-										<TableRow>
-											<TableCell>Код причины</TableCell>
-											<TableCell>Ученик / Группа</TableCell>
-											<TableCell>Преподаватель</TableCell>
-											<TableCell>Предмет</TableCell>
-											<TableCell>Сообщение</TableCell>
-										</TableRow>
-									</TableHead>
-									<TableBody>
-										{issues.map(issue => (
-											<TableRow key={issue.id}>
-												<TableCell>
-													<Chip
-														label={issue.reason_code}
-														color='error'
-														size='small'
-														variant='outlined'
-													/>
-												</TableCell>
-												<TableCell>
-													{issue.group_lesson_id
-														? `Группа: ${issue.group_lesson?.name || issue.group_lesson_id}`
-														: (issue.student?.full_name || issue.student_id || '—')}
-												</TableCell>
-												<TableCell>
-													{issue.teacher?.full_name || issue.teacher_id || '—'}
-												</TableCell>
-												<TableCell>
-													{issue.subject?.name || issue.subject_id || '—'}
-												</TableCell>
-												<TableCell>{issue.message}</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
-							</TableContainer>
-						</AccordionDetails>
-					</Accordion>
-				)}
+				{!loading && issues.length > 0 && (() => {
+					const handleIssueSortClick = col => {
+						if (issueSortBy === col) {
+							setIssueSortDir(d => d === 'asc' ? 'desc' : 'asc')
+						} else {
+							setIssueSortBy(col)
+							setIssueSortDir('asc')
+						}
+					}
+
+					const sortIssues = list => [...list].sort((a, b) => {
+						let aVal = '', bVal = ''
+						if (issueSortBy === 'student') {
+							aVal = a.group_lesson_id ? (a.group_lesson?.name || '') : (a.student?.full_name || '')
+							bVal = b.group_lesson_id ? (b.group_lesson?.name || '') : (b.student?.full_name || '')
+						} else if (issueSortBy === 'teacher') {
+							aVal = a.teacher?.full_name || ''
+							bVal = b.teacher?.full_name || ''
+						} else if (issueSortBy === 'reason') {
+							aVal = a.message || ''
+							bVal = b.message || ''
+						} else {
+							aVal = a.subject?.name || ''
+							bVal = b.subject?.name || ''
+						}
+						const cmp = aVal.localeCompare(bVal, 'ru')
+						return issueSortDir === 'asc' ? cmp : -cmp
+					})
+
+					const filtered = issues.filter(issue => {
+						if (filterIssueStudentId && issue.student_id !== Number(filterIssueStudentId)) return false
+						if (filterIssueTeacherId && issue.teacher_id !== Number(filterIssueTeacherId)) return false
+						if (filterIssueFundingType) {
+							const student = students.find(s => s.id === issue.student_id) || issue.student
+							if (student?.funding_type !== filterIssueFundingType) return false
+						}
+						return true
+					})
+
+					const isConflict = issue => issue.message.startsWith('Все возможные')
+					const configErrors = sortIssues(filtered.filter(i => !isConflict(i)))
+					const conflicts = sortIssues(filtered.filter(i => isConflict(i)))
+
+					const sortableHead = (
+						<TableHead>
+							<TableRow>
+								<TableCell>
+									<TableSortLabel
+										active={issueSortBy === 'student'}
+										direction={issueSortBy === 'student' ? issueSortDir : 'asc'}
+										onClick={() => handleIssueSortClick('student')}
+									>
+										Ученик / Группа
+									</TableSortLabel>
+								</TableCell>
+								<TableCell>
+									<TableSortLabel
+										active={issueSortBy === 'teacher'}
+										direction={issueSortBy === 'teacher' ? issueSortDir : 'asc'}
+										onClick={() => handleIssueSortClick('teacher')}
+									>
+										Преподаватель
+									</TableSortLabel>
+								</TableCell>
+								<TableCell>
+									<TableSortLabel
+										active={issueSortBy === 'subject'}
+										direction={issueSortBy === 'subject' ? issueSortDir : 'asc'}
+										onClick={() => handleIssueSortClick('subject')}
+									>
+										Предмет
+									</TableSortLabel>
+								</TableCell>
+								<TableCell>
+										<TableSortLabel
+											active={issueSortBy === 'reason'}
+											direction={issueSortBy === 'reason' ? issueSortDir : 'asc'}
+											onClick={() => handleIssueSortClick('reason')}
+										>
+											Причина
+										</TableSortLabel>
+									</TableCell>
+							</TableRow>
+						</TableHead>
+					)
+
+					const renderRows = list => list.map(issue => (
+						<TableRow key={issue.id}>
+							<TableCell>
+								{issue.group_lesson_id
+									? `Группа: ${issue.group_lesson?.name || issue.group_lesson_id}`
+									: (issue.student?.full_name || issue.student_id || '—')}
+							</TableCell>
+							<TableCell>{issue.teacher?.full_name || issue.teacher_id || '—'}</TableCell>
+							<TableCell>{issue.subject?.name || issue.subject_id || '—'}</TableCell>
+							<TableCell>{issue.message}</TableCell>
+						</TableRow>
+					))
+
+					return (
+						<Accordion sx={{ mt: 2 }}>
+							<AccordionSummary expandIcon={<ExpandIcon />}>
+								<Typography color='error.main'>
+									Проблемы при генерации ({issues.length})
+								</Typography>
+							</AccordionSummary>
+							<AccordionDetails>
+								{/* Filters */}
+								<Grid container spacing={2} alignItems='center' sx={{ mb: 2 }}>
+									<Grid item xs={12} sm={3}>
+										<FormControl fullWidth size='small'>
+											<InputLabel>Ученик</InputLabel>
+											<Select value={filterIssueStudentId} label='Ученик' onChange={e => setFilterIssueStudentId(e.target.value)}>
+												<MenuItem value=''>Все ученики</MenuItem>
+												{students.map(s => <MenuItem key={s.id} value={s.id}>{s.full_name}</MenuItem>)}
+											</Select>
+										</FormControl>
+									</Grid>
+									<Grid item xs={12} sm={3}>
+										<FormControl fullWidth size='small'>
+											<InputLabel>Преподаватель</InputLabel>
+											<Select value={filterIssueTeacherId} label='Преподаватель' onChange={e => setFilterIssueTeacherId(e.target.value)}>
+												<MenuItem value=''>Все преподаватели</MenuItem>
+												{teachers.map(t => <MenuItem key={t.id} value={t.id}>{t.full_name}</MenuItem>)}
+											</Select>
+										</FormControl>
+									</Grid>
+									<Grid item xs={12} sm={3}>
+										<FormControl fullWidth size='small'>
+											<InputLabel>Финансирование</InputLabel>
+											<Select value={filterIssueFundingType} label='Финансирование' onChange={e => setFilterIssueFundingType(e.target.value)}>
+												<MenuItem value=''>Все</MenuItem>
+												<MenuItem value='paid'>Платники</MenuItem>
+												<MenuItem value='budget'>Бюджетники</MenuItem>
+											</Select>
+										</FormControl>
+									</Grid>
+									<Grid item xs={12} sm={3}>
+										<Button
+											size='small'
+											onClick={() => { setFilterIssueStudentId(''); setFilterIssueTeacherId(''); setFilterIssueFundingType('') }}
+											disabled={!filterIssueStudentId && !filterIssueTeacherId && !filterIssueFundingType}
+										>
+											Сбросить фильтры
+										</Button>
+									</Grid>
+								</Grid>
+
+								{/* Category 1: config errors */}
+								{configErrors.length > 0 && (
+									<Box mb={3}>
+										<Typography variant='subtitle2' color='warning.dark' sx={{ mb: 1 }}>
+											Ошибки конфигурации — занятие невозможно поставить из-за неполных настроек ({configErrors.length})
+										</Typography>
+										<TableContainer>
+											<Table size='small'>
+												{sortableHead}
+												<TableBody>{renderRows(configErrors)}</TableBody>
+											</Table>
+										</TableContainer>
+									</Box>
+								)}
+
+								{/* Category 2: schedule conflicts */}
+								{conflicts.length > 0 && (
+									<Box>
+										<Typography variant='subtitle2' color='error.main' sx={{ mb: 1 }}>
+											Конфликты расписания — все слоты заняты другими занятиями ({conflicts.length})
+										</Typography>
+										<TableContainer>
+											<Table size='small'>
+												{sortableHead}
+												<TableBody>{renderRows(conflicts)}</TableBody>
+											</Table>
+										</TableContainer>
+									</Box>
+								)}
+							</AccordionDetails>
+						</Accordion>
+					)
+				})()}
 			</Paper>
 
 			{/* Create Slot Dialog */}
@@ -1043,6 +1260,51 @@ const AdminSchedule = () => {
 					</Button>
 					<Button onClick={saveEditSlot} variant='contained'>
 						Сохранить
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Conflict Warning Dialog */}
+			<Dialog
+				open={conflictDialog.open}
+				onClose={() => setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })}
+				maxWidth='sm'
+				fullWidth
+			>
+				<DialogTitle>Конфликт занятий</DialogTitle>
+				<DialogContent>
+					<Typography variant='body2' gutterBottom>
+						Новое занятие пересекается со следующими занятиями:
+					</Typography>
+					<List dense>
+						{conflictDialog.conflicts.map(s => (
+							<ListItem key={s.id} disableGutters>
+								<ListItemText primary={describeConflictingSlot(s)} />
+							</ListItem>
+						))}
+					</List>
+					<FormControlLabel
+						control={
+							<Checkbox
+								checked={conflictDialog.deleteConflicts}
+								onChange={e =>
+									setConflictDialog(prev => ({ ...prev, deleteConflicts: e.target.checked }))
+								}
+							/>
+						}
+						label='Удалить конфликтующее занятие'
+					/>
+				</DialogContent>
+				<DialogActions>
+					<Button
+						onClick={() =>
+							setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })
+						}
+					>
+						Отмена
+					</Button>
+					<Button onClick={handleConflictConfirm} variant='contained' color='error'>
+						Поставить занятие
 					</Button>
 				</DialogActions>
 			</Dialog>

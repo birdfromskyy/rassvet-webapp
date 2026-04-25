@@ -29,14 +29,16 @@ import {
 	OutlinedInput,
 	Checkbox,
 	ListItemText,
+	Tooltip,
 } from '@mui/material'
 import {
 	Add as AddIcon,
 	Edit as EditIcon,
 	Delete as DeleteIcon,
-	Block as DeactivateIcon,
 	ArrowBack as BackIcon,
 	School as SubjectsIcon,
+	Pause as PauseIcon,
+	PlayArrow as PlayIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -143,14 +145,18 @@ const AdminRooms = () => {
 		}
 	}
 
-	const deactivateRoom = async id => {
-		if (!window.confirm('Деактивировать кабинет?')) return
+	const toggleRoomActive = async room => {
 		try {
-			await scheduleService.deactivateRoom(id)
-			toast.success('Кабинет деактивирован')
+			if (room.is_active) {
+				await scheduleService.deactivateRoom(room.id)
+				toast.success('Кабинет деактивирован')
+			} else {
+				await scheduleService.updateRoom(room.id, { is_active: true })
+				toast.success('Кабинет активирован')
+			}
 			loadAll()
 		} catch {
-			toast.error('Ошибка деактивации')
+			toast.error('Ошибка изменения статуса')
 		}
 	}
 
@@ -237,14 +243,15 @@ const AdminRooms = () => {
 											>
 												<SubjectsIcon />
 											</IconButton>
-											<IconButton
-												onClick={() => deactivateRoom(r.id)}
-												size='small'
-												color='warning'
-												title='Деактивировать'
-											>
-												<DeactivateIcon />
-											</IconButton>
+											<Tooltip title={r.is_active ? 'Деактивировать' : 'Активировать'}>
+												<IconButton
+													onClick={() => toggleRoomActive(r)}
+													size='small'
+													color={r.is_active ? 'warning' : 'success'}
+												>
+													{r.is_active ? <PauseIcon /> : <PlayIcon />}
+												</IconButton>
+											</Tooltip>
 											<IconButton
 												onClick={() => removeRoom(r.id)}
 												size='small'
