@@ -517,6 +517,10 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 	}
 
 	if err := h.db.Delete(&assignment).Error; err != nil {
+		if strings.Contains(err.Error(), "23503") {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить назначение: есть связанные слоты расписания. Сначала удалите их или сбросьте расписание."})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete assignment"})
 		return
 	}

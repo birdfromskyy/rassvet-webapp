@@ -30,6 +30,7 @@ import {
 import {
 	Add as AddIcon,
 	Edit as EditIcon,
+	Delete as DeleteIcon,
 	ArrowBack as BackIcon,
 	FilterList as FilterIcon,
 	Pause as PauseIcon,
@@ -166,6 +167,18 @@ const AdminAssignments = () => {
 			loadAssignments()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка сохранения')
+		}
+	}
+
+	const deleteAssignment = async a => {
+		if (!window.confirm(`Удалить назначение? Если к нему привязаны слоты расписания — удаление не сработает.`))
+			return
+		try {
+			await scheduleService.deleteAssignment(a.id)
+			toast.success('Назначение удалено')
+			loadAssignments()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления (возможно, есть связанные слоты)')
 		}
 	}
 
@@ -378,6 +391,15 @@ const AdminAssignments = () => {
 													color={a.status === 'active' ? 'warning' : 'success'}
 												>
 													{a.status === 'active' ? <PauseIcon /> : <PlayIcon />}
+												</IconButton>
+											</Tooltip>
+											<Tooltip title='Удалить назначение'>
+												<IconButton
+													onClick={() => deleteAssignment(a)}
+													size='small'
+													color='error'
+												>
+													<DeleteIcon />
 												</IconButton>
 											</Tooltip>
 										</TableCell>

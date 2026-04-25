@@ -22,6 +22,8 @@ import AdminRooms from './pages/AdminRooms'
 import AdminAssignments from './pages/AdminAssignments'
 import AdminSchedule from './pages/AdminSchedule'
 import AdminGroupLessons from './pages/AdminGroupLessons'
+import AdminUsers from './pages/AdminUsers'
+import ChildSchedule from './pages/ChildSchedule'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword'
@@ -126,6 +128,7 @@ function App() {
 					/>
 					<Route path='/reviews' element={<Reviews user={user} />} />
 					<Route path='/create-review' element={<CreateReview />} />
+					<Route path='/my-schedule' element={<ChildSchedule user={user} />} />
 
 					<Route element={<AdminRoute user={user} />}>
 						<Route path='/admin/reviews' element={<AdminReviews />} />
@@ -139,6 +142,7 @@ function App() {
 						<Route path='/admin/schedule/assignments' element={<AdminAssignments />} />
 						<Route path='/admin/schedule/group-lessons' element={<AdminGroupLessons />} />
 						<Route path='/admin/schedule/weekly' element={<AdminSchedule />} />
+						<Route path='/admin/users' element={<AdminUsers />} />
 					</Route>
 				</Route>
 

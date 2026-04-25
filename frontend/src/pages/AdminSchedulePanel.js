@@ -20,6 +20,7 @@ import {
 	CalendarMonth as ScheduleIcon,
 	Groups as GroupIcon,
 	ArrowBack as BackIcon,
+	ManageAccounts as UsersIcon,
 } from '@mui/icons-material'
 
 const MODULES = [
@@ -71,6 +72,13 @@ const MODULES = [
 		icon: ScheduleIcon,
 		color: 'error',
 		path: '/admin/schedule/weekly',
+	},
+	{
+		title: 'Пользователи',
+		description: 'Привязка учеников к учётным записям родителей',
+		icon: UsersIcon,
+		color: 'primary',
+		path: '/admin/users',
 	},
 ]
 

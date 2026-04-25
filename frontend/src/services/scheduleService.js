@@ -242,8 +242,16 @@ const scheduleService = {
 		const r = await api.post(`/admin/schedules/${id}/approve`)
 		return r.data
 	},
+	unapproveSchedule: async id => {
+		const r = await api.post(`/admin/schedules/${id}/unapprove`)
+		return r.data
+	},
 	resetAutoSchedule: async id => {
 		const r = await api.post(`/admin/schedules/${id}/reset-auto`)
+		return r.data
+	},
+	clearAutoSchedule: async id => {
+		const r = await api.post(`/admin/schedules/${id}/clear-auto`)
 		return r.data
 	},
 
@@ -267,6 +275,42 @@ const scheduleService = {
 	},
 	removeSlotExclusion: async (scheduleId, slotId, studentId) => {
 		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}/exclusions/${studentId}`)
+	},
+	// ========== USERS (admin) ==========
+	getUsers: async () => {
+		const r = await api.get('/admin/users')
+		return r.data.users || []
+	},
+	createUser: async data => {
+		const r = await api.post('/admin/users', data)
+		return r.data.user
+	},
+	updateUser: async (id, data) => {
+		const r = await api.put(`/admin/users/${id}`, data)
+		return r.data.user
+	},
+	getUserChildren: async userId => {
+		const r = await api.get(`/admin/users/${userId}/children`)
+		return r.data.children || []
+	},
+	addUserChild: async (userId, studentId) => {
+		const r = await api.post(`/admin/users/${userId}/children`, { student_id: studentId })
+		return r.data.link
+	},
+	removeUserChild: async (userId, studentId) => {
+		await api.delete(`/admin/users/${userId}/children/${studentId}`)
+	},
+
+	// ========== PARENT SCHEDULE ==========
+	getMyChildren: async () => {
+		const r = await api.get('/my-children')
+		return r.data.children || []
+	},
+	getChildSchedule: async (studentId, weekStart) => {
+		const r = await api.get(`/my-children/${studentId}/schedule`, {
+			params: { week_start: weekStart },
+		})
+		return r.data
 	},
 }
 

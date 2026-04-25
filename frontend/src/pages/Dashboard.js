@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
 	Container,
@@ -18,13 +18,22 @@ import {
 	Newspaper as NewsIcon,
 	Person as PersonIcon,
 	CalendarMonth as ScheduleIcon,
+	ChildCare as ChildIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import authService from '../services/authService'
+import scheduleService from '../services/scheduleService'
 import NewsSection from '../components/NewsSection'
 
 const Dashboard = ({ user, onLogout }) => {
 	const navigate = useNavigate()
+	const [hasChildren, setHasChildren] = useState(false)
+
+	useEffect(() => {
+		scheduleService.getMyChildren()
+			.then(data => setHasChildren(data.length > 0))
+			.catch(() => {})
+	}, [])
 
 	const handleLogout = async () => {
 		try {
@@ -138,6 +147,32 @@ const Dashboard = ({ user, onLogout }) => {
 							</CardActions>
 						</Card>
 					</Grid>
+
+					{hasChildren && (
+						<Grid item xs={12} md={4}>
+							<Card>
+								<CardContent>
+									<Box display='flex' alignItems='center' mb={2}>
+										<ChildIcon sx={{ fontSize: 40, mr: 2, color: 'success.main' }} />
+										<Typography variant='h5'>Расписание</Typography>
+									</Box>
+									<Typography variant='body2' color='text.secondary'>
+										Расписание занятий вашего ребёнка
+									</Typography>
+								</CardContent>
+								<CardActions>
+									<Button
+										size='small'
+										variant='contained'
+										color='success'
+										onClick={() => navigate('/my-schedule')}
+									>
+										Смотреть расписание
+									</Button>
+								</CardActions>
+							</Card>
+						</Grid>
+					)}
 
 					{user?.role === 'admin' && (
 						<Grid item xs={12} md={4}>

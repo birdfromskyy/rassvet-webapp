@@ -56,6 +56,7 @@ func Migrate(db *gorm.DB) {
 		&models.ScheduleSlot{},
 		&models.ScheduleSlotExclusion{},
 		&models.ScheduleGenerationIssue{},
+		&models.UserStudent{},
 	)
 
 	if err != nil {

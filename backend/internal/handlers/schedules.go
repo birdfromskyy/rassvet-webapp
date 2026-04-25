@@ -181,6 +181,43 @@ func (h *ScheduleHandler) ApproveSchedule(c *gin.Context) {
 	})
 }
 
+func (h *ScheduleHandler) UnapproveSchedule(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	var schedule models.Schedule
+	if err := h.db.First(&schedule, scheduleID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		return
+	}
+
+	if schedule.Status != models.ScheduleStatusApproved {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Расписание не является утверждённым"})
+		return
+	}
+
+	schedule.Status = models.ScheduleStatusDraft
+	schedule.ApprovedAt = nil
+	schedule.ApprovedByUserID = nil
+
+	if err := h.db.Save(&schedule).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unapprove schedule"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Schedule unapproved successfully",
+		"schedule": schedule,
+	})
+}
+
 func (h *ScheduleHandler) ResetAutoSchedule(c *gin.Context) {
 	scheduleID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || scheduleID <= 0 {
@@ -439,6 +476,35 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Schedule slot deleted successfully",
 	})
+}
+
+func (h *ScheduleHandler) ClearAutoSchedule(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	var schedule models.Schedule
+	if err := h.db.First(&schedule, scheduleID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		return
+	}
+
+	if err := h.generator.CleanupAutoSlots(schedule.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear auto slots"})
+		return
+	}
+	if err := h.generator.CleanupGenerationIssues(schedule.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear generation issues"})
+		return
+	}
+
+	h.respondWithSchedule(c, &schedule)
 }
 
 func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.Schedule) {

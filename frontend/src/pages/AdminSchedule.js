@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import ExcelJS from 'exceljs'
 import { useNavigate } from 'react-router-dom'
 import {
 	Container,
@@ -47,11 +48,14 @@ import {
 	Edit as EditIcon,
 	Delete as DeleteIcon,
 	CheckCircle as ApproveIcon,
+	Cancel as UnapproveIcon,
 	Refresh as ResetIcon,
 	AutoAwesome as GenerateIcon,
 	ExpandMore as ExpandIcon,
 	PersonOff as ExcludeIcon,
 	PersonAdd as IncludeIcon,
+	ClearAll as ClearIcon,
+	TableChart as ExcelIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -254,6 +258,17 @@ const AdminSchedule = () => {
 		}
 	}
 
+	const unapprove = async () => {
+		if (!window.confirm('Снять утверждение? Расписание вернётся в статус "Черновик".')) return
+		try {
+			await scheduleService.unapproveSchedule(scheduleData.schedule.id)
+			toast.success('Утверждение снято')
+			loadSchedule()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка')
+		}
+	}
+
 	const resetAuto = async () => {
 		if (
 			!window.confirm(
@@ -273,6 +288,133 @@ const AdminSchedule = () => {
 		} finally {
 			setGenerating(false)
 		}
+	}
+
+	const clearAuto = async () => {
+		if (!window.confirm('Удалить все авто-слоты? Ручные слоты сохранятся. Перегенерации не будет.'))
+			return
+		try {
+			const data = await scheduleService.clearAutoSchedule(scheduleData.schedule.id)
+			setScheduleData(data)
+			toast.success('Авто-слоты очищены')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка очистки')
+		}
+	}
+
+	const exportToExcel = async () => {
+		if (!scheduleData?.slots?.length) {
+			toast.error('Нет слотов для экспорта')
+			return
+		}
+		const slotsByTeacher = {}
+		for (const slot of scheduleData.slots) {
+			if (slot.status === 'cancelled') continue
+			const name = slot.teacher?.full_name || `ID ${slot.teacher_id}`
+			if (!slotsByTeacher[name]) slotsByTeacher[name] = []
+			slotsByTeacher[name].push(slot)
+		}
+		if (!Object.keys(slotsByTeacher).length) {
+			toast.error('Нет слотов для экспорта')
+			return
+		}
+
+		const workbook = new ExcelJS.Workbook()
+		workbook.creator = 'Rassvet'
+		const weekLabel = formatWeekLabel(weekStart)
+
+		const C = {
+			headerBg:  'FF283593',
+			titleBg:   'FF1A237E',
+			dayBg:     'FFE8EAF6',
+			paid:      'FFFDE8E8',
+			budget:    'FFE8F0FE',
+			group:     'FFE8F5E9',
+			white:     'FFFFFFFF',
+		}
+
+		for (const [teacherName, slots] of Object.entries(slotsByTeacher)) {
+			const sheetName = teacherName.slice(0, 31)
+			const ws = workbook.addWorksheet(sheetName)
+			ws.columns = [
+				{ width: 15 }, { width: 13 }, { width: 11 },
+				{ width: 28 }, { width: 18 }, { width: 14 }, { width: 13 },
+			]
+
+			// Title
+			const r1 = ws.addRow([teacherName, '', '', '', '', '', ''])
+			ws.mergeCells(`A${r1.number}:G${r1.number}`)
+			r1.height = 24
+			r1.getCell(1).font = { bold: true, size: 14, color: { argb: C.white } }
+			r1.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.titleBg } }
+			r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+
+			// Week subtitle
+			const r2 = ws.addRow([`Неделя: ${weekLabel}`, '', '', '', '', '', ''])
+			ws.mergeCells(`A${r2.number}:G${r2.number}`)
+			r2.getCell(1).font = { italic: true, size: 10 }
+			r2.getCell(1).alignment = { horizontal: 'center' }
+
+			// Column headers
+			const hRow = ws.addRow(['День', 'Время', 'Тип', 'Ученик / Группа', 'Предмет', 'Кабинет', 'Финансирование'])
+			hRow.height = 18
+			hRow.eachCell(cell => {
+				cell.font = { bold: true, color: { argb: C.white }, size: 10 }
+				cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.headerBg } }
+				cell.alignment = { horizontal: 'center', vertical: 'middle' }
+				cell.border = { bottom: { style: 'thin', color: { argb: 'FFAAAAAA' } } }
+			})
+
+			const sorted = [...slots].sort((a, b) =>
+				a.weekday !== b.weekday ? a.weekday - b.weekday : a.start_time.localeCompare(b.start_time)
+			)
+
+			let lastDay = null
+			for (const slot of sorted) {
+				if (slot.weekday !== lastDay) {
+					const dr = ws.addRow([WEEKDAY_NAMES[slot.weekday] || slot.weekday, '', '', '', '', '', ''])
+					ws.mergeCells(`A${dr.number}:G${dr.number}`)
+					dr.getCell(1).font = { bold: true, size: 10 }
+					dr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dayBg } }
+					dr.getCell(1).alignment = { horizontal: 'left', indent: 1, vertical: 'middle' }
+					dr.height = 16
+					lastDay = slot.weekday
+				}
+
+				const isGroup = slot.slot_type === 'group'
+				const isPaid = !isGroup && slot.assignment?.funding_type === 'paid'
+				const bg = isGroup ? C.group : isPaid ? C.paid : C.budget
+				const studentLabel = isGroup ? (slot.group_lesson?.name || 'Группа') : (slot.student?.full_name || '—')
+				const fundingLabel = isGroup ? 'Группа' : isPaid ? 'Платник' : 'Бюджет'
+
+				const row = ws.addRow([
+					'',
+					`${slot.start_time}–${slot.end_time}`,
+					isGroup ? 'Групповое' : 'Индив.',
+					studentLabel,
+					slot.subject?.name || '—',
+					slot.room?.name || '—',
+					fundingLabel,
+				])
+				row.height = 15
+				row.eachCell(cell => {
+					cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } }
+					cell.alignment = { vertical: 'middle' }
+					cell.border = { bottom: { style: 'hair', color: { argb: 'FFDDDDDD' } } }
+				})
+			}
+		}
+
+		const buffer = await workbook.xlsx.writeBuffer()
+		const blob = new Blob([buffer], {
+			type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		})
+		const url = URL.createObjectURL(blob)
+		const a = document.createElement('a')
+		a.href = url
+		a.download = `Расписание_${formatDateISO(weekStart)}.xlsx`
+		a.click()
+		URL.revokeObjectURL(url)
 	}
 
 	const openCreateSlot = () => {
@@ -311,7 +453,10 @@ const AdminSchedule = () => {
 			toast.error('Назначение не найдено')
 			return
 		}
-		const conflicts = findConflictingSlots(slotForm.weekday, slotForm.start_time, slotForm.end_time)
+		const conflicts = findConflictingSlots(
+			slotForm.weekday, slotForm.start_time, slotForm.end_time,
+			slotForm.room_id, assignment.teacher_id, assignment.student_id,
+		)
 		if (conflicts.length > 0) {
 			pendingSlotAction.current = doCreateSlot
 			setConflictDialog({ open: true, conflicts, deleteConflicts: true })
@@ -347,11 +492,15 @@ const AdminSchedule = () => {
 	}
 
 	const saveEditSlot = async () => {
+		const slot = editDialog.slot
 		const conflicts = findConflictingSlots(
 			editForm.weekday,
 			editForm.start_time,
 			editForm.end_time,
-			editDialog.slot?.id,
+			editForm.room_id,
+			slot?.teacher_id,
+			slot?.student_id,
+			slot?.id,
 		)
 		if (conflicts.length > 0) {
 			pendingSlotAction.current = doSaveEditSlot
@@ -404,7 +553,7 @@ const AdminSchedule = () => {
 		return h * 60 + m
 	}
 
-	const findConflictingSlots = (weekday, startTime, endTime, excludeSlotId = null) => {
+	const findConflictingSlots = (weekday, startTime, endTime, roomId, teacherId, studentId, excludeSlotId = null) => {
 		if (!scheduleData?.slots) return []
 		const start = timeToMinutes(startTime)
 		const end = timeToMinutes(endTime)
@@ -413,7 +562,9 @@ const AdminSchedule = () => {
 			if (s.weekday !== weekday) return false
 			const sStart = timeToMinutes(s.start_time)
 			const sEnd = timeToMinutes(s.end_time)
-			return start < sEnd + 5 && end > sStart - 5
+			if (!(start < sEnd + 5 && end > sStart - 5)) return false
+			// Only flag conflicts for matching room, teacher, or student
+			return s.room_id === roomId || s.teacher_id === teacherId || s.student_id === studentId
 		})
 	}
 
@@ -562,7 +713,27 @@ const AdminSchedule = () => {
 							>
 								{generating ? 'Пересчёт...' : 'Сбросить авто'}
 							</Button>
+							<Button
+								variant='outlined'
+								color='error'
+								startIcon={<ClearIcon />}
+								onClick={clearAuto}
+								disabled={generating}
+							>
+								Очистить авто
+							</Button>
 						</>
+					)}
+
+					{isApproved && (
+						<Button
+							variant='outlined'
+							color='warning'
+							startIcon={<UnapproveIcon />}
+							onClick={unapprove}
+						>
+							Снять утверждение
+						</Button>
 					)}
 
 					{canAddSlot && (
@@ -572,6 +743,16 @@ const AdminSchedule = () => {
 							onClick={openCreateSlot}
 						>
 							Добавить слот
+						</Button>
+					)}
+					{schedule && (
+						<Button
+							variant='outlined'
+							color='success'
+							startIcon={<ExcelIcon />}
+							onClick={exportToExcel}
+						>
+							Экспорт в Excel
 						</Button>
 					)}
 				</Box>

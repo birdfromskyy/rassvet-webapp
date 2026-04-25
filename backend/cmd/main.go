@@ -73,6 +73,7 @@ func main() {
 
 	scheduleGenerator := services.NewScheduleGenerator(db)
 	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
+	userStudentHandler := handlers.NewUserStudentHandler(db)
 
 	// Public API routes
 	r.POST("/api/register", authHandler.Register)
@@ -176,6 +177,7 @@ func main() {
 			admin.GET("/schedules/:id", scheduleHandler.GetScheduleByID)
 			admin.POST("/schedules/generate", scheduleHandler.GenerateSchedule)
 			admin.POST("/schedules/:id/approve", scheduleHandler.ApproveSchedule)
+			admin.POST("/schedules/:id/unapprove", scheduleHandler.UnapproveSchedule)
 			admin.POST("/schedules/:id/reset-auto", scheduleHandler.ResetAutoSchedule)
 
 			admin.POST("/schedules/:id/slots", scheduleHandler.CreateScheduleSlot)
@@ -202,7 +204,22 @@ func main() {
 			// Teacher rooms
 			admin.GET("/teachers/:id/rooms", teacherHandler.GetTeacherRooms)
 			admin.PUT("/teachers/:id/rooms", teacherHandler.UpdateTeacherRooms)
+
+			// Clear auto schedule without regenerating
+			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
+
+			// User-student links
+			admin.GET("/users", userStudentHandler.GetUsers)
+			admin.POST("/users", userStudentHandler.CreateUser)
+			admin.PUT("/users/:id", userStudentHandler.UpdateUser)
+			admin.GET("/users/:id/children", userStudentHandler.GetUserChildren)
+			admin.POST("/users/:id/children", userStudentHandler.AddUserChild)
+			admin.DELETE("/users/:id/children/:studentId", userStudentHandler.RemoveUserChild)
 		}
+
+		// Parent routes (any authenticated user)
+		protected.GET("/my-children", userStudentHandler.GetMyChildren)
+		protected.GET("/my-children/:studentId/schedule", userStudentHandler.GetChildSchedule)
 	}
 
 	siteDir := "./static/site"
