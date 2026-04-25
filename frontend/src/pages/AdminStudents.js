@@ -54,7 +54,6 @@ const WEEKDAY_FULL = {
 const EMPTY_STUDENT = {
 	full_name: '',
 	parent_phone: '',
-	funding_type: 'paid',
 	is_active: true,
 	notes: '',
 }
@@ -100,7 +99,6 @@ const AdminStudents = () => {
 		setForm({
 			full_name: item.full_name,
 			parent_phone: item.parent_phone || '',
-			funding_type: item.funding_type,
 			is_active: item.is_active,
 			notes: item.notes || '',
 		})
@@ -118,7 +116,6 @@ const AdminStudents = () => {
 			const data = {
 				full_name: form.full_name.trim(),
 				parent_phone: form.parent_phone || null,
-				funding_type: form.funding_type,
 				is_active: form.is_active,
 				notes: form.notes || null,
 			}
@@ -273,7 +270,6 @@ const AdminStudents = () => {
 									<TableCell>ID</TableCell>
 									<TableCell>ФИО</TableCell>
 									<TableCell>Телефон родителя</TableCell>
-									<TableCell>Тип</TableCell>
 									<TableCell>Статус</TableCell>
 									<TableCell align='center'>Действия</TableCell>
 								</TableRow>
@@ -284,13 +280,6 @@ const AdminStudents = () => {
 										<TableCell>{s.id}</TableCell>
 										<TableCell>{s.full_name}</TableCell>
 										<TableCell>{s.parent_phone || '—'}</TableCell>
-										<TableCell>
-											<Chip
-												label={s.funding_type === 'paid' ? 'Платный' : 'Бюджет'}
-												color={s.funding_type === 'paid' ? 'error' : 'success'}
-												size='small'
-											/>
-										</TableCell>
 										<TableCell>
 											<Chip
 												label={s.is_active ? 'Активен' : 'Неактивен'}
@@ -336,7 +325,7 @@ const AdminStudents = () => {
 								))}
 								{!students.length && (
 									<TableRow>
-										<TableCell colSpan={6} align='center'>
+										<TableCell colSpan={5} align='center'>
 											<Typography color='text.secondary'>
 												Ученики не найдены
 											</Typography>
@@ -374,19 +363,6 @@ const AdminStudents = () => {
 							onChange={e => setForm({ ...form, parent_phone: e.target.value })}
 							fullWidth
 						/>
-						<FormControl fullWidth>
-							<InputLabel>Тип финансирования</InputLabel>
-							<Select
-								value={form.funding_type}
-								label='Тип финансирования'
-								onChange={e =>
-									setForm({ ...form, funding_type: e.target.value })
-								}
-							>
-								<MenuItem value='paid'>Платный</MenuItem>
-								<MenuItem value='budget'>Бюджет</MenuItem>
-							</Select>
-						</FormControl>
 						<TextField
 							label='Примечания'
 							value={form.notes}

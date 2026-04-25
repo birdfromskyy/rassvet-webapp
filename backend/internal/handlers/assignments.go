@@ -23,6 +23,7 @@ type CreateAssignmentRequest struct {
 	StudentID       uint    `json:"student_id" binding:"required"`
 	TeacherID       uint    `json:"teacher_id" binding:"required"`
 	SubjectID       uint    `json:"subject_id" binding:"required"`
+	FundingType     string  `json:"funding_type"`
 	VisitsPerWeek   int     `json:"visits_per_week" binding:"required"`
 	DurationMin     int     `json:"duration_min" binding:"required"`
 	Status          string  `json:"status"`
@@ -34,6 +35,7 @@ type UpdateAssignmentRequest struct {
 	StudentID       *uint   `json:"student_id"`
 	TeacherID       *uint   `json:"teacher_id"`
 	SubjectID       *uint   `json:"subject_id"`
+	FundingType     string  `json:"funding_type"`
 	VisitsPerWeek   *int    `json:"visits_per_week"`
 	DurationMin     *int    `json:"duration_min"`
 	Status          string  `json:"status"`
@@ -62,11 +64,11 @@ func isValidAssignmentStatus(value string) bool {
 }
 
 func isValidVisitsPerWeek(value int) bool {
-	return value >= 1 && value <= 3
+	return value >= 1 && value <= 5
 }
 
 func isValidPlannedVisits(value int) bool {
-	return value >= 0 && value <= 3
+	return value >= 0 && value <= 5
 }
 
 func isValidDurationMin(value int) bool {
@@ -202,7 +204,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	}
 
 	if !isValidVisitsPerWeek(req.VisitsPerWeek) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week must be between 1 and 3"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week must be between 1 and 5"})
 		return
 	}
 
@@ -218,6 +220,15 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 			return
 		}
 		status = req.Status
+	}
+
+	fundingType := models.FundingTypeBudget
+	if strings.TrimSpace(req.FundingType) != "" {
+		if !isValidFundingType(req.FundingType) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "funding_type must be 'paid' or 'budget'"})
+			return
+		}
+		fundingType = req.FundingType
 	}
 
 	allowSubstitute := false
@@ -284,6 +295,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		StudentID:       req.StudentID,
 		TeacherID:       req.TeacherID,
 		SubjectID:       req.SubjectID,
+		FundingType:     fundingType,
 		VisitsPerWeek:   req.VisitsPerWeek,
 		DurationMin:     req.DurationMin,
 		Status:          status,
@@ -362,9 +374,17 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		newSubjectID = *req.SubjectID
 	}
 
+	if strings.TrimSpace(req.FundingType) != "" {
+		if !isValidFundingType(req.FundingType) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "funding_type must be 'paid' or 'budget'"})
+			return
+		}
+		assignment.FundingType = req.FundingType
+	}
+
 	if req.VisitsPerWeek != nil {
 		if !isValidVisitsPerWeek(*req.VisitsPerWeek) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week must be between 1 and 3"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week must be between 1 and 5"})
 			return
 		}
 		assignment.VisitsPerWeek = *req.VisitsPerWeek

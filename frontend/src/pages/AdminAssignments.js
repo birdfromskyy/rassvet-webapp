@@ -25,6 +25,7 @@ import {
 	Select,
 	MenuItem,
 	Grid,
+	Autocomplete,
 } from '@mui/material'
 import {
 	Add as AddIcon,
@@ -42,6 +43,7 @@ const EMPTY_ASSIGNMENT = {
 	student_id: '',
 	teacher_id: '',
 	subject_id: '',
+	funding_type: 'budget',
 	visits_per_week: 1,
 	duration_min: 50,
 	status: 'active',
@@ -135,6 +137,7 @@ const AdminAssignments = () => {
 			student_id: item.student_id,
 			teacher_id: item.teacher_id,
 			subject_id: item.subject_id,
+			funding_type: item.funding_type || 'budget',
 			visits_per_week: item.visits_per_week,
 			duration_min: item.duration_min,
 			status: item.status,
@@ -315,6 +318,7 @@ const AdminAssignments = () => {
 									<TableCell>Ученик</TableCell>
 									<TableCell>Преподаватель</TableCell>
 									<TableCell>Предмет</TableCell>
+									<TableCell>Тип</TableCell>
 									<TableCell>Зан./нед.</TableCell>
 									<TableCell>Длит.</TableCell>
 									<TableCell>Статус</TableCell>
@@ -336,6 +340,13 @@ const AdminAssignments = () => {
 										<TableCell>
 											{a.subject?.name ||
 												findName(subjects, a.subject_id, 'name')}
+										</TableCell>
+										<TableCell>
+											<Chip
+												label={a.funding_type === 'paid' ? 'Платник' : 'Бюджет'}
+												color={a.funding_type === 'paid' ? 'error' : 'success'}
+												size='small'
+											/>
 										</TableCell>
 										<TableCell>{a.visits_per_week}</TableCell>
 										<TableCell>{a.duration_min} мин</TableCell>
@@ -374,7 +385,7 @@ const AdminAssignments = () => {
 								))}
 								{!assignments.length && (
 									<TableRow>
-										<TableCell colSpan={8} align='center'>
+										<TableCell colSpan={9} align='center'>
 											<Typography color='text.secondary'>
 												Назначения не найдены
 											</Typography>
@@ -399,36 +410,28 @@ const AdminAssignments = () => {
 				</DialogTitle>
 				<DialogContent>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
-						<FormControl fullWidth required>
-							<InputLabel>Ученик</InputLabel>
-							<Select
-								value={form.student_id}
-								label='Ученик'
-								onChange={e => setForm({ ...form, student_id: e.target.value })}
-							>
-								{students.map(s => (
-									<MenuItem key={s.id} value={s.id}>
-										{s.full_name}
-										{!s.is_active ? ' (неактивен)' : ''}
-									</MenuItem>
-								))}
-							</Select>
-						</FormControl>
-						<FormControl fullWidth required>
-							<InputLabel>Преподаватель</InputLabel>
-							<Select
-								value={form.teacher_id}
-								label='Преподаватель'
-								onChange={e => setForm({ ...form, teacher_id: e.target.value, subject_id: '' })}
-							>
-								{teachers.map(t => (
-									<MenuItem key={t.id} value={t.id}>
-										{t.full_name}
-										{!t.is_active ? ' (неактивен)' : ''}
-									</MenuItem>
-								))}
-							</Select>
-						</FormControl>
+						<Autocomplete
+							options={students}
+							getOptionLabel={s => s.full_name + (!s.is_active ? ' (неактивен)' : '')}
+							value={students.find(s => s.id === form.student_id) || null}
+							onChange={(_, val) => setForm({ ...form, student_id: val?.id || '' })}
+							renderInput={params => (
+								<TextField {...params} label='Ученик' required />
+							)}
+							isOptionEqualToValue={(o, v) => o.id === v.id}
+						/>
+						<Autocomplete
+							options={teachers}
+							getOptionLabel={t => t.full_name + (!t.is_active ? ' (неактивен)' : '')}
+							value={teachers.find(t => t.id === form.teacher_id) || null}
+							onChange={(_, val) =>
+								setForm({ ...form, teacher_id: val?.id || '', subject_id: '' })
+							}
+							renderInput={params => (
+								<TextField {...params} label='Преподаватель' required />
+							)}
+							isOptionEqualToValue={(o, v) => o.id === v.id}
+						/>
 						<FormControl fullWidth required>
 							<InputLabel>Предмет</InputLabel>
 							<Select
@@ -448,6 +451,17 @@ const AdminAssignments = () => {
 							</Select>
 						</FormControl>
 						<FormControl fullWidth>
+							<InputLabel>Тип финансирования</InputLabel>
+							<Select
+								value={form.funding_type}
+								label='Тип финансирования'
+								onChange={e => setForm({ ...form, funding_type: e.target.value })}
+							>
+								<MenuItem value='budget'>Бюджет</MenuItem>
+								<MenuItem value='paid'>Платник</MenuItem>
+							</Select>
+						</FormControl>
+						<FormControl fullWidth>
 							<InputLabel>Занятий в неделю</InputLabel>
 							<Select
 								value={form.visits_per_week}
@@ -456,9 +470,9 @@ const AdminAssignments = () => {
 									setForm({ ...form, visits_per_week: e.target.value })
 								}
 							>
-								<MenuItem value={1}>1</MenuItem>
-								<MenuItem value={2}>2</MenuItem>
-								<MenuItem value={3}>3</MenuItem>
+								{[1, 2, 3, 4, 5].map(n => (
+									<MenuItem key={n} value={n}>{n}</MenuItem>
+								))}
 							</Select>
 						</FormControl>
 						<FormControl fullWidth>

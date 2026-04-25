@@ -104,10 +104,9 @@ const EMPTY_EDIT_FORM = {
 }
 
 // Row background colors: green=group, red=paid individual, blue=budget individual
-const getSlotBgColor = (slot, students) => {
+const getSlotBgColor = slot => {
 	if (slot.slot_type === 'group') return 'rgba(76,175,80,0.10)'
-	const student = students.find(s => s.id === slot.student_id) || slot.student
-	if (student?.funding_type === 'paid') return 'rgba(244,67,54,0.10)'
+	if (slot.assignment?.funding_type === 'paid') return 'rgba(244,67,54,0.10)'
 	return 'rgba(33,150,243,0.10)'
 }
 
@@ -464,8 +463,7 @@ const AdminSchedule = () => {
 				if (slot.slot_type === 'group') {
 					// group slots are not filtered by funding type
 				} else {
-					const student = students.find(s => s.id === slot.student_id) || slot.student
-					if (student?.funding_type !== filterFundingType) continue
+					if (slot.assignment?.funding_type !== filterFundingType) continue
 				}
 			}
 			if (!slotsByDay[slot.weekday]) slotsByDay[slot.weekday] = []
@@ -764,7 +762,7 @@ const AdminSchedule = () => {
 											{daySlots.map(slot => (
 												<TableRow
 													key={slot.id}
-													sx={{ bgcolor: getSlotBgColor(slot, students) }}
+													sx={{ bgcolor: getSlotBgColor(slot) }}
 												>
 													<TableCell>
 														{slot.start_time}–{slot.end_time}

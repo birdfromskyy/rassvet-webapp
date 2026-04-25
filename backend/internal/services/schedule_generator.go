@@ -48,14 +48,15 @@ type WeeklyTask struct {
 	TeacherID    uint
 	SubjectID    uint
 
-	StudentName   string
-	TeacherName   string
-	SubjectName   string
-	FundingType   string
-	VisitsPerWeek int
-	DurationMin   int
-	TaskIndex     int
-	HasStrictRoom bool
+	StudentName            string
+	TeacherName            string
+	SubjectName            string
+	FundingType            string
+	VisitsPerWeek          int
+	DurationMin            int
+	TaskIndex              int
+	HasStrictRoom          bool
+	AvailableWindowMinutes int // total intersection of teacher+student windows across all weekdays
 }
 
 type GroupWeeklyTask struct {
@@ -429,7 +430,11 @@ func (g *ScheduleGenerator) BuildWeeklyTasks(
 		}
 
 		hasStrictRoom := ctx.StrictTeacherIDs[assignment.TeacherID]
+		windowMinutes := g.computeAvailableWindowMinutes(assignment.TeacherID, assignment.StudentID, ctx)
 		expanded := g.ExpandTasks(assignment, visitsPerWeek, durationMin, hasStrictRoom)
+		for k := range expanded {
+			expanded[k].AvailableWindowMinutes = windowMinutes
+		}
 		tasks = append(tasks, expanded...)
 	}
 
@@ -453,7 +458,7 @@ func (g *ScheduleGenerator) ExpandTasks(
 			StudentName:   assignment.Student.FullName,
 			TeacherName:   assignment.Teacher.FullName,
 			SubjectName:   assignment.Subject.Name,
-			FundingType:   assignment.Student.FundingType,
+			FundingType:   assignment.FundingType,
 			VisitsPerWeek: visitsPerWeek,
 			DurationMin:   durationMin,
 			TaskIndex:     i + 1,
@@ -471,17 +476,23 @@ func (g *ScheduleGenerator) SortTasksByPriority(tasks []WeeklyTask) {
 			return tasks[i].FundingType == models.FundingTypePaid
 		}
 
-		// 2. Строгие кабинеты — сначала (меньше гибкости)
+		// 2. Строгие кабинеты — сначала (меньше гибкости по кабинетам)
 		if tasks[i].HasStrictRoom != tasks[j].HasStrictRoom {
 			return tasks[i].HasStrictRoom
 		}
 
-		// 3. Больше занятий в неделю — приоритетнее
+		// 3. Меньше суммарного доступного времени — сначала (Earliest Deadline First):
+		//    ученик с узким окном должен быть поставлен раньше, иначе его время истечёт
+		if tasks[i].AvailableWindowMinutes != tasks[j].AvailableWindowMinutes {
+			return tasks[i].AvailableWindowMinutes < tasks[j].AvailableWindowMinutes
+		}
+
+		// 4. Больше занятий в неделю — приоритетнее
 		if tasks[i].VisitsPerWeek != tasks[j].VisitsPerWeek {
 			return tasks[i].VisitsPerWeek > tasks[j].VisitsPerWeek
 		}
 
-		// 4. Длиннее занятия — приоритетнее
+		// 5. Длиннее занятия — приоритетнее
 		if tasks[i].DurationMin != tasks[j].DurationMin {
 			return tasks[i].DurationMin > tasks[j].DurationMin
 		}
@@ -1462,4 +1473,33 @@ func (g *ScheduleGenerator) DiagnoseNoGroupCandidates(task GroupWeeklyTask, ctx 
 	}
 
 	return "Все возможные временные слоты заняты конфликтующими занятиями (преподаватель, кто-то из учеников группы или кабинет недоступны)"
+}
+
+// timeHHMMToMinutes converts "HH:MM" string to total minutes since midnight.
+func timeHHMMToMinutes(t string) int {
+	if len(t) < 5 {
+		return 0
+	}
+	h := int(t[0]-'0')*10 + int(t[1]-'0')
+	m := int(t[3]-'0')*10 + int(t[4]-'0')
+	return h*60 + m
+}
+
+// computeAvailableWindowMinutes returns the total minutes that a student and teacher
+// share across all weekdays — the broader this window, the more scheduling flexibility exists.
+func (g *ScheduleGenerator) computeAvailableWindowMinutes(teacherID, studentID uint, ctx *GenerationContext) int {
+	total := 0
+	for weekday := 1; weekday <= 7; weekday++ {
+		teacherWindows := g.filterTeacherAvailability(teacherID, weekday, ctx.TeacherAvailability)
+		studentWindows := g.filterStudentAvailability(studentID, weekday, ctx.StudentAvailability)
+		for _, tw := range teacherWindows {
+			for _, sw := range studentWindows {
+				start, end, ok := intersectWindows(tw.StartTime, tw.EndTime, sw.StartTime, sw.EndTime)
+				if ok {
+					total += timeHHMMToMinutes(end) - timeHHMMToMinutes(start)
+				}
+			}
+		}
+	}
+	return total
 }

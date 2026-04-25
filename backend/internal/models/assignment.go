@@ -12,6 +12,7 @@ type Assignment struct {
 	StudentID       uint      `json:"student_id" gorm:"not null;uniqueIndex:idx_student_teacher_subject"`
 	TeacherID       uint      `json:"teacher_id" gorm:"not null;index;uniqueIndex:idx_student_teacher_subject"`
 	SubjectID       uint      `json:"subject_id" gorm:"not null;index;uniqueIndex:idx_student_teacher_subject"`
+	FundingType     string    `json:"funding_type" gorm:"type:varchar(20);not null;default:'budget'"`
 	VisitsPerWeek   int       `json:"visits_per_week" gorm:"not null"`
 	DurationMin     int       `json:"duration_min" gorm:"not null"`
 	Status          string    `json:"status" gorm:"type:varchar(20);not null;default:'active';index"`
