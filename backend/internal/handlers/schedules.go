@@ -30,14 +30,17 @@ type GenerateScheduleRequest struct {
 }
 
 type CreateManualSlotRequest struct {
-	AssignmentID uint   `json:"assignment_id" binding:"required"`
-	StudentID    uint   `json:"student_id" binding:"required"`
-	TeacherID    uint   `json:"teacher_id" binding:"required"`
-	SubjectID    uint   `json:"subject_id" binding:"required"`
-	RoomID       uint   `json:"room_id" binding:"required"`
-	Weekday      int    `json:"weekday" binding:"required"`
-	StartTime    string `json:"start_time" binding:"required"`
-	EndTime      string `json:"end_time" binding:"required"`
+	SlotType      string `json:"slot_type"`
+	AssignmentID  uint   `json:"assignment_id"`
+	GroupLessonID uint   `json:"group_lesson_id"`
+	StudentID     uint   `json:"student_id"`
+	TeacherID     uint   `json:"teacher_id" binding:"required"`
+	SubjectID     uint   `json:"subject_id"`
+	RoomID        uint   `json:"room_id"`
+	RoomName      string `json:"room_name"`
+	Weekday       int    `json:"weekday" binding:"required"`
+	StartTime     string `json:"start_time" binding:"required"`
+	EndTime       string `json:"end_time" binding:"required"`
 }
 
 type UpdateScheduleSlotRequest struct {
@@ -46,6 +49,7 @@ type UpdateScheduleSlotRequest struct {
 	StartTime string `json:"start_time"`
 	EndTime   string `json:"end_time"`
 	Status    string `json:"status"`
+	RoomName  string `json:"room_name"`
 }
 
 func (h *ScheduleHandler) GetScheduleByWeek(c *gin.Context) {
@@ -272,8 +276,17 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		return
 	}
 
-	if req.AssignmentID == 0 || req.StudentID == 0 || req.TeacherID == 0 || req.SubjectID == 0 || req.RoomID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "assignment_id, student_id, teacher_id, subject_id and room_id must be positive"})
+	slotType := strings.TrimSpace(req.SlotType)
+	if slotType == "" {
+		slotType = models.SlotTypeIndividual
+	}
+	if slotType != models.SlotTypeIndividual && slotType != models.SlotTypeGroup {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "slot_type must be individual or group"})
+		return
+	}
+
+	if req.TeacherID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "teacher_id must be positive"})
 		return
 	}
 
@@ -302,23 +315,57 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		return
 	}
 
-	if err := h.ensureManualSlotRelations(req.AssignmentID, req.StudentID, req.TeacherID, req.SubjectID, req.RoomID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	slot := models.ScheduleSlot{
+		ScheduleID: uint(scheduleID),
+		SlotType:   slotType,
+		TeacherID:  req.TeacherID,
+		RoomName:   strings.TrimSpace(req.RoomName),
+		Weekday:    req.Weekday,
+		StartTime:  req.StartTime,
+		EndTime:    req.EndTime,
+		Origin:     models.ScheduleSlotOriginManual,
+		Status:     models.ScheduleSlotStatusScheduled,
 	}
 
-	slot := models.ScheduleSlot{
-		ScheduleID:   uint(scheduleID),
-		AssignmentID: &req.AssignmentID,
-		StudentID:    &req.StudentID,
-		TeacherID:    req.TeacherID,
-		SubjectID:    req.SubjectID,
-		RoomID:       req.RoomID,
-		Weekday:      req.Weekday,
-		StartTime:    req.StartTime,
-		EndTime:      req.EndTime,
-		Origin:       models.ScheduleSlotOriginManual,
-		Status:       models.ScheduleSlotStatusScheduled,
+	if slotType == models.SlotTypeIndividual {
+		if req.AssignmentID == 0 || req.StudentID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "assignment_id and student_id must be positive for individual slots"})
+			return
+		}
+		if req.SubjectID == 0 || req.RoomID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "subject_id and room_id must be positive for individual slots"})
+			return
+		}
+		if err := h.ensureManualSlotRelations(req.AssignmentID, req.StudentID, req.TeacherID, req.SubjectID, req.RoomID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		subjectID := req.SubjectID
+		roomID := req.RoomID
+		slot.AssignmentID = &req.AssignmentID
+		slot.StudentID = &req.StudentID
+		slot.SubjectID = &subjectID
+		slot.RoomID = &roomID
+	} else {
+		if req.GroupLessonID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "group_lesson_id must be positive for group slots"})
+			return
+		}
+		if strings.TrimSpace(req.RoomName) == "" {
+			var groupLesson models.GroupLesson
+			if err := h.db.First(&groupLesson, req.GroupLessonID).Error; err == nil {
+				req.RoomName = groupLesson.RoomName
+			}
+		}
+		if strings.TrimSpace(req.RoomName) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "room_name is required for group slots"})
+			return
+		}
+		if err := h.ensureManualGroupSlotRelations(req.GroupLessonID, req.TeacherID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		slot.GroupLessonID = &req.GroupLessonID
 	}
 
 	if err := h.db.Create(&slot).Error; err != nil {
@@ -332,6 +379,10 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		Preload("Subject").
 		Preload("Room").
 		Preload("Assignment").
+		Preload("GroupLesson").
+		Preload("GroupLesson.Enrollments").
+		Preload("GroupLesson.Enrollments.Student").
+		Preload("Exclusions").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch created schedule slot"})
 		return
@@ -378,7 +429,12 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "room_id must be positive"})
 			return
 		}
-		slot.RoomID = *req.RoomID
+		slot.RoomID = req.RoomID
+		slot.RoomName = ""
+	}
+	if strings.TrimSpace(req.RoomName) != "" {
+		slot.RoomName = strings.TrimSpace(req.RoomName)
+		slot.RoomID = nil
 	}
 
 	if req.Weekday != nil {
@@ -433,6 +489,10 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		Preload("Subject").
 		Preload("Room").
 		Preload("Assignment").
+		Preload("GroupLesson").
+		Preload("GroupLesson.Enrollments").
+		Preload("GroupLesson.Enrollments.Student").
+		Preload("Exclusions").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated schedule slot"})
 		return
@@ -567,30 +627,57 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 }
 
 func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Schedule) int {
+	total := 0
+
+	assignmentOverrides := map[uint]models.AssignmentWeekOverride{}
 	var overrides []models.AssignmentWeekOverride
 	if err := h.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&overrides).Error; err == nil {
-		if len(overrides) > 0 {
-			total := 0
-			for _, o := range overrides {
-				if o.Status == models.AssignmentStatusPaused {
-					continue
-				}
-				total += o.PlannedVisits
-			}
-			return total
+		for _, o := range overrides {
+			assignmentOverrides[o.AssignmentID] = o
 		}
 	}
 
 	var assignments []models.Assignment
 	if err := h.db.Where("status = ?", models.AssignmentStatusActive).Find(&assignments).Error; err == nil {
-		total := 0
 		for _, a := range assignments {
+			if override, ok := assignmentOverrides[a.ID]; ok {
+				if override.Status == models.AssignmentStatusPaused {
+					continue
+				}
+				total += override.PlannedVisits
+				continue
+			}
 			total += a.VisitsPerWeek
 		}
-		return total
 	}
 
-	return 0
+	groupOverrides := map[uint]models.GroupLessonWeekOverride{}
+	var groupWeekOverrides []models.GroupLessonWeekOverride
+	if err := h.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&groupWeekOverrides).Error; err == nil {
+		for _, o := range groupWeekOverrides {
+			groupOverrides[o.GroupLessonID] = o
+		}
+	}
+
+	var groupLessons []models.GroupLesson
+	if err := h.db.Where("status = ?", models.GroupLessonStatusActive).Find(&groupLessons).Error; err == nil {
+		for _, g := range groupLessons {
+			if override, ok := groupOverrides[g.ID]; ok {
+				if override.Status == models.GroupLessonStatusPaused {
+					continue
+				}
+				if override.PlannedVisits != nil {
+					total += *override.PlannedVisits
+				} else {
+					total += g.VisitsPerWeek
+				}
+				continue
+			}
+			total += g.VisitsPerWeek
+		}
+	}
+
+	return total
 }
 
 func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, teacherID, subjectID, roomID uint) error {
@@ -626,6 +713,33 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 }
 
 // ========== SLOT EXCLUSIONS (для групповых слотов) ==========
+
+func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherID uint) error {
+	var groupLesson models.GroupLesson
+	if err := h.db.First(&groupLesson, groupLessonID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("group lesson not found")
+		}
+		return err
+	}
+
+	if groupLesson.Status != models.GroupLessonStatusActive {
+		return fmt.Errorf("group lesson is not active")
+	}
+
+	var teacher models.Teacher
+	if err := h.db.First(&teacher, teacherID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("teacher not found")
+		}
+		return err
+	}
+	if !teacher.IsActive {
+		return fmt.Errorf("teacher is not active")
+	}
+
+	return nil
+}
 
 func (h *ScheduleHandler) AddSlotExclusion(c *gin.Context) {
 	scheduleID, err := strconv.Atoi(c.Param("id"))

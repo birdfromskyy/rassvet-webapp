@@ -516,6 +516,34 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 		return
 	}
 
+	if assignment.Status == models.AssignmentStatusPaused {
+		err := h.db.Transaction(func(tx *gorm.DB) error {
+			slotIDs := tx.Model(&models.ScheduleSlot{}).Select("id").Where("assignment_id = ?", assignment.ID)
+			if err := tx.Where("schedule_slot_id IN (?)", slotIDs).Delete(&models.ScheduleSlotExclusion{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("assignment_id = ?", assignment.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("assignment_id = ?", assignment.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("assignment_id = ?", assignment.ID).Delete(&models.AssignmentWeekOverride{}).Error; err != nil {
+				return err
+			}
+			return tx.Delete(&assignment).Error
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete paused assignment"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Assignment deleted successfully",
+		})
+		return
+	}
+
 	if err := h.db.Delete(&assignment).Error; err != nil {
 		if strings.Contains(err.Error(), "23503") {
 			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить назначение: есть связанные слоты расписания. Сначала удалите их или сбросьте расписание."})

@@ -39,6 +39,7 @@ import {
 	TableSortLabel,
 	Checkbox,
 	FormControlLabel,
+	Autocomplete,
 } from '@mui/material'
 import {
 	ArrowBack as BackIcon,
@@ -92,8 +93,13 @@ const SLOT_STATUS_LABELS = {
 }
 
 const EMPTY_SLOT_FORM = {
+	slot_type: 'individual',
 	assignment_id: '',
+	group_lesson_id: '',
+	teacher_id: '',
+	subject_id: '',
 	room_id: '',
+	room_name: '',
 	weekday: 1,
 	start_time: '09:00',
 	end_time: '09:50',
@@ -125,6 +131,12 @@ const getMonday = date => {
 
 const formatDateISO = date => date.toISOString().split('T')[0]
 
+const getSlotDuration = slot => {
+	const [startH, startM] = slot.start_time.split(':').map(Number)
+	const [endH, endM] = slot.end_time.split(':').map(Number)
+	return endH * 60 + endM - (startH * 60 + startM)
+}
+
 const formatWeekLabel = weekStart => {
 	const weekEnd = new Date(weekStart)
 	weekEnd.setDate(weekEnd.getDate() + 5)
@@ -141,6 +153,7 @@ const AdminSchedule = () => {
 
 	// Reference data for dialogs and filters
 	const [assignments, setAssignments] = useState([])
+	const [groupLessons, setGroupLessons] = useState([])
 	const [rooms, setRooms] = useState([])
 	const [students, setStudents] = useState([])
 	const [teachers, setTeachers] = useState([])
@@ -168,6 +181,7 @@ const AdminSchedule = () => {
 	// Edit slot dialog
 	const [editDialog, setEditDialog] = useState({ open: false, slot: null })
 	const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM)
+	const [addGroupStudentId, setAddGroupStudentId] = useState('')
 
 	// Conflict warning dialog
 	const [conflictDialog, setConflictDialog] = useState({ open: false, conflicts: [], deleteConflicts: true })
@@ -200,12 +214,14 @@ const AdminSchedule = () => {
 		if (refLoaded) return
 		Promise.all([
 			scheduleService.getAssignments({ status: 'active' }),
+			scheduleService.getGroupLessons({ status: 'active' }),
 			scheduleService.getRooms(),
 			scheduleService.getStudents(),
 			scheduleService.getTeachers(),
 		])
-			.then(([aData, rData, sData, tData]) => {
+			.then(([aData, gData, rData, sData, tData]) => {
 				setAssignments(aData)
+				setGroupLessons(gData)
 				setRooms(rData.filter(r => r.is_active))
 				setStudents(sData)
 				setTeachers(tData)
@@ -302,7 +318,7 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const exportToExcel = async () => {
+	const exportTeachersToExcel = async () => {
 		if (!scheduleData?.slots?.length) {
 			toast.error('Нет слотов для экспорта')
 			return
@@ -393,7 +409,7 @@ const AdminSchedule = () => {
 					isGroup ? 'Групповое' : 'Индив.',
 					studentLabel,
 					slot.subject?.name || '—',
-					slot.room?.name || '—',
+					slot.room_name || slot.room?.name || '—',
 					fundingLabel,
 				])
 				row.height = 15
@@ -417,24 +433,143 @@ const AdminSchedule = () => {
 		URL.revokeObjectURL(url)
 	}
 
+	const getActiveGroupEnrollments = slot => {
+		const excluded = new Set((slot.exclusions || []).map(ex => ex.student_id))
+		return (slot.group_lesson?.enrollments || []).filter(enr => !excluded.has(enr.student_id))
+	}
+
+	const exportStudentsToExcel = async () => {
+		if (!scheduleData?.slots?.length) {
+			toast.error('Нет слотов для экспорта')
+			return
+		}
+
+		const slotsByStudent = {}
+		for (const slot of scheduleData.slots) {
+			if (slot.status === 'cancelled') continue
+			if (slot.slot_type === 'group') {
+				for (const enr of getActiveGroupEnrollments(slot)) {
+					const name = enr.student?.full_name || `ID ${enr.student_id}`
+					if (!slotsByStudent[name]) slotsByStudent[name] = []
+					slotsByStudent[name].push(slot)
+				}
+				continue
+			}
+			const name = slot.student?.full_name || `ID ${slot.student_id}`
+			if (!slotsByStudent[name]) slotsByStudent[name] = []
+			slotsByStudent[name].push(slot)
+		}
+
+		if (!Object.keys(slotsByStudent).length) {
+			toast.error('Нет слотов для экспорта')
+			return
+		}
+
+		const workbook = new ExcelJS.Workbook()
+		workbook.creator = 'Rassvet'
+		const weekLabel = formatWeekLabel(weekStart)
+		const C = {
+			headerBg: 'FF2E7D32',
+			titleBg: 'FF1B5E20',
+			dayBg: 'FFE8F5E9',
+			lesson: 'FFF1F8E9',
+			white: 'FFFFFFFF',
+		}
+
+		for (const [studentName, slots] of Object.entries(slotsByStudent)) {
+			const ws = workbook.addWorksheet(studentName.slice(0, 31))
+			ws.columns = [{ width: 15 }, { width: 13 }, { width: 14 }, { width: 24 }, { width: 24 }, { width: 16 }]
+
+			const r1 = ws.addRow([studentName, '', '', '', '', ''])
+			ws.mergeCells(`A${r1.number}:F${r1.number}`)
+			r1.height = 24
+			r1.getCell(1).font = { bold: true, size: 14, color: { argb: C.white } }
+			r1.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.titleBg } }
+			r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+
+			const r2 = ws.addRow([`Неделя: ${weekLabel}`, '', '', '', '', ''])
+			ws.mergeCells(`A${r2.number}:F${r2.number}`)
+			r2.getCell(1).font = { italic: true, size: 10 }
+			r2.getCell(1).alignment = { horizontal: 'center' }
+
+			const hRow = ws.addRow(['День', 'Время', 'Тип', 'Предмет', 'Преподаватель', 'Кабинет'])
+			hRow.eachCell(cell => {
+				cell.font = { bold: true, color: { argb: C.white }, size: 10 }
+				cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.headerBg } }
+				cell.alignment = { horizontal: 'center', vertical: 'middle' }
+			})
+
+			const sorted = [...slots].sort((a, b) =>
+				a.weekday !== b.weekday ? a.weekday - b.weekday : a.start_time.localeCompare(b.start_time)
+			)
+			let lastDay = null
+			for (const slot of sorted) {
+				if (slot.weekday !== lastDay) {
+					const dr = ws.addRow([WEEKDAY_NAMES[slot.weekday] || slot.weekday, '', '', '', '', ''])
+					ws.mergeCells(`A${dr.number}:F${dr.number}`)
+					dr.getCell(1).font = { bold: true, size: 10 }
+					dr.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.dayBg } }
+					lastDay = slot.weekday
+				}
+
+				const row = ws.addRow([
+					'',
+					`${slot.start_time}-${slot.end_time}`,
+					slot.slot_type === 'group' ? 'Групповое' : 'Индив.',
+					slot.subject?.name || '-',
+					slot.teacher?.full_name || '-',
+					slot.room_name || slot.room?.name || '-',
+				])
+				row.eachCell(cell => {
+					cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.lesson } }
+					cell.border = { bottom: { style: 'hair', color: { argb: 'FFDDDDDD' } } }
+				})
+			}
+		}
+
+		const buffer = await workbook.xlsx.writeBuffer()
+		const blob = new Blob([buffer], {
+			type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+		})
+		const url = URL.createObjectURL(blob)
+		const a = document.createElement('a')
+		a.href = url
+		a.download = `Расписание_дети_${formatDateISO(weekStart)}.xlsx`
+		a.click()
+		URL.revokeObjectURL(url)
+	}
+
 	const openCreateSlot = () => {
 		setSlotForm(EMPTY_SLOT_FORM)
 		setCreateDialog(true)
 	}
 
 	const doCreateSlot = async () => {
-		const assignment = assignments.find(a => a.id === slotForm.assignment_id)
+		const assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
+		const groupLesson = groupLessons.find(g => g.id === Number(slotForm.group_lesson_id))
 		try {
-			await scheduleService.createSlot(scheduleData.schedule.id, {
-				assignment_id: slotForm.assignment_id,
-				student_id: assignment.student_id,
-				teacher_id: assignment.teacher_id,
-				subject_id: assignment.subject_id,
-				room_id: slotForm.room_id,
-				weekday: slotForm.weekday,
-				start_time: slotForm.start_time,
-				end_time: slotForm.end_time,
-			})
+			const payload = slotForm.slot_type === 'group'
+				? {
+					slot_type: 'group',
+					group_lesson_id: Number(slotForm.group_lesson_id),
+					teacher_id: Number(slotForm.teacher_id || groupLesson.default_teacher_id),
+					room_name: slotForm.room_name || groupLesson.room_name,
+					weekday: Number(slotForm.weekday),
+					start_time: slotForm.start_time,
+					end_time: slotForm.end_time,
+				}
+				: {
+					slot_type: 'individual',
+					assignment_id: Number(slotForm.assignment_id),
+					student_id: assignment.student_id,
+					teacher_id: assignment.teacher_id,
+					subject_id: assignment.subject_id,
+					room_id: Number(slotForm.room_id),
+					weekday: Number(slotForm.weekday),
+					start_time: slotForm.start_time,
+					end_time: slotForm.end_time,
+				}
+			await scheduleService.createSlot(scheduleData.schedule.id, payload)
 			toast.success('Слот добавлен')
 			setCreateDialog(false)
 			loadSchedule()
@@ -444,18 +579,47 @@ const AdminSchedule = () => {
 	}
 
 	const createSlot = async () => {
-		if (!slotForm.assignment_id || !slotForm.room_id) {
-			toast.error('Выберите назначение и кабинет')
+		if (slotForm.slot_type === 'group') {
+			const groupLesson = groupLessons.find(g => g.id === Number(slotForm.group_lesson_id))
+			if (!groupLesson) {
+				toast.error('?????? ?? ???????')
+				return
+			}
+			const teacherId = Number(slotForm.teacher_id || groupLesson.default_teacher_id)
+			if (!teacherId) {
+				toast.error('???????? ?????????????')
+				return
+			}
+			if (!String(slotForm.room_name || groupLesson.room_name || '').trim()) {
+				toast.error('??????? ??????? ??? ????? ??????????')
+				return
+			}
+			const conflicts = findConflictingSlots(
+				Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
+				null, teacherId,
+				(groupLesson.enrollments || []).map(enr => enr.student_id),
+			)
+			if (conflicts.length > 0) {
+				pendingSlotAction.current = doCreateSlot
+				setConflictDialog({ open: true, conflicts, deleteConflicts: true })
+				return
+			}
+			await doCreateSlot()
 			return
 		}
-		const assignment = assignments.find(a => a.id === slotForm.assignment_id)
+
+		if (!slotForm.room_id) {
+			toast.error('???????? ?????????? ? ???????')
+			return
+		}
+		const assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
 		if (!assignment) {
-			toast.error('Назначение не найдено')
+			toast.error('?????????? ?? ???????')
 			return
 		}
 		const conflicts = findConflictingSlots(
-			slotForm.weekday, slotForm.start_time, slotForm.end_time,
-			slotForm.room_id, assignment.teacher_id, assignment.student_id,
+			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
+			Number(slotForm.room_id), assignment.teacher_id, [assignment.student_id],
 		)
 		if (conflicts.length > 0) {
 			pendingSlotAction.current = doCreateSlot
@@ -464,7 +628,6 @@ const AdminSchedule = () => {
 		}
 		await doCreateSlot()
 	}
-
 	const openEditSlot = slot => {
 		setEditForm({
 			weekday: slot.weekday,
@@ -473,6 +636,7 @@ const AdminSchedule = () => {
 			room_id: slot.room_id,
 			status: slot.status,
 		})
+		setAddGroupStudentId('')
 		setEditDialog({ open: true, slot })
 	}
 
@@ -499,7 +663,7 @@ const AdminSchedule = () => {
 			editForm.end_time,
 			editForm.room_id,
 			slot?.teacher_id,
-			slot?.student_id,
+			getSlotStudentIds(slot),
 			slot?.id,
 		)
 		if (conflicts.length > 0) {
@@ -548,13 +712,37 @@ const AdminSchedule = () => {
 		}
 	}
 
+	const handleAddStudentToGroupSlot = async () => {
+		const slot = editDialog.slot
+		if (!slot?.group_lesson_id || !addGroupStudentId) return
+		try {
+			await scheduleService.addGroupEnrollment(slot.group_lesson_id, Number(addGroupStudentId))
+			toast.success('Ученик добавлен в группу')
+			setAddGroupStudentId('')
+			const data = await scheduleService.getScheduleByWeek(weekStartISO)
+			setScheduleData(data)
+			const updatedSlot = data.slots?.find(s => s.id === slot.id)
+			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка добавления ученика')
+		}
+	}
+
 	const timeToMinutes = t => {
 		const [h, m] = t.split(':').map(Number)
 		return h * 60 + m
 	}
 
-	const findConflictingSlots = (weekday, startTime, endTime, roomId, teacherId, studentId, excludeSlotId = null) => {
+	const getSlotStudentIds = slot => {
+		if (slot.slot_type === 'group') {
+			return getActiveGroupEnrollments(slot).map(enr => enr.student_id)
+		}
+		return slot.student_id ? [slot.student_id] : []
+	}
+
+	const findConflictingSlots = (weekday, startTime, endTime, roomId, teacherId, studentIds = [], excludeSlotId = null) => {
 		if (!scheduleData?.slots) return []
+		const checkedStudentIds = new Set(Array.isArray(studentIds) ? studentIds : [studentIds].filter(Boolean))
 		const start = timeToMinutes(startTime)
 		const end = timeToMinutes(endTime)
 		return scheduleData.slots.filter(s => {
@@ -564,7 +752,9 @@ const AdminSchedule = () => {
 			const sEnd = timeToMinutes(s.end_time)
 			if (!(start < sEnd + 5 && end > sStart - 5)) return false
 			// Only flag conflicts for matching room, teacher, or student
-			return s.room_id === roomId || s.teacher_id === teacherId || s.student_id === studentId
+			const hasStudentConflict = getSlotStudentIds(s).some(id => checkedStudentIds.has(id))
+			const hasRoomConflict = roomId && s.room_id === roomId
+			return hasRoomConflict || s.teacher_id === teacherId || hasStudentConflict
 		})
 	}
 
@@ -750,9 +940,19 @@ const AdminSchedule = () => {
 							variant='outlined'
 							color='success'
 							startIcon={<ExcelIcon />}
-							onClick={exportToExcel}
+							onClick={exportTeachersToExcel}
 						>
-							Экспорт в Excel
+							Экспорт преподавателей
+						</Button>
+					)}
+					{schedule && (
+						<Button
+							variant='outlined'
+							color='success'
+							startIcon={<ExcelIcon />}
+							onClick={exportStudentsToExcel}
+						>
+							Экспорт детей
 						</Button>
 					)}
 				</Box>
@@ -930,6 +1130,7 @@ const AdminSchedule = () => {
 										<TableHead>
 											<TableRow>
 												<TableCell>Время</TableCell>
+												<TableCell>{'\u0414\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c'}</TableCell>
 												<TableCell>Ученик / Группа</TableCell>
 												<TableCell>Преподаватель</TableCell>
 												<TableCell>Предмет</TableCell>
@@ -948,6 +1149,7 @@ const AdminSchedule = () => {
 													<TableCell>
 														{slot.start_time}–{slot.end_time}
 													</TableCell>
+													<TableCell>{getSlotDuration(slot)} {'\u043c\u0438\u043d'}</TableCell>
 													<TableCell>
 														{slot.slot_type === 'group'
 															? <><strong>{slot.group_lesson?.name || '—'}</strong>
@@ -966,7 +1168,7 @@ const AdminSchedule = () => {
 														{slot.subject?.name || slot.subject_id}
 													</TableCell>
 													<TableCell>
-														{slot.room?.name || slot.room_id}
+														{slot.room_name || slot.room?.name || slot.room_id || '—'}
 													</TableCell>
 													<TableCell>
 														<Chip
@@ -1210,40 +1412,99 @@ const AdminSchedule = () => {
 				<DialogTitle>Добавить слот вручную</DialogTitle>
 				<DialogContent>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
-						<FormControl fullWidth required>
-							<InputLabel>Назначение</InputLabel>
+						<FormControl fullWidth>
+							<InputLabel>Тип занятия</InputLabel>
 							<Select
-								value={slotForm.assignment_id}
-								label='Назначение'
+								value={slotForm.slot_type}
+								label='Тип занятия'
 								onChange={e =>
-									setSlotForm({ ...slotForm, assignment_id: e.target.value })
+									setSlotForm({
+										...slotForm,
+										slot_type: e.target.value,
+										assignment_id: '',
+										group_lesson_id: '',
+										teacher_id: '',
+										subject_id: '',
+									})
 								}
 							>
-								{assignments.map(a => (
-									<MenuItem key={a.id} value={a.id}>
-										{a.student?.full_name || a.student_id} →{' '}
-										{a.teacher?.full_name || a.teacher_id} (
-										{a.subject?.name || a.subject_id})
-									</MenuItem>
-								))}
+								<MenuItem value='individual'>Индивидуальное</MenuItem>
+								<MenuItem value='group'>Групповое</MenuItem>
 							</Select>
 						</FormControl>
-						<FormControl fullWidth required>
-							<InputLabel>Кабинет</InputLabel>
-							<Select
-								value={slotForm.room_id}
-								label='Кабинет'
-								onChange={e =>
-									setSlotForm({ ...slotForm, room_id: e.target.value })
+						{slotForm.slot_type === 'individual' && (
+							<Autocomplete
+								options={assignments}
+								value={assignments.find(a => a.id === Number(slotForm.assignment_id)) || null}
+								getOptionLabel={a =>
+									a
+										? `${a.student?.full_name || a.student_id} → ${a.teacher?.full_name || a.teacher_id} (${a.subject?.name || a.subject_id})`
+										: ''
 								}
-							>
-								{rooms.map(r => (
-									<MenuItem key={r.id} value={r.id}>
-										{r.name}
-									</MenuItem>
-								))}
-							</Select>
-						</FormControl>
+								onChange={(event, value) =>
+									setSlotForm({ ...slotForm, assignment_id: value?.id || '' })
+								}
+								renderInput={params => (
+									<TextField {...params} label='Назначение' required />
+								)}
+							/>
+						)}
+						{slotForm.slot_type === 'group' && (
+							<>
+								<Autocomplete
+									options={groupLessons}
+									value={groupLessons.find(g => g.id === Number(slotForm.group_lesson_id)) || null}
+									getOptionLabel={g =>
+										g ? `${g.name} (${g.subject?.name || g.subject_id}, ${g.enrollments?.length || 0} уч.)` : ''
+									}
+								onChange={(event, value) =>
+									setSlotForm({
+										...slotForm,
+										group_lesson_id: value?.id || '',
+										subject_id: value?.subject_id || '',
+										teacher_id: value?.default_teacher_id || '',
+										room_name: value?.room_name || '',
+									})
+								}
+									renderInput={params => (
+										<TextField {...params} label='Группа' required />
+									)}
+								/>
+								<FormControl fullWidth required>
+									<InputLabel>Преподаватель</InputLabel>
+									<Select
+										value={slotForm.teacher_id}
+										label='Преподаватель'
+										onChange={e => setSlotForm({ ...slotForm, teacher_id: e.target.value })}
+									>
+										{teachers.filter(t => t.is_active).map(t => (
+											<MenuItem key={t.id} value={t.id}>
+												{t.full_name}
+											</MenuItem>
+										))}
+									</Select>
+								</FormControl>
+							</>
+						)}
+						{slotForm.slot_type === 'group' ? (
+							<TextField
+								label='Кабинет / место проведения'
+								value={slotForm.room_name}
+								onChange={e => setSlotForm({ ...slotForm, room_name: e.target.value })}
+								fullWidth
+								required
+							/>
+						) : (
+							<Autocomplete
+								options={rooms}
+								value={rooms.find(r => r.id === Number(slotForm.room_id)) || null}
+								getOptionLabel={r => r?.name || ''}
+								onChange={(event, value) => setSlotForm({ ...slotForm, room_id: value?.id || '' })}
+								renderInput={params => (
+									<TextField {...params} label='Кабинет' required />
+								)}
+							/>
+						)}
 						<FormControl fullWidth>
 							<InputLabel>День недели</InputLabel>
 							<Select
@@ -1382,6 +1643,28 @@ const AdminSchedule = () => {
 										В группе нет учеников
 									</Typography>
 								)}
+								<Box display='flex' gap={1} alignItems='center'>
+									<Autocomplete
+										fullWidth
+										size='small'
+										options={students.filter(s =>
+											!(editDialog.slot.group_lesson?.enrollments || []).some(enr => enr.student_id === s.id)
+										)}
+										value={students.find(s => s.id === Number(addGroupStudentId)) || null}
+										getOptionLabel={s => s?.full_name || ''}
+										onChange={(event, value) => setAddGroupStudentId(value?.id || '')}
+										renderInput={params => (
+											<TextField {...params} label='Добавить ученика' />
+										)}
+									/>
+									<Button
+										variant='outlined'
+										onClick={handleAddStudentToGroupSlot}
+										disabled={!addGroupStudentId}
+									>
+										Добавить
+									</Button>
+								</Box>
 								<List dense disablePadding>
 									{(editDialog.slot.group_lesson?.enrollments || []).map(enr => {
 										const isExcluded = editDialog.slot.exclusions?.some(

@@ -23,6 +23,7 @@ import AdminAssignments from './pages/AdminAssignments'
 import AdminSchedule from './pages/AdminSchedule'
 import AdminGroupLessons from './pages/AdminGroupLessons'
 import AdminUsers from './pages/AdminUsers'
+import AdminReports from './pages/AdminReports'
 import ChildSchedule from './pages/ChildSchedule'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
@@ -142,6 +143,7 @@ function App() {
 						<Route path='/admin/schedule/assignments' element={<AdminAssignments />} />
 						<Route path='/admin/schedule/group-lessons' element={<AdminGroupLessons />} />
 						<Route path='/admin/schedule/weekly' element={<AdminSchedule />} />
+						<Route path='/admin/schedule/reports' element={<AdminReports />} />
 						<Route path='/admin/users' element={<AdminUsers />} />
 					</Route>
 				</Route>

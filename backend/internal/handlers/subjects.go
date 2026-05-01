@@ -247,6 +247,76 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		return
 	}
 
+	if !subject.IsActive {
+		var activeAssignments int64
+		if err := h.db.Model(&models.Assignment{}).
+			Where("subject_id = ? AND status = ?", subject.ID, models.AssignmentStatusActive).
+			Count(&activeAssignments).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subject assignments"})
+			return
+		}
+		if activeAssignments > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть активные назначения. Сначала поставьте их на паузу."})
+			return
+		}
+
+		var activeGroups int64
+		if err := h.db.Model(&models.GroupLesson{}).
+			Where("subject_id = ? AND status = ?", subject.ID, models.GroupLessonStatusActive).
+			Count(&activeGroups).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subject groups"})
+			return
+		}
+		if activeGroups > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть активные группы. Сначала поставьте их на паузу."})
+			return
+		}
+
+		err := h.db.Transaction(func(tx *gorm.DB) error {
+			slotIDs := tx.Model(&models.ScheduleSlot{}).Select("id").Where("subject_id = ?", subject.ID)
+			if err := tx.Where("schedule_slot_id IN (?)", slotIDs).Delete(&models.ScheduleSlotExclusion{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
+				return err
+			}
+			assignmentIDs := tx.Model(&models.Assignment{}).Select("id").Where("subject_id = ?", subject.ID)
+			if err := tx.Where("assignment_id IN (?)", assignmentIDs).Delete(&models.AssignmentWeekOverride{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.Assignment{}).Error; err != nil {
+				return err
+			}
+			groupIDs := tx.Model(&models.GroupLesson{}).Select("id").Where("subject_id = ?", subject.ID)
+			if err := tx.Where("group_lesson_id IN (?)", groupIDs).Delete(&models.GroupLessonWeekOverride{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("group_lesson_id IN (?)", groupIDs).Delete(&models.GroupLessonEnrollment{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.GroupLesson{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.TeacherSubject{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.RoomSubject{}).Error; err != nil {
+				return err
+			}
+			return tx.Delete(&subject).Error
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete inactive subject"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Subject deleted successfully"})
+		return
+	}
+
 	if err := h.db.Delete(&subject).Error; err != nil {
 		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
 			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть связанные назначения. Сначала деактивируйте."})

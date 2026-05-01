@@ -136,7 +136,7 @@ func (v *ScheduleValidator) HasRoomConflict(
 	existingSlots []models.ScheduleSlot,
 ) bool {
 	for _, slot := range existingSlots {
-		if slot.RoomID != roomID {
+		if slot.RoomID == nil || *slot.RoomID != roomID {
 			continue
 		}
 		if slot.Weekday != weekday {
@@ -205,7 +205,7 @@ func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 	enrollments []models.GroupLessonEnrollment,
 ) bool {
 	for _, slot := range existingSlots {
-		if slot.SubjectID != subjectID {
+		if slot.SubjectID == nil || *slot.SubjectID != subjectID {
 			continue
 		}
 		if slot.Weekday != weekday {

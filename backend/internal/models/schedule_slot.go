@@ -22,8 +22,9 @@ type ScheduleSlot struct {
 	GroupLessonID *uint  `json:"group_lesson_id,omitempty" gorm:"index"`
 	StudentID     *uint  `json:"student_id,omitempty" gorm:"index:idx_schedule_student_weekday"`
 	TeacherID     uint   `json:"teacher_id" gorm:"not null;index:idx_schedule_teacher_weekday"`
-	SubjectID     uint   `json:"subject_id" gorm:"not null"`
-	RoomID        uint   `json:"room_id" gorm:"not null;index:idx_schedule_room_weekday"`
+	SubjectID     *uint  `json:"subject_id,omitempty" gorm:"index"`
+	RoomID        *uint  `json:"room_id,omitempty" gorm:"index:idx_schedule_room_weekday"`
+	RoomName      string `json:"room_name,omitempty" gorm:"type:varchar(255)"`
 	Weekday       int    `json:"weekday" gorm:"not null;index:idx_schedule_weekday"` // 1=Mon ... 7=Sun
 	StartTime     string `json:"start_time" gorm:"type:varchar(5);not null"`         // HH:MM
 	EndTime       string `json:"end_time" gorm:"type:varchar(5);not null"`           // HH:MM
@@ -38,7 +39,7 @@ type ScheduleSlot struct {
 	GroupLesson *GroupLesson           `json:"group_lesson,omitempty" gorm:"foreignKey:GroupLessonID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Student     *Student               `json:"student,omitempty" gorm:"foreignKey:StudentID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Teacher     Teacher                `json:"teacher,omitempty" gorm:"foreignKey:TeacherID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Subject     Subject                `json:"subject,omitempty" gorm:"foreignKey:SubjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Room        Room                   `json:"room,omitempty" gorm:"foreignKey:RoomID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Subject     *Subject               `json:"subject,omitempty" gorm:"foreignKey:SubjectID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
+	Room        *Room                  `json:"room,omitempty" gorm:"foreignKey:RoomID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	Exclusions  []ScheduleSlotExclusion `json:"exclusions,omitempty" gorm:"foreignKey:ScheduleSlotID"`
 }

@@ -20,8 +20,9 @@ func NewGroupLessonHandler(db *gorm.DB) *GroupLessonHandler {
 
 type CreateGroupLessonRequest struct {
 	Name             string  `json:"name" binding:"required"`
-	SubjectID        uint    `json:"subject_id" binding:"required"`
+	SubjectID        *uint   `json:"subject_id"`
 	DefaultTeacherID *uint   `json:"default_teacher_id"`
+	RoomName         string  `json:"room_name"`
 	VisitsPerWeek    int     `json:"visits_per_week" binding:"required"`
 	DurationMin      int     `json:"duration_min" binding:"required"`
 	MaxStudents      int     `json:"max_students"`
@@ -33,6 +34,7 @@ type UpdateGroupLessonRequest struct {
 	Name             string  `json:"name"`
 	SubjectID        *uint   `json:"subject_id"`
 	DefaultTeacherID *uint   `json:"default_teacher_id"`
+	RoomName         *string `json:"room_name"`
 	VisitsPerWeek    *int    `json:"visits_per_week"`
 	DurationMin      *int    `json:"duration_min"`
 	MaxStudents      *int    `json:"max_students"`
@@ -116,6 +118,7 @@ func (h *GroupLessonHandler) CreateGroupLesson(c *gin.Context) {
 		Name:             req.Name,
 		SubjectID:        req.SubjectID,
 		DefaultTeacherID: req.DefaultTeacherID,
+		RoomName:         strings.TrimSpace(req.RoomName),
 		VisitsPerWeek:    req.VisitsPerWeek,
 		DurationMin:      req.DurationMin,
 		MaxStudents:      maxStudents,
@@ -159,11 +162,12 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 	if strings.TrimSpace(req.Name) != "" {
 		lesson.Name = req.Name
 	}
-	if req.SubjectID != nil {
-		lesson.SubjectID = *req.SubjectID
-	}
+	lesson.SubjectID = req.SubjectID
 	if req.DefaultTeacherID != nil {
 		lesson.DefaultTeacherID = req.DefaultTeacherID
+	}
+	if req.RoomName != nil {
+		lesson.RoomName = strings.TrimSpace(*req.RoomName)
 	}
 	if req.VisitsPerWeek != nil {
 		lesson.VisitsPerWeek = *req.VisitsPerWeek

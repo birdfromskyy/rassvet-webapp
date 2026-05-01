@@ -238,7 +238,7 @@ const ChildSchedule = ({ user }) => {
 															{slot.teacher?.full_name || '—'}
 														</TableCell>
 														<TableCell sx={{ whiteSpace: 'nowrap' }}>
-															{slot.room?.name || '—'}
+															{slot.room_name || slot.room?.name || '—'}
 														</TableCell>
 													</TableRow>
 												))}

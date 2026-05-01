@@ -276,6 +276,20 @@ const scheduleService = {
 	removeSlotExclusion: async (scheduleId, slotId, studentId) => {
 		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}/exclusions/${studentId}`)
 	},
+
+	// ========== REPORTS ==========
+	getMonthlyReport: async (year, month) => {
+		const r = await api.get('/admin/reports/monthly', {
+			params: { year, month },
+		})
+		return r.data
+	},
+	getTeacherReport: async (teacherId, startDate, endDate) => {
+		const r = await api.get('/admin/reports/monthly', {
+			params: { teacher_id: teacherId, start_date: startDate, end_date: endDate },
+		})
+		return r.data
+	},
 	// ========== USERS (admin) ==========
 	getUsers: async () => {
 		const r = await api.get('/admin/users')

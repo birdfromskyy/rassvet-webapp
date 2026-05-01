@@ -30,7 +30,7 @@ const AdminGroupLessons = () => {
 	const [formOpen, setFormOpen] = useState(false)
 	const [editingGroup, setEditingGroup] = useState(null)
 	const [formData, setFormData] = useState({
-		name: '', subject_id: '', default_teacher_id: '',
+		name: '', subject_id: '', default_teacher_id: '', room_name: '',
 		visits_per_week: 1, duration_min: 50, max_students: 10, status: 'active', notes: '',
 	})
 
@@ -65,7 +65,7 @@ const AdminGroupLessons = () => {
 	const openCreate = () => {
 		setEditingGroup(null)
 		setFormData({
-			name: '', subject_id: '', default_teacher_id: '',
+			name: '', subject_id: '', default_teacher_id: '', room_name: '',
 			visits_per_week: 1, duration_min: 50, max_students: 10, status: 'active', notes: '',
 		})
 		setFormOpen(true)
@@ -77,6 +77,7 @@ const AdminGroupLessons = () => {
 			name: group.name,
 			subject_id: group.subject_id || '',
 			default_teacher_id: group.default_teacher_id || '',
+			room_name: group.room_name || '',
 			visits_per_week: group.visits_per_week,
 			duration_min: group.duration_min,
 			max_students: group.max_students,
@@ -88,14 +89,15 @@ const AdminGroupLessons = () => {
 
 	const handleSave = async () => {
 		if (!formData.name.trim()) { toast.error('Введите название группы'); return }
-		if (!formData.subject_id) { toast.error('Выберите предмет'); return }
+		if (!formData.room_name.trim()) { toast.error('??????? ??????? ??? ????? ??????????'); return }
 		if (formData.visits_per_week < 1) { toast.error('Занятий в неделю должно быть >= 1'); return }
 		if (formData.duration_min < 1) { toast.error('Длительность должна быть >= 1 мин'); return }
 
 		const payload = {
 			name: formData.name.trim(),
-			subject_id: Number(formData.subject_id),
+			subject_id: formData.subject_id ? Number(formData.subject_id) : null,
 			default_teacher_id: formData.default_teacher_id ? Number(formData.default_teacher_id) : null,
+			room_name: formData.room_name.trim(),
 			visits_per_week: Number(formData.visits_per_week),
 			duration_min: Number(formData.duration_min),
 			max_students: Number(formData.max_students),
@@ -263,17 +265,11 @@ const AdminGroupLessons = () => {
 						label='Название группы' fullWidth required
 						value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
 					/>
-					<FormControl fullWidth required>
-						<InputLabel>Предмет</InputLabel>
-						<Select
-							value={formData.subject_id} label='Предмет'
-							onChange={e => setFormData(p => ({ ...p, subject_id: e.target.value }))}
-						>
-							{subjects.filter(s => s.is_active).map(s => (
-								<MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-							))}
-						</Select>
-					</FormControl>
+					<TextField
+						label='??????? / ????? ??????????' fullWidth required
+						value={formData.room_name}
+						onChange={e => setFormData(p => ({ ...p, room_name: e.target.value }))}
+					/>
 					<FormControl fullWidth>
 						<InputLabel>Преподаватель по умолчанию</InputLabel>
 						<Select

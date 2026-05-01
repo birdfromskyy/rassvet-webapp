@@ -713,15 +713,23 @@ func (g *ScheduleGenerator) BuildGroupWeeklyTasks(
 		}
 
 		hasStrictRoom := ctx.StrictTeacherIDs[teacherID]
+		subjectID := uint(0)
+		subjectName := ""
+		if lesson.SubjectID != nil {
+			subjectID = *lesson.SubjectID
+		}
+		if lesson.Subject != nil {
+			subjectName = lesson.Subject.Name
+		}
 
 		for i := 0; i < visitsPerWeek; i++ {
 			tasks = append(tasks, GroupWeeklyTask{
 				GroupLessonID:      lesson.ID,
 				TeacherID:          teacherID,
-				SubjectID:          lesson.SubjectID,
+				SubjectID:          subjectID,
 				GroupName:          lesson.Name,
 				TeacherName:        g.getTeacherName(teacherID, ctx),
-				SubjectName:        lesson.Subject.Name,
+				SubjectName:        subjectName,
 				EnrolledStudentIDs: studentIDs,
 				VisitsPerWeek:      visitsPerWeek,
 				DurationMin:        durationMin,
@@ -1059,6 +1067,8 @@ func (g *ScheduleGenerator) CleanupGenerationIssues(scheduleID uint) error {
 func (g *ScheduleGenerator) SaveGeneratedSlot(scheduleID uint, candidate CandidateSlot) (*models.ScheduleSlot, error) {
 	assignmentID := candidate.AssignmentID
 	studentID := candidate.StudentID
+	subjectID := candidate.SubjectID
+	roomID := candidate.RoomID
 
 	slot := &models.ScheduleSlot{
 		ScheduleID:   scheduleID,
@@ -1066,8 +1076,8 @@ func (g *ScheduleGenerator) SaveGeneratedSlot(scheduleID uint, candidate Candida
 		AssignmentID: &assignmentID,
 		StudentID:    &studentID,
 		TeacherID:    candidate.TeacherID,
-		SubjectID:    candidate.SubjectID,
-		RoomID:       candidate.RoomID,
+		SubjectID:    &subjectID,
+		RoomID:       &roomID,
 		Weekday:      candidate.Weekday,
 		StartTime:    candidate.StartTime,
 		EndTime:      candidate.EndTime,
@@ -1084,14 +1094,16 @@ func (g *ScheduleGenerator) SaveGeneratedSlot(scheduleID uint, candidate Candida
 
 func (g *ScheduleGenerator) SaveGeneratedGroupSlot(scheduleID uint, candidate GroupCandidateSlot) (*models.ScheduleSlot, error) {
 	groupLessonID := candidate.GroupLessonID
+	subjectID := candidate.SubjectID
+	roomID := candidate.RoomID
 
 	slot := &models.ScheduleSlot{
 		ScheduleID:    scheduleID,
 		SlotType:      models.SlotTypeGroup,
 		GroupLessonID: &groupLessonID,
 		TeacherID:     candidate.TeacherID,
-		SubjectID:     candidate.SubjectID,
-		RoomID:        candidate.RoomID,
+		SubjectID:     &subjectID,
+		RoomID:        &roomID,
 		Weekday:       candidate.Weekday,
 		StartTime:     candidate.StartTime,
 		EndTime:       candidate.EndTime,

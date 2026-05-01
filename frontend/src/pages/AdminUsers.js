@@ -112,6 +112,7 @@ const AdminUsers = () => {
 	const [students, setStudents] = useState([])
 	const [loading, setLoading] = useState(true)
 	const [childrenCounts, setChildrenCounts] = useState({})
+	const [search, setSearch] = useState('')
 
 	const [childDialog, setChildDialog] = useState({ open: false, user: null })
 	const [children, setChildren] = useState([])
@@ -251,6 +252,23 @@ const AdminUsers = () => {
 
 	const linkedStudentIds = children.map(c => c.student_id)
 	const availableStudents = students.filter(s => !linkedStudentIds.includes(s.id))
+	const normalizedSearch = search.trim().toLowerCase()
+	const filteredUsers = normalizedSearch
+		? users.filter(u =>
+			[
+				u.email,
+				u.first_name,
+				u.last_name,
+				u.middle_name,
+				u.role,
+				String(u.id),
+			]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase()
+				.includes(normalizedSearch)
+		)
+		: users
 
 	return (
 		<Container maxWidth='lg' sx={{ mt: 4 }}>
@@ -276,6 +294,15 @@ const AdminUsers = () => {
 					после его публикации.
 				</Typography>
 
+				<TextField
+					label='Поиск пользователей'
+					value={search}
+					onChange={e => setSearch(e.target.value)}
+					fullWidth
+					size='small'
+					sx={{ mb: 2 }}
+				/>
+
 				{loading ? (
 					<Box display='flex' justifyContent='center' p={4}>
 						<CircularProgress />
@@ -294,7 +321,7 @@ const AdminUsers = () => {
 								</TableRow>
 							</TableHead>
 							<TableBody>
-								{users.map(u => (
+								{filteredUsers.map(u => (
 									<TableRow key={u.id}>
 										<TableCell>{u.id}</TableCell>
 										<TableCell>{u.email}</TableCell>
@@ -344,7 +371,7 @@ const AdminUsers = () => {
 										</TableCell>
 									</TableRow>
 								))}
-								{!users.length && (
+								{!filteredUsers.length && (
 									<TableRow>
 										<TableCell colSpan={6} align='center'>
 											<Typography color='text.secondary'>Пользователи не найдены</Typography>

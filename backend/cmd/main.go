@@ -70,6 +70,7 @@ func main() {
 	teacherHandler := handlers.NewTeacherHandler(db)
 	assignmentHandler := handlers.NewAssignmentHandler(db)
 	groupLessonHandler := handlers.NewGroupLessonHandler(db)
+	reportHandler := handlers.NewReportHandler(db)
 
 	scheduleGenerator := services.NewScheduleGenerator(db)
 	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
@@ -207,6 +208,9 @@ func main() {
 
 			// Clear auto schedule without regenerating
 			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
+
+			// Reports
+			admin.GET("/reports/monthly", reportHandler.GetMonthlyReport)
 
 			// User-student links
 			admin.GET("/users", userStudentHandler.GetUsers)

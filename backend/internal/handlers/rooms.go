@@ -246,6 +246,32 @@ func (h *RoomHandler) DeleteRoom(c *gin.Context) {
 		return
 	}
 
+	if !room.IsActive {
+		err := h.db.Transaction(func(tx *gorm.DB) error {
+			slotIDs := tx.Model(&models.ScheduleSlot{}).Select("id").Where("room_id = ?", room.ID)
+			if err := tx.Where("schedule_slot_id IN (?)", slotIDs).Delete(&models.ScheduleSlotExclusion{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("room_id = ?", room.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("room_id = ?", room.ID).Delete(&models.RoomSubject{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("room_id = ?", room.ID).Delete(&models.TeacherRoom{}).Error; err != nil {
+				return err
+			}
+			return tx.Delete(&room).Error
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete inactive room"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Room deleted successfully"})
+		return
+	}
+
 	if err := h.db.Delete(&room).Error; err != nil {
 		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
 			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить кабинет: есть связанные слоты расписания. Сначала деактивируйте."})
