@@ -100,6 +100,7 @@ const UserFormFields = ({ form, setForm, isEdit }) => (
 				onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
 			>
 				<MenuItem value='user'>Пользователь</MenuItem>
+				<MenuItem value='teacher'>Преподаватель</MenuItem>
 				<MenuItem value='admin'>Администратор</MenuItem>
 			</Select>
 		</FormControl>
@@ -330,8 +331,8 @@ const AdminUsers = () => {
 										</TableCell>
 										<TableCell>
 											<Chip
-												label={u.role === 'admin' ? 'Администратор' : 'Пользователь'}
-												color={u.role === 'admin' ? 'error' : 'default'}
+												label={u.role === 'admin' ? 'Администратор' : u.role === 'teacher' ? 'Преподаватель' : 'Пользователь'}
+												color={u.role === 'admin' ? 'error' : u.role === 'teacher' ? 'primary' : 'default'}
 												size='small'
 											/>
 										</TableCell>

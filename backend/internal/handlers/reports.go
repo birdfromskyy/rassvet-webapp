@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/models"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -33,6 +34,8 @@ type monthlyTeacherReportRow struct {
 	TeacherName string  `json:"teacher_name"`
 	SubjectID   uint    `json:"subject_id"`
 	SubjectName string  `json:"subject_name"`
+	Duration30  int     `json:"duration_30"`
+	Duration50  int     `json:"duration_50"`
 	Lessons     int     `json:"lessons"`
 	Hours       float64 `json:"hours"`
 }
@@ -80,7 +83,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 	queryEnd := endDate.AddDate(0, 0, 1)
 
 	var slots []models.ScheduleSlot
-	query := h.db.
+	query := h.db.Model(&models.ScheduleSlot{}).
 		Joins("JOIN schedules ON schedules.id = schedule_slots.schedule_id").
 		Preload("Schedule").
 		Preload("Teacher").
@@ -128,7 +131,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		if teacherName == "" {
 			teacherName = strconv.Itoa(int(slot.TeacherID))
 		}
-		tKey := strconv.Itoa(int(slot.TeacherID)) + ":" + strconv.Itoa(int(subjectID))
+		tKey := strconv.Itoa(int(slot.TeacherID)) + ":" + strconv.Itoa(int(subjectID)) + ":" + subjectName
 		tRow := teacherRows[tKey]
 		if tRow == nil {
 			tRow = &monthlyTeacherReportRow{
@@ -141,37 +144,46 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		}
 		tRow.Lessons++
 		tRow.Hours += hours
-		if teacherID != 0 || studentID != 0 {
-			switch duration {
-			case 30:
-				durationCounts["30"]++
-			case 50:
-				durationCounts["50"]++
-			default:
-				durationCounts["other"]++
-			}
-			lessons = append(lessons, reportLessonRow{
-				Date:        lessonDate.Format("2006-01-02"),
-				Weekday:     slot.Weekday,
-				StartTime:   slot.StartTime,
-				EndTime:     slot.EndTime,
-				DurationMin: duration,
-				Hours:       hours,
-				SlotType:    slot.SlotType,
-				StudentName: reportSlotStudentLabel(slot),
-				GroupName:   slot.GroupLesson.Name,
-				TeacherName: teacherName,
-				SubjectName: subjectName,
-				RoomName:    reportRoomName(slot),
-			})
+		switch duration {
+		case 30:
+			tRow.Duration30++
+		case 50:
+			tRow.Duration50++
 		}
+
+		switch duration {
+		case 30:
+			durationCounts["30"]++
+		case 50:
+			durationCounts["50"]++
+		default:
+			durationCounts["other"]++
+		}
+		groupName := ""
+		if slot.GroupLesson != nil {
+			groupName = slot.GroupLesson.Name
+		}
+		lessons = append(lessons, reportLessonRow{
+			Date:        lessonDate.Format("2006-01-02"),
+			Weekday:     slot.Weekday,
+			StartTime:   slot.StartTime,
+			EndTime:     slot.EndTime,
+			DurationMin: duration,
+			Hours:       hours,
+			SlotType:    slot.SlotType,
+			StudentName: reportSlotStudentLabel(slot),
+			GroupName:   groupName,
+			TeacherName: teacherName,
+			SubjectName: subjectName,
+			RoomName:    reportRoomName(slot),
+		})
 
 		for _, student := range slotStudents {
 			studentName := student.FullName
 			if studentName == "" {
 				studentName = strconv.Itoa(int(student.ID))
 			}
-			sKey := strconv.Itoa(int(student.ID)) + ":" + strconv.Itoa(int(subjectID)) + ":" + strconv.Itoa(duration)
+			sKey := strconv.Itoa(int(student.ID)) + ":" + strconv.Itoa(int(subjectID)) + ":" + subjectName + ":" + strconv.Itoa(duration)
 			sRow := studentRows[sKey]
 			if sRow == nil {
 				sRow = &monthlyStudentReportRow{
@@ -192,11 +204,38 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 	for _, row := range studentRows {
 		students = append(students, *row)
 	}
+	sort.Slice(students, func(i, j int) bool {
+		if students[i].StudentName != students[j].StudentName {
+			return students[i].StudentName < students[j].StudentName
+		}
+		if students[i].SubjectName != students[j].SubjectName {
+			return students[i].SubjectName < students[j].SubjectName
+		}
+		return students[i].DurationMin < students[j].DurationMin
+	})
 
 	teachers := make([]monthlyTeacherReportRow, 0, len(teacherRows))
 	for _, row := range teacherRows {
 		teachers = append(teachers, *row)
 	}
+	sort.Slice(teachers, func(i, j int) bool {
+		if teachers[i].TeacherName != teachers[j].TeacherName {
+			return teachers[i].TeacherName < teachers[j].TeacherName
+		}
+		return teachers[i].SubjectName < teachers[j].SubjectName
+	})
+	sort.Slice(lessons, func(i, j int) bool {
+		if lessons[i].Date != lessons[j].Date {
+			return lessons[i].Date < lessons[j].Date
+		}
+		if lessons[i].StartTime != lessons[j].StartTime {
+			return lessons[i].StartTime < lessons[j].StartTime
+		}
+		if lessons[i].TeacherName != lessons[j].TeacherName {
+			return lessons[i].TeacherName < lessons[j].TeacherName
+		}
+		return lessons[i].SubjectName < lessons[j].SubjectName
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"period": gin.H{
@@ -263,6 +302,9 @@ func reportHours(durationMin int) float64 {
 
 func slotReportStudents(slot models.ScheduleSlot) []models.Student {
 	if slot.SlotType == models.SlotTypeGroup {
+		if slot.GroupLesson == nil {
+			return nil
+		}
 		excluded := map[uint]bool{}
 		for _, exclusion := range slot.Exclusions {
 			excluded[exclusion.StudentID] = true

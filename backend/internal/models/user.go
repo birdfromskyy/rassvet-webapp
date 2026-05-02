@@ -9,8 +9,9 @@ import (
 type UserRole string
 
 const (
-	RoleUser  UserRole = "user"
-	RoleAdmin UserRole = "admin"
+	RoleUser    UserRole = "user"
+	RoleAdmin   UserRole = "admin"
+	RoleTeacher UserRole = "teacher"
 )
 
 type User struct {
@@ -38,4 +39,3 @@ type VerificationCode struct {
 	ExpiresAt time.Time `gorm:"not null"`
 	Used      bool      `gorm:"default:false"`
 }
-

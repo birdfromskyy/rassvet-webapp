@@ -148,7 +148,7 @@ const Dashboard = ({ user, onLogout }) => {
 						</Card>
 					</Grid>
 
-					{hasChildren && (
+					{(hasChildren || user?.role === 'teacher') && (
 						<Grid item xs={12} md={4}>
 							<Card>
 								<CardContent>
@@ -157,7 +157,7 @@ const Dashboard = ({ user, onLogout }) => {
 										<Typography variant='h5'>Расписание</Typography>
 									</Box>
 									<Typography variant='body2' color='text.secondary'>
-										Расписание занятий вашего ребёнка
+										{user?.role === 'teacher' ? 'Просмотр опубликованного расписания преподавателей и учеников' : 'Расписание занятий вашего ребёнка'}
 									</Typography>
 								</CardContent>
 								<CardActions>
@@ -271,7 +271,7 @@ const Dashboard = ({ user, onLogout }) => {
 									Роль:
 								</Typography>
 								<Typography variant='body1'>
-									{user?.role === 'admin' ? 'Администратор' : 'Пользователь'}
+									{user?.role === 'admin' ? 'Администратор' : user?.role === 'teacher' ? 'Преподаватель' : 'Пользователь'}
 								</Typography>
 							</Grid>
 						</Grid>

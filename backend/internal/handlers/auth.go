@@ -32,6 +32,14 @@ type PendingRegistration struct {
 	LastName     string `json:"last_name"`
 	MiddleName   string `json:"middle_name"`
 	Code         string `json:"code"`
+	Attempts     int    `json:"attempts"`
+}
+
+type PendingEmailVerification struct {
+	UserID   uint   `json:"user_id"`
+	Email    string `json:"email"`
+	Code     string `json:"code"`
+	Attempts int    `json:"attempts"`
 }
 
 type PendingPasswordReset struct {
@@ -40,6 +48,7 @@ type PendingPasswordReset struct {
 }
 
 const verificationCodeCooldown = 60 * time.Second
+const maxVerificationAttempts = 5
 
 func NewAuthHandler(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *AuthHandler {
 	return &AuthHandler{
@@ -69,6 +78,14 @@ type VerifyEmailRequest struct {
 
 func verificationCooldownKey(email string) string {
 	return "cooldown:verify:" + strings.ToLower(strings.TrimSpace(email))
+}
+
+func registerKey(email string) string {
+	return "register:" + strings.ToLower(strings.TrimSpace(email))
+}
+
+func emailVerificationKey(email string) string {
+	return "verify_email:" + strings.ToLower(strings.TrimSpace(email))
 }
 
 func (h *AuthHandler) getVerificationCooldown(ctx context.Context, email string) (time.Duration, error) {
@@ -143,7 +160,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	key := "register:" + req.Email
+	key := registerKey(req.Email)
 
 	// Сохраняем в Redis на 15 минут
 	if err := h.rdb.Set(ctx, key, data, 15*time.Minute).Err(); err != nil {
@@ -210,20 +227,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			return
 		}
 
-		// Удаляем старые неиспользованные коды для этого email
-		h.db.Where("email = ? AND used = false", user.Email).Delete(&models.VerificationCode{})
-
-		// Генерируем новый код
 		code := fmt.Sprintf("%06d", rand.Intn(1000000))
-		verificationCode := models.VerificationCode{
-			Email:     user.Email,
-			Code:      code,
-			ExpiresAt: time.Now().Add(15 * time.Minute),
-			Used:      false,
+		pending := PendingEmailVerification{UserID: user.ID, Email: user.Email, Code: code}
+		data, err := json.Marshal(pending)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare verification data"})
+			return
 		}
-
-		if err := h.db.Create(&verificationCode).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create verification code"})
+		if err := h.rdb.Set(ctx, emailVerificationKey(user.Email), data, 15*time.Minute).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save verification code"})
 			return
 		}
 
@@ -301,7 +313,7 @@ func (h *AuthHandler) ResendCode(c *gin.Context) {
 	}
 
 	// Сценарий 1: pending registration в Redis
-	key := "register:" + req.Email
+	key := registerKey(req.Email)
 	raw, err := h.rdb.Get(ctx, key).Result()
 	if err == nil {
 		var pending PendingRegistration
@@ -345,22 +357,61 @@ func (h *AuthHandler) ResendCode(c *gin.Context) {
 		return
 	}
 
+	verifyKey := emailVerificationKey(req.Email)
+	raw, err = h.rdb.Get(ctx, verifyKey).Result()
+	if err == nil {
+		var pending PendingEmailVerification
+		if err := json.Unmarshal([]byte(raw), &pending); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse verification data"})
+			return
+		}
+
+		newCode := fmt.Sprintf("%06d", rand.Intn(1000000))
+		pending.Code = newCode
+		pending.Attempts = 0
+
+		data, err := json.Marshal(pending)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare verification data"})
+			return
+		}
+		if err := h.rdb.Set(ctx, verifyKey, data, 15*time.Minute).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update verification data"})
+			return
+		}
+
+		emailService := services.NewEmailService(h.cfg)
+		if err := emailService.SendVerificationCode(req.Email, newCode); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+			return
+		}
+
+		if err := h.setVerificationCooldown(ctx, req.Email); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resend cooldown"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Verification code sent"})
+		return
+	}
+
+	if err != nil && err != redis.Nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load verification data"})
+		return
+	}
+
 	// Сценарий 2: пользователь есть в БД, но email не подтвержден
 	if userErr == nil && !user.IsVerified {
 		newCode := fmt.Sprintf("%06d", rand.Intn(1000000))
 
-		resetCode := models.VerificationCode{
-			Email:     req.Email,
-			Code:      newCode,
-			ExpiresAt: time.Now().Add(15 * time.Minute),
-			Used:      false,
+		pending := PendingEmailVerification{UserID: user.ID, Email: req.Email, Code: newCode}
+		data, err := json.Marshal(pending)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare verification data"})
+			return
 		}
-
-		// Удаляем старые неподтвержденные коды для этого email
-		h.db.Where("email = ? AND used = false", req.Email).Delete(&models.VerificationCode{})
-
-		if err := h.db.Create(&resetCode).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create verification code"})
+		if err := h.rdb.Set(ctx, emailVerificationKey(req.Email), data, 15*time.Minute).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save verification code"})
 			return
 		}
 
@@ -390,7 +441,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	key := "register:" + req.Email
+	key := registerKey(req.Email)
 
 	// Сценарий 1: новая регистрация через Redis
 	raw, err := h.rdb.Get(ctx, key).Result()
@@ -401,7 +452,16 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 			return
 		}
 
+		if pending.Attempts >= maxVerificationAttempts {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many attempts. Please request a new code"})
+			return
+		}
+
 		if pending.Code != req.Code {
+			pending.Attempts++
+			if updated, err := json.Marshal(pending); err == nil {
+				_ = h.rdb.Set(ctx, key, updated, redis.KeepTTL).Err()
+			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
 			return
 		}
@@ -439,30 +499,54 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	// Сценарий 2: подтверждение новой почты у уже существующего пользователя
-	var verificationCode models.VerificationCode
-	if err := h.db.Where("email = ? AND code = ? AND used = false", req.Email, req.Code).First(&verificationCode).Error; err == nil {
-		if time.Now().After(verificationCode.ExpiresAt) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Code has expired"})
+	// Сценарий 2: подтверждение почты у уже существующего пользователя через Redis
+	verifyKey := emailVerificationKey(req.Email)
+	raw, err = h.rdb.Get(ctx, verifyKey).Result()
+	if err == nil {
+		var pending PendingEmailVerification
+		if err := json.Unmarshal([]byte(raw), &pending); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse verification data"})
+			return
+		}
+		if pending.Attempts >= maxVerificationAttempts {
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many attempts. Please request a new code"})
+			return
+		}
+		if pending.Code != req.Code {
+			pending.Attempts++
+			if updated, err := json.Marshal(pending); err == nil {
+				_ = h.rdb.Set(ctx, verifyKey, updated, redis.KeepTTL).Err()
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
 			return
 		}
 
 		var user models.User
-		if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		if err := h.db.First(&user, pending.UserID).Error; err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 			return
 		}
 
+		var existingUser models.User
+		if err := h.db.Where("email = ? AND id != ?", pending.Email, pending.UserID).First(&existingUser).Error; err == nil {
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
+			return
+		}
+
+		user.Email = pending.Email
 		user.IsVerified = true
 		if err := h.db.Save(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email"})
 			return
 		}
 
-		verificationCode.Used = true
-		_ = h.db.Save(&verificationCode).Error
+		_ = h.rdb.Del(ctx, verifyKey).Err()
 
 		c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully"})
+		return
+	}
+	if err != nil && err != redis.Nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load verification data"})
 		return
 	}
 
@@ -650,6 +734,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	// Флаг для отслеживания смены email
 	emailChanged := false
+	newEmail := ""
 
 	// Обновляем имя и фамилию только для админов
 	user.FirstName = req.FirstName
@@ -664,9 +749,8 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Email already exists"})
 			return
 		}
-		user.Email = req.Email
-		user.IsVerified = false // Требуется повторная верификация
 		emailChanged = true
+		newEmail = strings.TrimSpace(req.Email)
 	}
 
 	// Обновляем пароль
@@ -686,10 +770,47 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	// Если email изменен, требуем повторную авторизацию
 	if emailChanged {
+		ctx := context.Background()
+		cooldown, err := h.getVerificationCooldown(ctx, newEmail)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check resend cooldown"})
+			return
+		}
+		if cooldown > 0 {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":               fmt.Sprintf("Verification code was sent recently. Try again in %d seconds", int(cooldown.Seconds())+1),
+				"retry_after_seconds": int(cooldown.Seconds()) + 1,
+			})
+			return
+		}
+
+		code := fmt.Sprintf("%06d", rand.Intn(1000000))
+		pending := PendingEmailVerification{UserID: user.ID, Email: newEmail, Code: code}
+		data, err := json.Marshal(pending)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare verification data"})
+			return
+		}
+		if err := h.rdb.Set(ctx, emailVerificationKey(newEmail), data, 15*time.Minute).Err(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save verification code"})
+			return
+		}
+
+		emailService := services.NewEmailService(h.cfg)
+		if err := emailService.SendVerificationCode(newEmail, code); err != nil {
+			_ = h.rdb.Del(ctx, emailVerificationKey(newEmail)).Err()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send verification email"})
+			return
+		}
+		if err := h.setVerificationCooldown(ctx, newEmail); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save resend cooldown"})
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"message":      "Profile updated. Please verify your new email",
 			"emailChanged": true,
-			"email":        user.Email,
+			"email":        newEmail,
 		})
 		return
 	}

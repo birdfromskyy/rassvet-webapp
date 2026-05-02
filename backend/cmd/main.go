@@ -224,6 +224,8 @@ func main() {
 		// Parent routes (any authenticated user)
 		protected.GET("/my-children", userStudentHandler.GetMyChildren)
 		protected.GET("/my-children/:studentId/schedule", userStudentHandler.GetChildSchedule)
+		protected.GET("/teacher/schedule", userStudentHandler.GetTeacherPublishedSchedule)
+		protected.GET("/teacher/schedule/options", userStudentHandler.GetTeacherScheduleOptions)
 	}
 
 	siteDir := "./static/site"

@@ -29,6 +29,8 @@ func Migrate(db *gorm.DB) {
 	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN subject_id DROP NOT NULL")
 	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN room_id DROP NOT NULL")
 	db.Exec("ALTER TABLE group_lessons ALTER COLUMN subject_id DROP NOT NULL")
+	db.Exec("ALTER TABLE students ALTER COLUMN funding_type DROP NOT NULL")
+	db.Exec("ALTER TABLE students ALTER COLUMN funding_type SET DEFAULT 'budget'")
 	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN assignment_id DROP NOT NULL")
 	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN student_id DROP NOT NULL")
 	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN teacher_id DROP NOT NULL")

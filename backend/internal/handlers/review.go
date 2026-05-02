@@ -30,6 +30,11 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 	}
 
 	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
+	if role == string(models.RoleTeacher) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Преподаватели не могут оставлять отзывы"})
+		return
+	}
 
 	// Проверяем, есть ли у пользователя существующий отзыв
 	var existingReview models.Review
@@ -70,6 +75,11 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 // Добавляем новый метод для обновления отзыва пользователем
 func (h *ReviewHandler) UpdateMyReview(c *gin.Context) {
 	userID, _ := c.Get("userID")
+	role, _ := c.Get("role")
+	if role == string(models.RoleTeacher) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Преподаватели не могут оставлять отзывы"})
+		return
+	}
 
 	var req CreateReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

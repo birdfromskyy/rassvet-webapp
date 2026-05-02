@@ -22,7 +22,7 @@ func NewStudentHandler(db *gorm.DB) *StudentHandler {
 type CreateStudentRequest struct {
 	FullName    string  `json:"full_name" binding:"required"`
 	ParentPhone *string `json:"parent_phone"`
-	FundingType string  `json:"funding_type" binding:"required"`
+	FundingType string  `json:"funding_type"`
 	IsActive    *bool   `json:"is_active"`
 	Notes       *string `json:"notes"`
 }
@@ -158,9 +158,12 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 		return
 	}
 
-	if !isValidFundingType(req.FundingType) {
+	if req.FundingType != "" && !isValidFundingType(req.FundingType) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "funding_type must be 'paid' or 'budget'"})
 		return
+	}
+	if req.FundingType == "" {
+		req.FundingType = models.FundingTypeBudget
 	}
 
 	isActive := true

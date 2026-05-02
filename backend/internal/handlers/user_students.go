@@ -61,7 +61,7 @@ func (h *UserStudentHandler) CreateUser(c *gin.Context) {
 	}
 
 	role := req.Role
-	if role != "admin" && role != "user" {
+	if role != "admin" && role != "user" && role != "teacher" {
 		role = "user"
 	}
 
@@ -132,7 +132,7 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 	}
 
 	role := req.Role
-	if role != "admin" && role != "user" {
+	if role != "admin" && role != "user" && role != "teacher" {
 		role = string(user.Role)
 	}
 
@@ -369,6 +369,146 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 		"student": student,
 		"slots":   filteredSlots,
 	})
+}
+
+// Protected teacher: GET /api/teacher/schedule?week_start=YYYY-MM-DD&teacher_id=&student_id=
+func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != string(models.RoleTeacher) && role != string(models.RoleAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Teacher access required"})
+		return
+	}
+
+	weekStart := c.Query("week_start")
+	if weekStart == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start query param is required"})
+		return
+	}
+
+	parsedWeekStart, err := time.Parse("2006-01-02", weekStart)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start must be in YYYY-MM-DD format"})
+		return
+	}
+
+	var teacherID uint
+	if raw := strings.TrimSpace(c.Query("teacher_id")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+			return
+		}
+		teacherID = uint(parsed)
+	}
+
+	var studentID uint
+	if raw := strings.TrimSpace(c.Query("student_id")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+			return
+		}
+		studentID = uint(parsed)
+	}
+
+	var schedule models.Schedule
+	if err := h.db.Where("week_start_date = ? AND status = ?", parsedWeekStart, models.ScheduleStatusApproved).First(&schedule).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Опубликованное расписание на эту неделю не найдено"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		return
+	}
+
+	var slots []models.ScheduleSlot
+	query := h.db.
+		Preload("Teacher").
+		Preload("Student").
+		Preload("Subject").
+		Preload("Room").
+		Preload("Assignment").
+		Preload("GroupLesson").
+		Preload("GroupLesson.Enrollments").
+		Preload("GroupLesson.Enrollments.Student").
+		Preload("Exclusions").
+		Where("schedule_id = ? AND status != ?", schedule.ID, models.ScheduleSlotStatusCancelled)
+
+	if teacherID != 0 {
+		query = query.Where("teacher_id = ?", teacherID)
+	}
+
+	if err := query.Order("weekday ASC, start_time ASC, id ASC").Find(&slots).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slots"})
+		return
+	}
+
+	if studentID != 0 {
+		filtered := []models.ScheduleSlot{}
+		for _, slot := range slots {
+			if slot.SlotType == models.SlotTypeIndividual && slot.StudentID != nil && *slot.StudentID == studentID {
+				filtered = append(filtered, slot)
+				continue
+			}
+			if slot.SlotType != models.SlotTypeGroup || slot.GroupLesson == nil {
+				continue
+			}
+			enrolled := false
+			for _, e := range slot.GroupLesson.Enrollments {
+				if e.StudentID == studentID {
+					enrolled = true
+					break
+				}
+			}
+			if !enrolled {
+				continue
+			}
+			excluded := false
+			for _, ex := range slot.Exclusions {
+				if ex.StudentID == studentID {
+					excluded = true
+					break
+				}
+			}
+			if !excluded {
+				filtered = append(filtered, slot)
+			}
+		}
+		slots = filtered
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"schedule": gin.H{
+			"id":              schedule.ID,
+			"week_start_date": schedule.WeekStartDate.Format("2006-01-02"),
+			"week_end_date":   schedule.WeekEndDate.Format("2006-01-02"),
+			"status":          schedule.Status,
+			"approved_at":     schedule.ApprovedAt,
+		},
+		"slots": slots,
+	})
+}
+
+func (h *UserStudentHandler) GetTeacherScheduleOptions(c *gin.Context) {
+	role, _ := c.Get("role")
+	if role != string(models.RoleTeacher) && role != string(models.RoleAdmin) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Teacher access required"})
+		return
+	}
+
+	var teachers []models.Teacher
+	if err := h.db.Where("is_active = ?", true).Order("full_name ASC").Find(&teachers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teachers"})
+		return
+	}
+
+	var students []models.Student
+	if err := h.db.Where("is_active = ?", true).Order("full_name ASC").Find(&students).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"teachers": teachers, "students": students})
 }
 
 func extractUserID(c *gin.Context) uint {

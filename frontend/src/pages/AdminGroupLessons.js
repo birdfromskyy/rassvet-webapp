@@ -1,27 +1,62 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-	Container, Paper, Typography, Box, Button, Table, TableBody,
-	TableCell, TableContainer, TableHead, TableRow, IconButton,
-	Dialog, DialogTitle, DialogContent, DialogActions, TextField,
-	Select, MenuItem, FormControl, InputLabel, Chip, Tooltip,
-	CircularProgress, Alert, Divider, List, ListItem, ListItemText,
+	Alert,
+	Box,
+	Button,
+	Chip,
+	CircularProgress,
+	Container,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
+	Divider,
+	FormControl,
+	IconButton,
+	InputLabel,
+	List,
+	ListItem,
 	ListItemSecondaryAction,
+	ListItemText,
+	MenuItem,
+	Paper,
+	Select,
+	Table,
+	TableBody,
+	TableCell,
+	TableContainer,
+	TableHead,
+	TableRow,
+	TextField,
+	Tooltip,
+	Typography,
 } from '@mui/material'
 import {
-	Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
-	ArrowBack as BackIcon, PersonAdd as PersonAddIcon,
+	Add as AddIcon,
+	ArrowBack as BackIcon,
+	Delete as DeleteIcon,
+	Edit as EditIcon,
+	PersonAdd as PersonAddIcon,
 	PersonRemove as PersonRemoveIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
 
-const WEEKDAYS = ['', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+const EMPTY_FORM = {
+	name: '',
+	default_teacher_id: '',
+	room_name: '',
+	visits_per_week: 1,
+	duration_min: 50,
+	max_students: 10,
+	status: 'active',
+	notes: '',
+}
 
 const AdminGroupLessons = () => {
 	const navigate = useNavigate()
 	const [groups, setGroups] = useState([])
-	const [subjects, setSubjects] = useState([])
 	const [teachers, setTeachers] = useState([])
 	const [students, setStudents] = useState([])
 	const [loading, setLoading] = useState(true)
@@ -29,30 +64,25 @@ const AdminGroupLessons = () => {
 
 	const [formOpen, setFormOpen] = useState(false)
 	const [editingGroup, setEditingGroup] = useState(null)
-	const [formData, setFormData] = useState({
-		name: '', subject_id: '', default_teacher_id: '', room_name: '',
-		visits_per_week: 1, duration_min: 50, max_students: 10, status: 'active', notes: '',
-	})
+	const [formData, setFormData] = useState(EMPTY_FORM)
 
 	const [enrollOpen, setEnrollOpen] = useState(false)
 	const [enrollGroup, setEnrollGroup] = useState(null)
 	const [addStudentId, setAddStudentId] = useState('')
-
 	const [deleteConfirm, setDeleteConfirm] = useState(null)
 
 	const load = useCallback(async () => {
 		try {
 			setLoading(true)
-			const [g, s, t, st] = await Promise.all([
+			const [g, t, st] = await Promise.all([
 				scheduleService.getGroupLessons(),
-				scheduleService.getSubjects(),
 				scheduleService.getTeachers(),
 				scheduleService.getStudents(),
 			])
 			setGroups(g)
-			setSubjects(s)
 			setTeachers(t)
 			setStudents(st)
+			setError('')
 		} catch {
 			setError('Не удалось загрузить данные')
 		} finally {
@@ -64,38 +94,34 @@ const AdminGroupLessons = () => {
 
 	const openCreate = () => {
 		setEditingGroup(null)
-		setFormData({
-			name: '', subject_id: '', default_teacher_id: '', room_name: '',
-			visits_per_week: 1, duration_min: 50, max_students: 10, status: 'active', notes: '',
-		})
+		setFormData(EMPTY_FORM)
 		setFormOpen(true)
 	}
 
 	const openEdit = group => {
 		setEditingGroup(group)
 		setFormData({
-			name: group.name,
-			subject_id: group.subject_id || '',
+			name: group.name || '',
 			default_teacher_id: group.default_teacher_id || '',
 			room_name: group.room_name || '',
-			visits_per_week: group.visits_per_week,
-			duration_min: group.duration_min,
-			max_students: group.max_students,
-			status: group.status,
+			visits_per_week: group.visits_per_week || 1,
+			duration_min: group.duration_min || 50,
+			max_students: group.max_students || 10,
+			status: group.status || 'active',
 			notes: group.notes || '',
 		})
 		setFormOpen(true)
 	}
 
 	const handleSave = async () => {
-		if (!formData.name.trim()) { toast.error('Введите название группы'); return }
-		if (!formData.room_name.trim()) { toast.error('??????? ??????? ??? ????? ??????????'); return }
-		if (formData.visits_per_week < 1) { toast.error('Занятий в неделю должно быть >= 1'); return }
-		if (formData.duration_min < 1) { toast.error('Длительность должна быть >= 1 мин'); return }
+		if (!formData.name.trim()) { toast.error('Введите название группового занятия'); return }
+		if (!formData.room_name.trim()) { toast.error('Введите кабинет или место проведения'); return }
+		if (Number(formData.visits_per_week) < 1) { toast.error('Занятий в неделю должно быть не меньше 1'); return }
+		if (Number(formData.duration_min) < 1) { toast.error('Длительность должна быть не меньше 1 минуты'); return }
 
 		const payload = {
 			name: formData.name.trim(),
-			subject_id: formData.subject_id ? Number(formData.subject_id) : null,
+			subject_id: null,
 			default_teacher_id: formData.default_teacher_id ? Number(formData.default_teacher_id) : null,
 			room_name: formData.room_name.trim(),
 			visits_per_week: Number(formData.visits_per_week),
@@ -108,10 +134,10 @@ const AdminGroupLessons = () => {
 		try {
 			if (editingGroup) {
 				await scheduleService.updateGroupLesson(editingGroup.id, payload)
-				toast.success('Группа обновлена')
+				toast.success('Групповое занятие обновлено')
 			} else {
 				await scheduleService.createGroupLesson(payload)
-				toast.success('Группа создана')
+				toast.success('Групповое занятие создано')
 			}
 			setFormOpen(false)
 			load()
@@ -123,7 +149,7 @@ const AdminGroupLessons = () => {
 	const handleDelete = async () => {
 		try {
 			await scheduleService.deleteGroupLesson(deleteConfirm.id)
-			toast.success('Группа удалена')
+			toast.success('Групповое занятие удалено')
 			setDeleteConfirm(null)
 			load()
 		} catch (e) {
@@ -137,15 +163,19 @@ const AdminGroupLessons = () => {
 		setEnrollOpen(true)
 	}
 
+	const refreshEnrollGroup = async () => {
+		const updated = await scheduleService.getGroupLessonById(enrollGroup.id)
+		setEnrollGroup(updated)
+		load()
+	}
+
 	const handleAddStudent = async () => {
 		if (!addStudentId) { toast.error('Выберите ученика'); return }
 		try {
 			await scheduleService.addGroupEnrollment(enrollGroup.id, Number(addStudentId))
 			toast.success('Ученик добавлен')
 			setAddStudentId('')
-			const updated = await scheduleService.getGroupLessonById(enrollGroup.id)
-			setEnrollGroup(updated)
-			load()
+			refreshEnrollGroup()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка')
 		}
@@ -155,9 +185,7 @@ const AdminGroupLessons = () => {
 		try {
 			await scheduleService.removeGroupEnrollment(enrollGroup.id, studentId)
 			toast.success('Ученик удалён из группы')
-			const updated = await scheduleService.getGroupLessonById(enrollGroup.id)
-			setEnrollGroup(updated)
-			load()
+			refreshEnrollGroup()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка')
 		}
@@ -175,16 +203,12 @@ const AdminGroupLessons = () => {
 					<Box>
 						<Typography variant='h5'>Групповые занятия</Typography>
 						<Typography variant='body2' color='text.secondary'>
-							Группы учеников с общим преподавателем и предметом
+							Занятия с произвольным названием, преподавателем, текстовым кабинетом и составом учеников
 						</Typography>
 					</Box>
 					<Box display='flex' gap={1}>
-						<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')}>
-							Назад
-						</Button>
-						<Button variant='contained' startIcon={<AddIcon />} onClick={openCreate}>
-							Создать группу
-						</Button>
+						<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')}>Назад</Button>
+						<Button variant='contained' startIcon={<AddIcon />} onClick={openCreate}>Создать группу</Button>
 					</Box>
 				</Box>
 
@@ -195,30 +219,31 @@ const AdminGroupLessons = () => {
 						<TableHead>
 							<TableRow>
 								<TableCell>Название</TableCell>
-								<TableCell>Предмет</TableCell>
-								<TableCell>Преподаватель (по умолч.)</TableCell>
+								<TableCell>Преподаватель</TableCell>
+								<TableCell>Кабинет</TableCell>
 								<TableCell align='center'>Занятий/нед.</TableCell>
-								<TableCell align='center'>Длит. (мин)</TableCell>
-								<TableCell align='center'>Учеников</TableCell>
+								<TableCell align='center'>Длительность</TableCell>
+								<TableCell align='center'>Ученики</TableCell>
 								<TableCell>Статус</TableCell>
+								<TableCell>Примечания</TableCell>
 								<TableCell align='right'>Действия</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
 							{groups.length === 0 && (
 								<TableRow>
-									<TableCell colSpan={8} align='center'>
-										<Typography color='text.secondary'>Групп пока нет</Typography>
+									<TableCell colSpan={9} align='center'>
+										<Typography color='text.secondary'>Групповых занятий пока нет</Typography>
 									</TableCell>
 								</TableRow>
 							)}
 							{groups.map(g => (
 								<TableRow key={g.id} hover>
 									<TableCell><strong>{g.name}</strong></TableCell>
-									<TableCell>{g.subject?.name || '—'}</TableCell>
-									<TableCell>{g.default_teacher?.full_name || '—'}</TableCell>
+									<TableCell>{g.default_teacher?.full_name || '-'}</TableCell>
+									<TableCell>{g.room_name || '-'}</TableCell>
 									<TableCell align='center'>{g.visits_per_week}</TableCell>
-									<TableCell align='center'>{g.duration_min}</TableCell>
+									<TableCell align='center'>{g.duration_min} мин</TableCell>
 									<TableCell align='center'>
 										<Chip
 											size='small'
@@ -229,25 +254,20 @@ const AdminGroupLessons = () => {
 									<TableCell>
 										<Chip
 											size='small'
-											label={g.status === 'active' ? 'Активна' : 'Приост.'}
+											label={g.status === 'active' ? 'Активна' : 'Приостановлена'}
 											color={g.status === 'active' ? 'success' : 'default'}
 										/>
 									</TableCell>
+									<TableCell>{g.notes || '-'}</TableCell>
 									<TableCell align='right'>
 										<Tooltip title='Состав группы'>
-											<IconButton size='small' onClick={() => openEnroll(g)}>
-												<PersonAddIcon fontSize='small' />
-											</IconButton>
+											<IconButton size='small' onClick={() => openEnroll(g)}><PersonAddIcon fontSize='small' /></IconButton>
 										</Tooltip>
 										<Tooltip title='Редактировать'>
-											<IconButton size='small' onClick={() => openEdit(g)}>
-												<EditIcon fontSize='small' />
-											</IconButton>
+											<IconButton size='small' onClick={() => openEdit(g)}><EditIcon fontSize='small' /></IconButton>
 										</Tooltip>
 										<Tooltip title='Удалить'>
-											<IconButton size='small' color='error' onClick={() => setDeleteConfirm(g)}>
-												<DeleteIcon fontSize='small' />
-											</IconButton>
+											<IconButton size='small' color='error' onClick={() => setDeleteConfirm(g)}><DeleteIcon fontSize='small' /></IconButton>
 										</Tooltip>
 									</TableCell>
 								</TableRow>
@@ -257,26 +277,27 @@ const AdminGroupLessons = () => {
 				</TableContainer>
 			</Paper>
 
-			{/* Форма создания/редактирования */}
 			<Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth='sm' fullWidth>
 				<DialogTitle>{editingGroup ? 'Редактировать группу' : 'Создать группу'}</DialogTitle>
 				<DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
 					<TextField
-						label='Название группы' fullWidth required
-						value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+						label='Название группового занятия' fullWidth required
+						value={formData.name}
+						onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
 					/>
 					<TextField
-						label='??????? / ????? ??????????' fullWidth required
+						label='Кабинет / место проведения' fullWidth required
 						value={formData.room_name}
 						onChange={e => setFormData(p => ({ ...p, room_name: e.target.value }))}
 					/>
 					<FormControl fullWidth>
 						<InputLabel>Преподаватель по умолчанию</InputLabel>
 						<Select
-							value={formData.default_teacher_id} label='Преподаватель по умолчанию'
+							value={formData.default_teacher_id}
+							label='Преподаватель по умолчанию'
 							onChange={e => setFormData(p => ({ ...p, default_teacher_id: e.target.value }))}
 						>
-							<MenuItem value=''>— Не указан —</MenuItem>
+							<MenuItem value=''>Не указан</MenuItem>
 							{teachers.filter(t => t.is_active).map(t => (
 								<MenuItem key={t.id} value={t.id}>{t.full_name}</MenuItem>
 							))}
@@ -305,7 +326,8 @@ const AdminGroupLessons = () => {
 					<FormControl fullWidth>
 						<InputLabel>Статус</InputLabel>
 						<Select
-							value={formData.status} label='Статус'
+							value={formData.status}
+							label='Статус'
 							onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}
 						>
 							<MenuItem value='active'>Активна</MenuItem>
@@ -320,18 +342,15 @@ const AdminGroupLessons = () => {
 				</DialogContent>
 				<DialogActions>
 					<Button onClick={() => setFormOpen(false)}>Отмена</Button>
-					<Button variant='contained' onClick={handleSave}>
-						{editingGroup ? 'Сохранить' : 'Создать'}
-					</Button>
+					<Button variant='contained' onClick={handleSave}>{editingGroup ? 'Сохранить' : 'Создать'}</Button>
 				</DialogActions>
 			</Dialog>
 
-			{/* Управление составом группы */}
 			<Dialog open={enrollOpen} onClose={() => setEnrollOpen(false)} maxWidth='sm' fullWidth>
 				<DialogTitle>
 					Состав группы: {enrollGroup?.name}
 					<Typography variant='caption' display='block' color='text.secondary'>
-						{enrollGroup?.subject?.name} · {enrollGroup?.visits_per_week} раз/нед · {enrollGroup?.duration_min} мин
+						{enrollGroup?.room_name || '-'} · {enrollGroup?.visits_per_week} раз/нед · {enrollGroup?.duration_min} мин
 					</Typography>
 				</DialogTitle>
 				<DialogContent>
@@ -339,20 +358,13 @@ const AdminGroupLessons = () => {
 					<Box display='flex' gap={1} mb={2}>
 						<FormControl fullWidth size='small'>
 							<InputLabel>Ученик</InputLabel>
-							<Select
-								value={addStudentId} label='Ученик'
-								onChange={e => setAddStudentId(e.target.value)}
-							>
+							<Select value={addStudentId} label='Ученик' onChange={e => setAddStudentId(e.target.value)}>
 								{availableStudents.map(s => (
-									<MenuItem key={s.id} value={s.id}>
-										{s.full_name} ({s.funding_type === 'paid' ? 'платник' : 'бюджет'})
-									</MenuItem>
+									<MenuItem key={s.id} value={s.id}>{s.full_name}</MenuItem>
 								))}
 							</Select>
 						</FormControl>
-						<Button variant='contained' onClick={handleAddStudent} disabled={!addStudentId}>
-							Добавить
-						</Button>
+						<Button variant='contained' onClick={handleAddStudent} disabled={!addStudentId}>Добавить</Button>
 					</Box>
 					<Divider sx={{ mb: 1 }} />
 					<Typography variant='subtitle2' gutterBottom>
@@ -364,10 +376,7 @@ const AdminGroupLessons = () => {
 					<List dense>
 						{(enrollGroup?.enrollments || []).map(e => (
 							<ListItem key={e.id} disableGutters>
-								<ListItemText
-									primary={e.student?.full_name}
-									secondary={e.student?.funding_type === 'paid' ? 'Платник' : 'Бюджетник'}
-								/>
+								<ListItemText primary={e.student?.full_name || `Ученик #${e.student_id}`} />
 								<ListItemSecondaryAction>
 									<Tooltip title='Удалить из группы'>
 										<IconButton size='small' color='error' onClick={() => handleRemoveStudent(e.student_id)}>
@@ -384,7 +393,6 @@ const AdminGroupLessons = () => {
 				</DialogActions>
 			</Dialog>
 
-			{/* Подтверждение удаления */}
 			<Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)}>
 				<DialogTitle>Удалить группу?</DialogTitle>
 				<DialogContent>

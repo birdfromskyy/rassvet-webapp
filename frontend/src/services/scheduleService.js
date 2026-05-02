@@ -285,8 +285,10 @@ const scheduleService = {
 		return r.data
 	},
 	getTeacherReport: async (teacherId, startDate, endDate) => {
+		const params = { start_date: startDate, end_date: endDate }
+		if (teacherId) params.teacher_id = teacherId
 		const r = await api.get('/admin/reports/monthly', {
-			params: { teacher_id: teacherId, start_date: startDate, end_date: endDate },
+			params,
 		})
 		return r.data
 	},
@@ -324,6 +326,17 @@ const scheduleService = {
 		const r = await api.get(`/my-children/${studentId}/schedule`, {
 			params: { week_start: weekStart },
 		})
+		return r.data
+	},
+	getTeacherPublishedSchedule: async (weekStart, filters = {}) => {
+		const params = { week_start: weekStart }
+		if (filters.teacher_id) params.teacher_id = filters.teacher_id
+		if (filters.student_id) params.student_id = filters.student_id
+		const r = await api.get('/teacher/schedule', { params })
+		return r.data
+	},
+	getTeacherScheduleOptions: async () => {
+		const r = await api.get('/teacher/schedule/options')
 		return r.data
 	},
 }

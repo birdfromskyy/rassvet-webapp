@@ -25,6 +25,7 @@ import AdminGroupLessons from './pages/AdminGroupLessons'
 import AdminUsers from './pages/AdminUsers'
 import AdminReports from './pages/AdminReports'
 import ChildSchedule from './pages/ChildSchedule'
+import TeacherSchedule from './pages/TeacherSchedule'
 import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword'
@@ -128,8 +129,15 @@ function App() {
 						element={<Dashboard user={user} onLogout={handleLogout} />}
 					/>
 					<Route path='/reviews' element={<Reviews user={user} />} />
-					<Route path='/create-review' element={<CreateReview />} />
-					<Route path='/my-schedule' element={<ChildSchedule user={user} />} />
+					<Route
+						path='/create-review'
+						element={user?.role === 'teacher' ? <Navigate to='/reviews' /> : <CreateReview />}
+					/>
+					<Route
+						path='/my-schedule'
+						element={user?.role === 'teacher' ? <TeacherSchedule user={user} /> : <ChildSchedule user={user} />}
+					/>
+					<Route path='/teacher/schedule' element={<TeacherSchedule user={user} />} />
 
 					<Route element={<AdminRoute user={user} />}>
 						<Route path='/admin/reviews' element={<AdminReviews />} />
