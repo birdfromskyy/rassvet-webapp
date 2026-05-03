@@ -514,6 +514,66 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	})
 }
 
+func (h *ScheduleHandler) PinScheduleSlot(c *gin.Context) {
+	h.setScheduleSlotOrigin(c, models.ScheduleSlotOriginManual, "pin")
+}
+
+func (h *ScheduleHandler) UnpinScheduleSlot(c *gin.Context) {
+	h.setScheduleSlotOrigin(c, models.ScheduleSlotOriginAuto, "unpin")
+}
+
+func (h *ScheduleHandler) setScheduleSlotOrigin(c *gin.Context, origin string, action string) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	slotID, err := strconv.Atoi(c.Param("slotId"))
+	if err != nil || slotID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		return
+	}
+
+	var slot models.ScheduleSlot
+	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).
+		First(&slot).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule slot not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule slot"})
+		return
+	}
+
+	slot.Origin = origin
+
+	if err := h.db.Save(&slot).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to " + action + " schedule slot"})
+		return
+	}
+
+	if err := h.db.
+		Preload("Student").
+		Preload("Teacher").
+		Preload("Subject").
+		Preload("Room").
+		Preload("Assignment").
+		Preload("GroupLesson").
+		Preload("GroupLesson.Enrollments").
+		Preload("GroupLesson.Enrollments.Student").
+		Preload("Exclusions").
+		First(&slot, slot.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated schedule slot"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Schedule slot origin updated successfully",
+		"slot":    slot,
+	})
+}
+
 func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 	scheduleID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || scheduleID <= 0 {

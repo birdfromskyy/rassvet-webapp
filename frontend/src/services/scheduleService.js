@@ -264,6 +264,14 @@ const scheduleService = {
 		const r = await api.put(`/admin/schedules/${scheduleId}/slots/${slotId}`, data)
 		return r.data
 	},
+	pinSlot: async (scheduleId, slotId) => {
+		const r = await api.patch(`/admin/schedules/${scheduleId}/slots/${slotId}/pin`)
+		return r.data
+	},
+	unpinSlot: async (scheduleId, slotId) => {
+		const r = await api.patch(`/admin/schedules/${scheduleId}/slots/${slotId}/unpin`)
+		return r.data
+	},
 	deleteSlot: async (scheduleId, slotId) => {
 		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}`)
 	},

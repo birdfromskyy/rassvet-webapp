@@ -183,6 +183,8 @@ func main() {
 
 			admin.POST("/schedules/:id/slots", scheduleHandler.CreateScheduleSlot)
 			admin.PUT("/schedules/:id/slots/:slotId", scheduleHandler.UpdateScheduleSlot)
+			admin.PATCH("/schedules/:id/slots/:slotId/pin", scheduleHandler.PinScheduleSlot)
+			admin.PATCH("/schedules/:id/slots/:slotId/unpin", scheduleHandler.UnpinScheduleSlot)
 			admin.DELETE("/schedules/:id/slots/:slotId", scheduleHandler.DeleteScheduleSlot)
 			admin.POST("/schedules/:id/slots/:slotId/exclusions", scheduleHandler.AddSlotExclusion)
 			admin.DELETE("/schedules/:id/slots/:slotId/exclusions/:studentId", scheduleHandler.RemoveSlotExclusion)

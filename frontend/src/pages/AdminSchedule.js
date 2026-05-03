@@ -57,6 +57,8 @@ import {
 	PersonAdd as IncludeIcon,
 	ClearAll as ClearIcon,
 	TableChart as ExcelIcon,
+	Lock as LockIcon,
+	LockOpen as LockOpenIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -721,6 +723,29 @@ const AdminSchedule = () => {
 		await doSaveEditSlot()
 	}
 
+	const pinSlotAsManual = async slot => {
+		if (slot.origin !== 'auto') return
+		if (!window.confirm('Закрепить это занятие как ручное? При следующей генерации оно не будет удалено.')) return
+		try {
+			await scheduleService.pinSlot(scheduleData.schedule.id, slot.id)
+			toast.success('Занятие закреплено')
+			loadSchedule()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Не удалось закрепить занятие')
+		}
+	}
+
+	const unpinSlotAsAuto = async slot => {
+		if (slot.origin !== 'manual') return
+		if (!window.confirm('\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u044d\u0442\u043e \u0437\u0430\u043d\u044f\u0442\u0438\u0435 \u0432 \u0430\u0432\u0442\u043e? \u041f\u0440\u0438 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0439 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438 \u043e\u043d\u043e \u043c\u043e\u0436\u0435\u0442 \u0431\u044b\u0442\u044c \u0443\u0434\u0430\u043b\u0435\u043d\u043e \u0438 \u043f\u0435\u0440\u0435\u0441\u043e\u0437\u0434\u0430\u043d\u043e.')) return
+		try {
+			await scheduleService.unpinSlot(scheduleData.schedule.id, slot.id)
+			toast.success('\u0417\u0430\u043d\u044f\u0442\u0438\u0435 \u0441\u043d\u043e\u0432\u0430 \u0430\u0432\u0442\u043e')
+			loadSchedule()
+		} catch (e) {
+			toast.error(e.response?.data?.error || '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u0437\u0430\u043d\u044f\u0442\u0438\u0435 \u0432 \u0430\u0432\u0442\u043e')
+		}
+	}
 	const deleteSlot = async slotId => {
 		if (!window.confirm('Удалить слот?')) return
 		try {
@@ -1233,6 +1258,26 @@ const AdminSchedule = () => {
 														/>
 													</TableCell>
 													<TableCell align='center'>
+														{slot.origin === 'auto' && (
+															<IconButton
+																size='small'
+																color='primary'
+																onClick={() => pinSlotAsManual(slot)}
+																title='Закрепить как ручное'
+															>
+																<LockIcon fontSize='small' />
+															</IconButton>
+														)}
+														{slot.origin === 'manual' && (
+															<IconButton
+																size='small'
+																color='secondary'
+																onClick={() => unpinSlotAsAuto(slot)}
+																title={'\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u0432 \u0430\u0432\u0442\u043e'}
+															>
+																<LockOpenIcon fontSize='small' />
+															</IconButton>
+														)}
 														<IconButton
 															size='small'
 															onClick={() => openEditSlot(slot)}
@@ -1507,7 +1552,7 @@ const AdminSchedule = () => {
 										setSlotForm({ ...slotForm, student_id: value?.id || '' })
 									}
 									renderInput={params => (
-										<TextField {...params} label='РЈС‡РµРЅРёРє' required />
+										<TextField {...params} label={'\u0423\u0447\u0435\u043d\u0438\u043a'} required />
 									)}
 								/>
 								<Autocomplete
@@ -1518,7 +1563,7 @@ const AdminSchedule = () => {
 										setSlotForm({ ...slotForm, teacher_id: value?.id || '' })
 									}
 									renderInput={params => (
-										<TextField {...params} label='РџСЂРµРїРѕРґР°РІР°С‚РµР»СЊ' required />
+										<TextField {...params} label={'\u041f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c'} required />
 									)}
 								/>
 								<Autocomplete
@@ -1529,7 +1574,7 @@ const AdminSchedule = () => {
 										setSlotForm({ ...slotForm, subject_id: value?.id || '' })
 									}
 									renderInput={params => (
-										<TextField {...params} label='РџСЂРµРґРјРµС‚' required />
+										<TextField {...params} label={'\u041f\u0440\u0435\u0434\u043c\u0435\u0442'} required />
 									)}
 								/>
 								<Alert severity='info'>Если назначения нет, система предложит создать его перед добавлением занятия.</Alert>
