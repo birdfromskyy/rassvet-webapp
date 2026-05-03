@@ -368,6 +368,11 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		slot.GroupLessonID = &req.GroupLessonID
 	}
 
+	if err := h.ensureSlotHasNoConflicts(slot, 0); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+
 	if err := h.db.Create(&slot).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create schedule slot"})
 		return
@@ -477,6 +482,11 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	}
 
 	slot.Origin = models.ScheduleSlotOriginManual
+
+	if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 
 	if err := h.db.Save(&slot).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update schedule slot"})
@@ -713,6 +723,143 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 }
 
 // ========== SLOT EXCLUSIONS (для групповых слотов) ==========
+
+func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, excludeSlotID uint) error {
+	if slot.Status == models.ScheduleSlotStatusCancelled {
+		return nil
+	}
+
+	bufferedStart, bufferedEnd := applyManualBreakBuffer(slot.StartTime, slot.EndTime, services.DefaultBreakMinutes)
+	studentIDs, err := h.getSlotStudentIDs(slot)
+	if err != nil {
+		return err
+	}
+
+	var slots []models.ScheduleSlot
+	if err := h.db.Where("schedule_id = ?", slot.ScheduleID).Find(&slots).Error; err != nil {
+		return fmt.Errorf("failed to load existing slots for conflict check")
+	}
+
+	for _, existing := range slots {
+		if excludeSlotID != 0 && existing.ID == excludeSlotID {
+			continue
+		}
+		if existing.Weekday != slot.Weekday || existing.Status == models.ScheduleSlotStatusCancelled {
+			continue
+		}
+
+		existingStart, existingEnd := applyManualBreakBuffer(existing.StartTime, existing.EndTime, services.DefaultBreakMinutes)
+		if !manualTimesOverlap(bufferedStart, bufferedEnd, existingStart, existingEnd) {
+			continue
+		}
+
+		if existing.TeacherID == slot.TeacherID {
+			return fmt.Errorf("teacher already has a lesson at this time")
+		}
+		if slot.RoomID != nil && existing.RoomID != nil && *slot.RoomID == *existing.RoomID {
+			return fmt.Errorf("room already has a lesson at this time")
+		}
+
+		existingStudentIDs, err := h.getSlotStudentIDs(existing)
+		if err != nil {
+			return err
+		}
+		if hasAnyStudentIntersection(studentIDs, existingStudentIDs) {
+			return fmt.Errorf("student already has a lesson at this time")
+		}
+	}
+
+	return nil
+}
+
+func (h *ScheduleHandler) getSlotStudentIDs(slot models.ScheduleSlot) ([]uint, error) {
+	if slot.SlotType == models.SlotTypeGroup {
+		if slot.GroupLessonID == nil {
+			return nil, nil
+		}
+		var enrollments []models.GroupLessonEnrollment
+		if err := h.db.Where("group_lesson_id = ?", *slot.GroupLessonID).Find(&enrollments).Error; err != nil {
+			return nil, fmt.Errorf("failed to load group enrollments for conflict check")
+		}
+		studentIDs := make([]uint, 0, len(enrollments))
+		for _, enrollment := range enrollments {
+			studentIDs = append(studentIDs, enrollment.StudentID)
+		}
+		return studentIDs, nil
+	}
+
+	if slot.StudentID == nil {
+		return nil, nil
+	}
+	return []uint{*slot.StudentID}, nil
+}
+
+func hasAnyStudentIntersection(left []uint, right []uint) bool {
+	if len(left) == 0 || len(right) == 0 {
+		return false
+	}
+	seen := make(map[uint]bool, len(left))
+	for _, id := range left {
+		seen[id] = true
+	}
+	for _, id := range right {
+		if seen[id] {
+			return true
+		}
+	}
+	return false
+}
+
+func applyManualBreakBuffer(startTime string, endTime string, breakMin int) (string, string) {
+	if breakMin <= 0 {
+		return startTime, endTime
+	}
+	start := manualHHMMToMinutes(startTime)
+	end := manualHHMMToMinutes(endTime)
+	if start < 0 || end < 0 {
+		return startTime, endTime
+	}
+	start -= breakMin
+	if start < 0 {
+		start = 0
+	}
+	end += breakMin
+	if end > 23*60+59 {
+		end = 23*60 + 59
+	}
+	return manualMinutesToHHMM(start), manualMinutesToHHMM(end)
+}
+
+func manualTimesOverlap(startA, endA, startB, endB string) bool {
+	return startA < endB && startB < endA
+}
+
+func manualHHMMToMinutes(value string) int {
+	if len(value) != 5 || value[2] != ':' {
+		return -1
+	}
+	hour, err := strconv.Atoi(value[:2])
+	if err != nil {
+		return -1
+	}
+	minute, err := strconv.Atoi(value[3:])
+	if err != nil {
+		return -1
+	}
+	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+		return -1
+	}
+	return hour*60 + minute
+}
+
+func manualMinutesToHHMM(value int) string {
+	if value < 0 {
+		value = 0
+	}
+	hour := value / 60
+	minute := value % 60
+	return fmt.Sprintf("%02d:%02d", hour, minute)
+}
 
 func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherID uint) error {
 	var groupLesson models.GroupLesson

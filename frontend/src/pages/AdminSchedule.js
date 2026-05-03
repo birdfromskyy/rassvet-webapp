@@ -96,6 +96,7 @@ const EMPTY_SLOT_FORM = {
 	slot_type: 'individual',
 	assignment_id: '',
 	group_lesson_id: '',
+	student_id: '',
 	teacher_id: '',
 	subject_id: '',
 	room_id: '',
@@ -155,6 +156,7 @@ const AdminSchedule = () => {
 	const [assignments, setAssignments] = useState([])
 	const [groupLessons, setGroupLessons] = useState([])
 	const [rooms, setRooms] = useState([])
+	const [subjects, setSubjects] = useState([])
 	const [students, setStudents] = useState([])
 	const [teachers, setTeachers] = useState([])
 	const [refLoaded, setRefLoaded] = useState(false)
@@ -216,13 +218,15 @@ const AdminSchedule = () => {
 			scheduleService.getAssignments({ status: 'active' }),
 			scheduleService.getGroupLessons({ status: 'active' }),
 			scheduleService.getRooms(),
+			scheduleService.getSubjects(),
 			scheduleService.getStudents(),
 			scheduleService.getTeachers(),
 		])
-			.then(([aData, gData, rData, sData, tData]) => {
+			.then(([aData, gData, rData, subjData, sData, tData]) => {
 				setAssignments(aData)
 				setGroupLessons(gData)
 				setRooms(rData.filter(r => r.is_active))
+				setSubjects(subjData.filter(s => s.is_active))
 				setStudents(sData)
 				setTeachers(tData)
 				setRefLoaded(true)
@@ -545,9 +549,31 @@ const AdminSchedule = () => {
 	}
 
 	const doCreateSlot = async () => {
-		const assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
+		let assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
 		const groupLesson = groupLessons.find(g => g.id === Number(slotForm.group_lesson_id))
 		try {
+			if (slotForm.slot_type === 'individual' && !assignment) {
+				assignment = assignments.find(a =>
+					a.student_id === Number(slotForm.student_id) &&
+					a.teacher_id === Number(slotForm.teacher_id) &&
+					a.subject_id === Number(slotForm.subject_id),
+				)
+			}
+			if (slotForm.slot_type === 'individual' && !assignment) {
+				const duration = timeToMinutes(slotForm.end_time) - timeToMinutes(slotForm.start_time)
+				assignment = await scheduleService.createAssignment({
+					student_id: Number(slotForm.student_id),
+					teacher_id: Number(slotForm.teacher_id),
+					subject_id: Number(slotForm.subject_id),
+					funding_type: 'budget',
+					visits_per_week: 1,
+					duration_min: duration,
+					status: 'active',
+				})
+				setAssignments(prev => [...prev, assignment])
+				setSlotForm(prev => ({ ...prev, assignment_id: assignment.id }))
+			}
+
 			const payload = slotForm.slot_type === 'group'
 				? {
 					slot_type: 'group',
@@ -560,7 +586,7 @@ const AdminSchedule = () => {
 				}
 				: {
 					slot_type: 'individual',
-					assignment_id: Number(slotForm.assignment_id),
+					assignment_id: assignment.id,
 					student_id: assignment.student_id,
 					teacher_id: assignment.teacher_id,
 					subject_id: assignment.subject_id,
@@ -612,14 +638,35 @@ const AdminSchedule = () => {
 			toast.error('???????? ?????????? ? ???????')
 			return
 		}
-		const assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
+		let assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
 		if (!assignment) {
-			toast.error('?????????? ?? ???????')
-			return
+			if (!slotForm.student_id || !slotForm.teacher_id || !slotForm.subject_id) {
+				toast.error('Выберите ребёнка, преподавателя и предмет')
+				return
+			}
+			assignment = assignments.find(a =>
+				a.student_id === Number(slotForm.student_id) &&
+				a.teacher_id === Number(slotForm.teacher_id) &&
+				a.subject_id === Number(slotForm.subject_id),
+			)
+			if (!assignment) {
+				if (!window.confirm('Такого назначения не существует. Создать его и добавить ручное занятие?')) {
+					return
+				}
+				const duration = timeToMinutes(slotForm.end_time) - timeToMinutes(slotForm.start_time)
+				if (duration !== 30 && duration !== 50) {
+					toast.error('Для нового назначения длительность должна быть 30 или 50 минут')
+					return
+				}
+			} else {
+				setSlotForm(prev => ({ ...prev, assignment_id: assignment.id }))
+			}
 		}
+		const studentId = assignment ? assignment.student_id : Number(slotForm.student_id)
+		const teacherId = assignment ? assignment.teacher_id : Number(slotForm.teacher_id)
 		const conflicts = findConflictingSlots(
 			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
-			Number(slotForm.room_id), assignment.teacher_id, [assignment.student_id],
+			Number(slotForm.room_id), teacherId, [studentId],
 		)
 		if (conflicts.length > 0) {
 			pendingSlotAction.current = doCreateSlot
@@ -1423,6 +1470,7 @@ const AdminSchedule = () => {
 										slot_type: e.target.value,
 										assignment_id: '',
 										group_lesson_id: '',
+										student_id: '',
 										teacher_id: '',
 										subject_id: '',
 									})
@@ -1448,6 +1496,44 @@ const AdminSchedule = () => {
 									<TextField {...params} label='Назначение' required />
 								)}
 							/>
+						)}
+						{slotForm.slot_type === 'individual' && !slotForm.assignment_id && (
+							<>
+								<Autocomplete
+									options={students.filter(s => s.is_active)}
+									value={students.find(s => s.id === Number(slotForm.student_id)) || null}
+									getOptionLabel={s => s?.full_name || ''}
+									onChange={(event, value) =>
+										setSlotForm({ ...slotForm, student_id: value?.id || '' })
+									}
+									renderInput={params => (
+										<TextField {...params} label='РЈС‡РµРЅРёРє' required />
+									)}
+								/>
+								<Autocomplete
+									options={teachers.filter(t => t.is_active)}
+									value={teachers.find(t => t.id === Number(slotForm.teacher_id)) || null}
+									getOptionLabel={t => t?.full_name || ''}
+									onChange={(event, value) =>
+										setSlotForm({ ...slotForm, teacher_id: value?.id || '' })
+									}
+									renderInput={params => (
+										<TextField {...params} label='РџСЂРµРїРѕРґР°РІР°С‚РµР»СЊ' required />
+									)}
+								/>
+								<Autocomplete
+									options={subjects}
+									value={subjects.find(s => s.id === Number(slotForm.subject_id)) || null}
+									getOptionLabel={s => s?.name || ''}
+									onChange={(event, value) =>
+										setSlotForm({ ...slotForm, subject_id: value?.id || '' })
+									}
+									renderInput={params => (
+										<TextField {...params} label='РџСЂРµРґРјРµС‚' required />
+									)}
+								/>
+								<Alert severity='info'>Если назначения нет, система предложит создать его перед добавлением занятия.</Alert>
+							</>
 						)}
 						{slotForm.slot_type === 'group' && (
 							<>
