@@ -177,9 +177,12 @@ func main() {
 			admin.GET("/schedules", scheduleHandler.GetScheduleByWeek)
 			admin.GET("/schedules/:id", scheduleHandler.GetScheduleByID)
 			admin.POST("/schedules/generate", scheduleHandler.GenerateSchedule)
+			admin.POST("/schedules/generate/async", scheduleHandler.StartGenerateSchedule)
+			admin.GET("/schedule-generation-jobs/:jobId", scheduleHandler.GetGenerationJob)
 			admin.POST("/schedules/:id/approve", scheduleHandler.ApproveSchedule)
 			admin.POST("/schedules/:id/unapprove", scheduleHandler.UnapproveSchedule)
 			admin.POST("/schedules/:id/reset-auto", scheduleHandler.ResetAutoSchedule)
+			admin.POST("/schedules/:id/reset-auto/async", scheduleHandler.StartResetAutoSchedule)
 
 			admin.POST("/schedules/:id/slots", scheduleHandler.CreateScheduleSlot)
 			admin.PUT("/schedules/:id/slots/:slotId", scheduleHandler.UpdateScheduleSlot)

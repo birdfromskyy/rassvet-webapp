@@ -9,6 +9,7 @@ import {
 	Button,
 	Chip,
 	CircularProgress,
+	LinearProgress,
 	Table,
 	TableBody,
 	TableCell,
@@ -153,6 +154,7 @@ const AdminSchedule = () => {
 	const [scheduleData, setScheduleData] = useState(null)
 	const [loading, setLoading] = useState(false)
 	const [generating, setGenerating] = useState(false)
+	const [generationProgress, setGenerationProgress] = useState(null)
 
 	// Reference data for dialogs and filters
 	const [assignments, setAssignments] = useState([])
@@ -250,6 +252,27 @@ const AdminSchedule = () => {
 			return n
 		})
 
+	const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+	const pollGenerationJob = async (jobId, successMessage) => {
+		let currentJob = null
+		while (true) {
+			await wait(1500)
+			currentJob = await scheduleService.getGenerationJob(jobId)
+			setGenerationProgress(currentJob)
+
+			if (currentJob.status === 'completed') {
+				if (currentJob.result) setScheduleData(currentJob.result)
+				toast.success(successMessage)
+				return
+			}
+
+			if (currentJob.status === 'failed') {
+				throw new Error(currentJob.error || 'Ошибка генерации')
+			}
+		}
+	}
+
 	const generate = async () => {
 		if (
 			!window.confirm(
@@ -258,14 +281,16 @@ const AdminSchedule = () => {
 		)
 			return
 		setGenerating(true)
+		setGenerationProgress({ percent: 0, message: 'Запуск генерации...' })
 		try {
-			const data = await scheduleService.generateSchedule(weekStartISO)
-			setScheduleData(data)
-			toast.success('Расписание сгенерировано')
+			const job = await scheduleService.startGenerateSchedule(weekStartISO)
+			setGenerationProgress(job)
+			await pollGenerationJob(job.id, 'Расписание сгенерировано')
 		} catch (e) {
-			toast.error(e.response?.data?.error || 'Ошибка генерации')
+			toast.error(e.response?.data?.error || e.message || 'Ошибка генерации')
 		} finally {
 			setGenerating(false)
+			setGenerationProgress(null)
 		}
 	}
 
@@ -299,16 +324,18 @@ const AdminSchedule = () => {
 		)
 			return
 		setGenerating(true)
+		setGenerationProgress({ percent: 0, message: 'Запуск пересчёта...' })
 		try {
-			const data = await scheduleService.resetAutoSchedule(
+			const job = await scheduleService.startResetAutoSchedule(
 				scheduleData.schedule.id,
 			)
-			setScheduleData(data)
-			toast.success('Авто-слоты сброшены и пересчитаны')
+			setGenerationProgress(job)
+			await pollGenerationJob(job.id, 'Авто-слоты сброшены и пересчитаны')
 		} catch (e) {
-			toast.error(e.response?.data?.error || 'Ошибка')
+			toast.error(e.response?.data?.error || e.message || 'Ошибка')
 		} finally {
 			setGenerating(false)
+			setGenerationProgress(null)
 		}
 	}
 
@@ -1028,6 +1055,30 @@ const AdminSchedule = () => {
 						</Button>
 					)}
 				</Box>
+
+				{generationProgress && (
+					<Paper variant='outlined' sx={{ p: 2, mb: 3 }}>
+						<Box display='flex' justifyContent='space-between' alignItems='center' mb={1}>
+							<Box>
+								<Typography variant='subtitle1' fontWeight={600}>
+									Идёт генерация...
+								</Typography>
+								<Typography variant='body2' color='text.secondary'>
+									{generationProgress.message || 'Расписание рассчитывается'}
+									{generationProgress.strategy ? ` · ${generationProgress.strategy}` : ''}
+								</Typography>
+							</Box>
+							<Typography variant='h6' sx={{ minWidth: 64, textAlign: 'right' }}>
+								{Math.round(generationProgress.percent || 0)}%
+							</Typography>
+						</Box>
+						<LinearProgress
+							variant='determinate'
+							value={Math.max(0, Math.min(100, generationProgress.percent || 0))}
+							sx={{ height: 10, borderRadius: 1 }}
+						/>
+					</Paper>
+				)}
 
 				{/* Slot filters */}
 				{schedule && (

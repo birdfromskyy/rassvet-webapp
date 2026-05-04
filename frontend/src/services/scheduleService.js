@@ -238,6 +238,16 @@ const scheduleService = {
 		})
 		return r.data
 	},
+	startGenerateSchedule: async weekStartDate => {
+		const r = await api.post('/admin/schedules/generate/async', {
+			week_start_date: weekStartDate,
+		})
+		return r.data.job
+	},
+	getGenerationJob: async jobId => {
+		const r = await api.get(`/admin/schedule-generation-jobs/${jobId}`)
+		return r.data.job
+	},
 	approveSchedule: async id => {
 		const r = await api.post(`/admin/schedules/${id}/approve`)
 		return r.data
@@ -249,6 +259,10 @@ const scheduleService = {
 	resetAutoSchedule: async id => {
 		const r = await api.post(`/admin/schedules/${id}/reset-auto`)
 		return r.data
+	},
+	startResetAutoSchedule: async id => {
+		const r = await api.post(`/admin/schedules/${id}/reset-auto/async`)
+		return r.data.job
 	},
 	clearAutoSchedule: async id => {
 		const r = await api.post(`/admin/schedules/${id}/clear-auto`)

@@ -3,10 +3,13 @@ package handlers
 import (
 	"backend/internal/models"
 	"backend/internal/services"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,17 +19,107 @@ import (
 type ScheduleHandler struct {
 	db        *gorm.DB
 	generator *services.ScheduleGenerator
+	jobs      *ScheduleGenerationJobManager
 }
 
 func NewScheduleHandler(db *gorm.DB, generator *services.ScheduleGenerator) *ScheduleHandler {
 	return &ScheduleHandler{
 		db:        db,
 		generator: generator,
+		jobs:      NewScheduleGenerationJobManager(),
 	}
 }
 
 type GenerateScheduleRequest struct {
 	WeekStartDate string `json:"week_start_date" binding:"required"`
+}
+
+type ScheduleGenerationJob struct {
+	ID        string                     `json:"id"`
+	Status    string                     `json:"status"`
+	Percent   int                        `json:"percent"`
+	Message   string                     `json:"message"`
+	Strategy  string                     `json:"strategy,omitempty"`
+	Error     string                     `json:"error,omitempty"`
+	Result    *services.ScheduleResponse `json:"result,omitempty"`
+	CreatedAt time.Time                  `json:"created_at"`
+	UpdatedAt time.Time                  `json:"updated_at"`
+}
+
+type ScheduleGenerationJobManager struct {
+	mu   sync.RWMutex
+	jobs map[string]*ScheduleGenerationJob
+}
+
+func NewScheduleGenerationJobManager() *ScheduleGenerationJobManager {
+	return &ScheduleGenerationJobManager{
+		jobs: make(map[string]*ScheduleGenerationJob),
+	}
+}
+
+func (m *ScheduleGenerationJobManager) Create(message string) *ScheduleGenerationJob {
+	now := time.Now()
+	job := &ScheduleGenerationJob{
+		ID:        newScheduleGenerationJobID(),
+		Status:    "running",
+		Percent:   0,
+		Message:   message,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	m.mu.Lock()
+	m.jobs[job.ID] = job
+	m.mu.Unlock()
+	return job
+}
+
+func (m *ScheduleGenerationJobManager) Update(id string, update func(*ScheduleGenerationJob)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job, ok := m.jobs[id]
+	if !ok {
+		return
+	}
+	update(job)
+	job.UpdatedAt = time.Now()
+}
+
+func (m *ScheduleGenerationJobManager) Get(id string) (*ScheduleGenerationJob, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	job, ok := m.jobs[id]
+	if !ok {
+		return nil, false
+	}
+	copyJob := *job
+	return &copyJob, true
+}
+
+func newScheduleGenerationJobID() string {
+	var bytes [16]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(bytes[:])
+}
+
+func currentUserID(c *gin.Context) uint {
+	userIDValue, exists := c.Get("userID")
+	if !exists {
+		return 0
+	}
+	switch v := userIDValue.(type) {
+	case uint:
+		return v
+	case int:
+		return uint(v)
+	case int64:
+		return uint(v)
+	case float64:
+		return uint(v)
+	default:
+		return 0
+	}
 }
 
 type CreateManualSlotRequest struct {
@@ -133,6 +226,102 @@ func (h *ScheduleHandler) GenerateSchedule(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *ScheduleHandler) StartGenerateSchedule(c *gin.Context) {
+	var req GenerateScheduleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	weekStartDate, err := time.Parse("2006-01-02", req.WeekStartDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start_date must be in YYYY-MM-DD format"})
+		return
+	}
+
+	generatedByUserID := currentUserID(c)
+	job := h.jobs.Create("Генерация поставлена в очередь")
+	jobResponse := *job
+
+	go func() {
+		progress := func(p services.ScheduleGenerationProgress) {
+			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
+				job.Percent = p.Percent
+				job.Message = p.Message
+				job.Strategy = p.Strategy
+			})
+		}
+
+		result, err := h.generator.GenerateScheduleWithProgress(weekStartDate, generatedByUserID, progress)
+		if err != nil {
+			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
+				job.Status = "failed"
+				job.Error = err.Error()
+				job.Message = "Генерация завершилась с ошибкой"
+			})
+			return
+		}
+		h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
+			job.Status = "completed"
+			job.Percent = 100
+			job.Message = "Генерация завершена"
+			job.Result = result
+		})
+	}()
+
+	c.JSON(http.StatusAccepted, gin.H{"job": jobResponse})
+}
+
+func (h *ScheduleHandler) StartResetAutoSchedule(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	generatedByUserID := currentUserID(c)
+	job := h.jobs.Create("Пересчёт авто-слотов поставлен в очередь")
+	jobResponse := *job
+
+	go func() {
+		progress := func(p services.ScheduleGenerationProgress) {
+			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
+				job.Percent = p.Percent
+				job.Message = p.Message
+				job.Strategy = p.Strategy
+			})
+		}
+
+		result, err := h.generator.ResetAutoScheduleWithProgress(uint(scheduleID), generatedByUserID, progress)
+		if err != nil {
+			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
+				job.Status = "failed"
+				job.Error = err.Error()
+				job.Message = "Пересчёт завершился с ошибкой"
+			})
+			return
+		}
+		h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
+			job.Status = "completed"
+			job.Percent = 100
+			job.Message = "Пересчёт завершён"
+			job.Result = result
+		})
+	}()
+
+	c.JSON(http.StatusAccepted, gin.H{"job": jobResponse})
+}
+
+func (h *ScheduleHandler) GetGenerationJob(c *gin.Context) {
+	jobID := strings.TrimSpace(c.Param("jobId"))
+	job, ok := h.jobs.Get(jobID)
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": "generation job not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"job": job})
 }
 
 func (h *ScheduleHandler) ApproveSchedule(c *gin.Context) {
