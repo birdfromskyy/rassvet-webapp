@@ -1,0 +1,373 @@
+.hero {
+  position: relative;
+  background-color: #f3efe3;
+  overflow: hidden;
+  padding: 70px 0 90px;
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  align-items: center;
+  gap: 40px;
+}
+
+.hero__content {
+  max-width: 690px;
+}
+
+.hero__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 18px;
+  margin-bottom: 28px;
+  border-radius: 999px;
+  background-color: #ffe96a;
+  color: #074462;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.hero__title {
+  margin: 0 0 40px;
+  font-family: "Merriweather", serif;
+  font-size: clamp(44px, 5.4vw, 78px);
+  line-height: 0.93;
+  font-weight: 900;
+  color: #074462;
+  letter-spacing: -0.02em;
+}
+
+.hero__text {
+  max-width: 700px;
+  margin: 0 0 40px;
+  font-size: clamp(18px, 1.8vw, 25px);
+  line-height: 1.25;
+  color: #1f678f;
+}
+
+.hero__features {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 38px;
+}
+
+.hero__feature {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.hero__feature img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+}
+
+.hero__feature span {
+  max-width: 150px;
+  font-size: 18px;
+  line-height: 1.2;
+  color: #074462;
+  font-weight: 500;
+}
+
+.hero__actions {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.hero__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: 0 34px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease, color 0.2s ease;
+}
+
+.hero__btn--primary {
+  background-color: #f7df00;
+  color: #074462;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.hero__btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+.hero__btn--secondary {
+  border: 2px solid #074462;
+  background-color: transparent;
+  color: #074462;
+}
+
+.hero__btn--secondary:hover {
+  background-color: #074462;
+  color: #ffffff;
+}
+
+/* video block */
+
+.hero__visual {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 520px;
+}
+
+.hero__photo-bg {
+  position: absolute;
+  right: 60px;
+  top: 40px;
+  z-index: 1;
+  width: 360px;
+  height: 340px;
+  border-radius: 48% 52% 45% 55% / 42% 40% 60% 58%;
+  background-color: #f6e96d;
+}
+
+.hero__photo-frame {
+  position: relative;
+  z-index: 3;
+  width: 520px;
+  max-width: 100%;
+  padding: 18px 18px 70px;
+  background-color: #ffffff;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+  transform: translateY(-30px) rotate(-0.5deg);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hero__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.hero__video-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 4;
+  transform: translateX(-50%);
+  margin: 0;
+  color: #074462;
+  font-family: "Merriweather", serif;
+  font-size: 26px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* decor */
+
+.hero__visual-decor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.hero__visual-decor--circle {
+  width: 24px;
+  height: 24px;
+  right: 20px;
+  top: 30px;
+  border-radius: 50%;
+  background-color: #f4df00;
+}
+
+.hero__visual-decor--circle-small {
+  width: 12px;
+  height: 12px;
+  right: 170px;
+  bottom: 95px;
+  border-radius: 50%;
+  background-color: rgba(7, 68, 98, 0.45);
+}
+
+.hero__visual-decor--dots {
+  width: 88px;
+  height: 58px;
+  left: 70px;
+  bottom: 120px;
+  opacity: 0.35;
+  background-image: radial-gradient(#074462 2px, transparent 2px);
+  background-size: 14px 14px;
+}
+
+.hero__decor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hero__decor--heart {
+  left: 53%;
+  top: 55%;
+  width: 80px;
+  height: 80px;
+  opacity: 0.5;
+  background: url("../../assets/graffiti-heart-shape.png") no-repeat center /
+    contain;
+  transform: rotate(-10deg);
+}
+
+/* adaptive */
+
+@media (max-width: 1200px) {
+  .hero {
+    padding: 60px 0 80px;
+  }
+
+  .hero__inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+
+  .hero__photo-frame {
+    width: 460px;
+  }
+
+  .hero__photo-bg {
+    width: 320px;
+    height: 300px;
+    right: 30px;
+  }
+}
+
+@media (max-width: 992px) {
+  .hero__inner {
+    grid-template-columns: 1fr;
+    gap: 44px;
+  }
+
+  .hero__content {
+    max-width: 100%;
+  }
+
+  .hero__visual {
+    min-height: auto;
+    padding-bottom: 20px;
+  }
+
+  .hero__photo-frame {
+    width: min(560px, 100%);
+    transform: none;
+  }
+
+  .hero__photo-bg {
+    right: 50%;
+    top: 35px;
+    transform: translateX(50%);
+  }
+
+  .hero__visual-decor--dots {
+    display: none;
+  }
+
+  .hero__decor--heart {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 46px 0 64px;
+  }
+
+  .hero__badge {
+    font-size: 15px;
+    padding: 10px 16px;
+    margin-bottom: 22px;
+  }
+
+  .hero__title {
+    margin-bottom: 24px;
+    line-height: 1;
+  }
+
+  .hero__text {
+    margin-bottom: 30px;
+  }
+
+  .hero__features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .hero__feature img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .hero__feature span {
+    font-size: 15px;
+  }
+
+  .hero__btn {
+    width: 100%;
+    min-height: 56px;
+    font-size: 16px;
+  }
+
+  .hero__photo-frame {
+    padding: 14px 14px 56px;
+  }
+
+  .hero__video-caption {
+    bottom: 18px;
+    font-size: 20px;
+  }
+
+  .hero__photo-bg,
+  .hero__visual-decor {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 36px 0 54px;
+  }
+
+  .hero__features {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  .hero__feature {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .hero__feature span {
+    max-width: none;
+    font-size: 16px;
+  }
+
+  .hero__photo-frame {
+    padding: 10px 10px 48px;
+  }
+
+  .hero__video-caption {
+    font-size: 17px;
+  }
+}

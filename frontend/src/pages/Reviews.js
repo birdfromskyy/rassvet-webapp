@@ -61,13 +61,15 @@ const Reviews = ({ user }) => {
 						>
 							На главную
 						</Button>
-						<Button
-							variant='contained'
-							startIcon={<AddIcon />}
-							onClick={() => navigate('/create-review')}
-						>
-							Написать отзыв
-						</Button>
+						{user?.role !== 'teacher' && (
+							<Button
+								variant='contained'
+								startIcon={<AddIcon />}
+								onClick={() => navigate('/create-review')}
+							>
+								Написать отзыв
+							</Button>
+						)}
 					</Box>
 				</Box>
 

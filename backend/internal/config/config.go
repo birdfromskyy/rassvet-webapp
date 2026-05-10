@@ -19,6 +19,11 @@ type Config struct {
 	EmailPassword string
 	SMTPHost      string
 	SMTPPort      string
+
+	RedisHost     string
+	RedisPort     string
+	RedisPassword string
+	RedisDB       string
 }
 
 func Load() *Config {
@@ -39,6 +44,11 @@ func Load() *Config {
 		EmailPassword: getEnv("EMAIL_PASSWORD", ""),
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:      getEnv("SMTP_PORT", "587"),
+
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnv("REDIS_PORT", "6379"),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisDB:       getEnv("REDIS_DB", "0"),
 	}
 }
 

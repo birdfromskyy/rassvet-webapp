@@ -1,0 +1,54 @@
+.ratingHero {
+  background: #f7f4ec;
+  padding: 80px 0 50px;
+  color: #074462;
+}
+
+.ratingHero__inner {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 60px;
+  align-items: center;
+}
+
+.ratingHero__badge {
+  display: inline-flex;
+  background: #f4df00;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.ratingHero h1 {
+  font-family: "Merriweather", serif;
+  font-size: 52px;
+  line-height: 1.1;
+  margin: 0 0 18px;
+}
+
+.ratingHero p {
+  max-width: 680px;
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.ratingHero__image {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+}
+
+@media (max-width: 850px) {
+  .ratingHero__inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .ratingHero__image {
+    max-width: 350px;
+    margin: 0 auto;
+  }
+}

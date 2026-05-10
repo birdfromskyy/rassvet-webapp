@@ -11,9 +11,10 @@ RUN go build -o main cmd/main.go
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates
-WORKDIR /root/
+WORKDIR /app
 
 COPY --from=builder /app/main .
 COPY --from=builder /app/.env .
+COPY --from=builder /app/static ./static
 
 CMD ["./main"]

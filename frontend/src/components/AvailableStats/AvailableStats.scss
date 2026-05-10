@@ -1,0 +1,68 @@
+.availableStats {
+  background: #f7f4ec;
+  padding: 20px 0 100px;
+}
+
+/* карточки цифр */
+
+.availableStats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 30px;
+}
+
+.statCard {
+  background: #fff;
+  border-radius: 28px;
+  padding: 30px;
+  box-shadow: 0 14px 34px rgba(7, 68, 98, 0.08);
+  text-align: center;
+}
+
+.statCard span {
+  display: block;
+  font-size: 16px;
+  color: #074462;
+  margin-bottom: 10px;
+}
+
+.statCard h2 {
+  font-family: "Merriweather", serif;
+  font-size: 52px;
+  margin: 0;
+  color: #074462;
+}
+
+/* форма обслуживания */
+
+.availableStats__type {
+  background: #eaf1f6;
+  border-radius: 28px;
+  padding: 26px 30px;
+}
+
+.availableStats__type span {
+  display: block;
+  font-weight: 800;
+  margin-bottom: 8px;
+  color: #074462;
+}
+
+.availableStats__type p {
+  margin: 0;
+  font-size: 18px;
+  color: #074462;
+}
+
+/* адаптив */
+
+@media (max-width: 900px) {
+  .availableStats__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .statCard h2 {
+    font-size: 42px;
+  }
+}

@@ -1,0 +1,57 @@
+.rulesHero {
+  padding: 80px 0 50px;
+  background: #f7f4ec;
+  color: #074462;
+}
+
+.rulesHero__inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 50px;
+  align-items: center;
+}
+
+.rulesHero__content {
+  max-width: 760px;
+}
+
+.rulesHero__image {
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+}
+
+.rulesHero__badge {
+  display: inline-flex;
+  background: #f4df00;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.rulesHero h1 {
+  font-family: "Merriweather", serif;
+  font-size: 48px;
+  margin-bottom: 18px;
+}
+
+.rulesHero p {
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+@media (max-width: 850px) {
+  .rulesHero__inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .rulesHero__image {
+    max-width: 260px;
+    margin: 0 auto;
+  }
+}

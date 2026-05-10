@@ -1,0 +1,36 @@
+.contactsHero {
+  background: #f7f4ec;
+  padding: 80px 0 50px;
+  color: #074462;
+}
+
+.contactsHero__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 60px;
+  align-items: center;
+}
+
+.contactsHero__badge {
+  display: inline-flex;
+  background: #f4df00;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.contactsHero h1 {
+  font-family: "Merriweather", serif;
+  font-size: 52px;
+  margin-bottom: 18px;
+}
+
+.contactsHero p {
+  font-size: 18px;
+}
+
+.contactsHero__image {
+  width: 100%;
+  max-width: 300px;
+}

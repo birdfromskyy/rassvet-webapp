@@ -1,0 +1,252 @@
+.about {
+  position: relative;
+  background: #dfe7ee;
+  padding: 70px 0 80px;
+  overflow: hidden;
+}
+
+.about__wave-top {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 100%;
+  height: 58px;
+  background:
+    radial-gradient(120px 28px at 8% 0, #f3efe3 98%, transparent 100%),
+    radial-gradient(170px 34px at 28% 0, #f3efe3 98%, transparent 100%),
+    radial-gradient(150px 30px at 50% 0, #f3efe3 98%, transparent 100%),
+    radial-gradient(180px 34px at 73% 0, #f3efe3 98%, transparent 100%),
+    radial-gradient(140px 28px at 93% 0, #f3efe3 98%, transparent 100%);
+  background-repeat: no-repeat;
+}
+
+.about__inner {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 48px;
+  align-items: center;
+  margin-bottom: 50px;
+}
+
+.about__illustration {
+  display: flex;
+  align-items: center;
+  justify-content: left;
+}
+
+.about__illustration img {
+  width: 300px;
+  max-width: 100%;
+  display: block;
+  opacity: 0.95;
+}
+
+.about__content {
+  max-width: 980px;
+}
+
+.about__badge {
+  display: inline-block;
+  margin-bottom: 14px;
+  color: #074462;
+  font-family: "Merriweather", serif;
+  font-size: 18px;
+  font-weight: 700;
+  position: relative;
+}
+
+.about__badge::after {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 3px;
+  background: #f0db3f;
+  margin-top: 8px;
+  border-radius: 3px;
+}
+
+.about__title {
+  margin: 0 0 18px;
+  color: #074462;
+  font-family: "Merriweather", serif;
+  font-size: 38px;
+  line-height: 1.15;
+  font-weight: 700;
+  max-width: 720px;
+}
+
+.about__text {
+  margin: 0 0 20px;
+  color: #215c7d;
+  font-size: 22px;
+  line-height: 1.45;
+  max-width: 760px;
+}
+
+.about__list {
+  margin: 0 0 28px;
+  padding-left: 20px;
+  max-width: 780px;
+  color: #215c7c;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.about__list li + li {
+  margin-top: 10px;
+}
+
+.about__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 999px;
+  background: #074462;
+  color: #fff;
+  text-decoration: none;
+  font-size: 17px;
+  font-weight: 700;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.about__btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(7, 68, 98, 0.18);
+}
+
+.about__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+
+.about__stat {
+  padding: 10px 28px 0;
+  border-left: 1px solid rgba(7, 68, 98, 0.12);
+  min-height: 110px;
+}
+
+.about__stat:first-child {
+  border-left: none;
+}
+
+.about__stat-value {
+  color: #074462;
+  font-family: "Merriweather", serif;
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.about__stat-label {
+  color: #215c7d;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+@media (max-width: 1100px) {
+  .about {
+    padding: 60px 0 70px;
+  }
+
+  .about__inner {
+    grid-template-columns: 1fr;
+    gap: 26px;
+  }
+
+  .about__illustration {
+    justify-content: flex-start;
+  }
+
+  .about__illustration img {
+    width: 150px;
+  }
+
+  .about__title {
+    font-size: 32px;
+  }
+
+  .about__text {
+    font-size: 20px;
+  }
+
+  .about__stats {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 24px;
+  }
+
+  .about__stat:nth-child(3) {
+    border-left: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .about {
+    padding: 46px 0 56px;
+  }
+
+  .about__wave-top {
+    height: 36px;
+    background:
+      radial-gradient(80px 18px at 10% 0, #f3efe3 98%, transparent 100%),
+      radial-gradient(95px 18px at 35% 0, #f3efe3 98%, transparent 100%),
+      radial-gradient(95px 18px at 65% 0, #f3efe3 98%, transparent 100%),
+      radial-gradient(80px 18px at 90% 0, #f3efe3 98%, transparent 100%);
+    background-repeat: no-repeat;
+  }
+
+  .about__badge {
+    font-size: 16px;
+  }
+
+  .about__title {
+    font-size: 26px;
+    margin-bottom: 14px;
+  }
+
+  .about__text {
+    font-size: 17px;
+    margin-bottom: 16px;
+  }
+
+  .about__list {
+    font-size: 16px;
+    margin-bottom: 22px;
+  }
+
+  .about__btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .about__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .about__stat {
+    border-left: none;
+    border-top: 1px solid rgba(7, 68, 98, 0.12);
+    padding: 18px 0 0;
+    min-height: auto;
+  }
+
+  .about__stat:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .about__stat-value {
+    font-size: 34px;
+    margin-bottom: 8px;
+  }
+
+  .about__stat-label {
+    font-size: 16px;
+  }
+}

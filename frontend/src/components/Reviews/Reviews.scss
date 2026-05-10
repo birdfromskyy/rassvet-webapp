@@ -1,0 +1,158 @@
+.reviews {
+  position: relative;
+  z-index: 1;
+  background-color: #dfe7ee;
+  padding: 120px 0 140px;
+}
+
+.reviews__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.reviews__wave-top,
+.reviews__wave-bottom {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  line-height: 0;
+}
+
+.reviews__wave-top {
+  transform: translateY(-100%);
+}
+
+.reviews__wave-bottom {
+  bottom: 0;
+}
+
+.reviews__wave-top svg,
+.reviews__wave-bottom svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.reviews__title {
+  margin: 0 0 50px;
+  font-family: "Merriweather", serif;
+  font-size: 56px;
+  font-weight: 900;
+  color: #074462;
+  text-align: center;
+}
+
+.reviews__grid {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 26px;
+  margin-bottom: 50px;
+}
+
+.reviews__card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+}
+
+.reviews__bubble {
+  position: relative;
+  width: 100%;
+  max-width: 350px;
+  min-height: 105px;
+  padding: 18px 16px;
+  border-radius: 18px;
+  background-color: #f4df00;
+  box-shadow: 4px 4px 0 rgba(7, 68, 98, 0.22);
+}
+
+.reviews__bubble p {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+  color: #111;
+  font-family: "Merriweather", serif;
+  font-weight: 700;
+}
+
+.reviews__bubble-tail {
+  position: absolute;
+  left: 26px;
+  bottom: -16px;
+  width: 26px;
+  height: 26px;
+  background-color: #f4df00;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  box-shadow: 4px 4px 0 rgba(7, 68, 98, 0.22);
+}
+
+.reviews__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.reviews__avatar {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.reviews__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.reviews__author {
+  font-size: 18px;
+  font-family: "Merriweather", serif;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 2px;
+}
+
+.reviews__stars {
+  font-size: 28px;
+  line-height: 1;
+  color: #f4df00;
+  letter-spacing: 1px;
+}
+
+.reviews__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 260px;
+  height: 52px;
+  padding: 0 30px;
+  border-radius: 999px;
+  background-color: #074462;
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.18);
+  color: #ffffff;
+  text-decoration: none;
+  font-family: "Merriweather", serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.reviews__btn:hover {
+  opacity: 0.9;
+}
+
+@media (max-width: 1100px) {
+  .reviews__grid {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .reviews__card {
+    flex: 0 1 300px;
+  }
+}

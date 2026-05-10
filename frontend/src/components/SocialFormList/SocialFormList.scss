@@ -1,0 +1,54 @@
+.socialForm {
+  background: #f7f4ec;
+  padding: 30px 0 100px;
+  color: #074462;
+}
+
+.socialForm__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px;
+}
+
+.socialFormCard {
+  background: #fff;
+  border-radius: 28px;
+  padding: 30px;
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+  box-shadow: 0 14px 34px rgba(7, 68, 98, 0.08);
+}
+
+.socialFormCard__icon {
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  background: #f4df00;
+  color: #074462;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.socialFormCard h2 {
+  font-family: "Merriweather", serif;
+  font-size: 26px;
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.socialFormCard p {
+  color: #35586b;
+  font-size: 16px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .socialForm__grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -11,6 +11,16 @@ const reviewService = {
 		return response.data
 	},
 
+	checkUserReview: async () => {
+		const response = await api.get('/reviews/check')
+		return response.data
+	},
+
+	updateMyReview: async reviewData => {
+		const response = await api.put('/reviews/my', reviewData)
+		return response.data
+	},
+
 	getMyReviews: async () => {
 		const response = await api.get('/my-reviews')
 		return response.data

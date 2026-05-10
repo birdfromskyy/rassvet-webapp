@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
 	Container,
@@ -11,6 +11,7 @@ import {
 	FormControlLabel,
 	Checkbox,
 	Alert,
+	CircularProgress,
 } from '@mui/material'
 import { toast } from 'react-toastify'
 import reviewService from '../services/reviewService'
@@ -24,6 +25,35 @@ const CreateReview = () => {
 	})
 	const [errors, setErrors] = useState({})
 	const [loading, setLoading] = useState(false)
+	const [checkingReview, setCheckingReview] = useState(true)
+	const [existingReview, setExistingReview] = useState(null)
+	const [isEditMode, setIsEditMode] = useState(false)
+
+	useEffect(() => {
+		checkExistingReview()
+	}, [])
+
+	const checkExistingReview = async () => {
+		try {
+			const response = await reviewService.checkUserReview()
+			if (response.hasReview && response.canEdit) {
+				setExistingReview(response.review)
+				setIsEditMode(true)
+				setFormData({
+					rating: response.review.rating,
+					content: response.review.content,
+					is_anonymous: response.review.is_anonymous,
+				})
+			} else if (response.hasReview && !response.canEdit) {
+				toast.error('Ваш отзыв был отклонен модерацией')
+				navigate('/reviews')
+			}
+		} catch (error) {
+			console.error('Error checking review:', error)
+		} finally {
+			setCheckingReview(false)
+		}
+	}
 
 	const handleChange = e => {
 		const { name, value, checked, type } = e.target
@@ -61,22 +91,52 @@ const CreateReview = () => {
 		setLoading(true)
 
 		try {
-			await reviewService.createReview(formData)
-			toast.success('Отзыв отправлен на модерацию!')
+			if (isEditMode) {
+				await reviewService.updateMyReview(formData)
+				toast.success('Отзыв обновлен и отправлен на модерацию!')
+			} else {
+				await reviewService.createReview(formData)
+				toast.success('Отзыв отправлен на модерацию!')
+			}
 			navigate('/reviews')
 		} catch (error) {
-			toast.error(error.response?.data?.error || 'Ошибка при создании отзыва')
+			if (error.response?.data?.hasReview) {
+				toast.error(error.response.data.error)
+				setTimeout(() => navigate('/reviews'), 2000)
+			} else {
+				toast.error(error.response?.data?.error || 'Ошибка при создании отзыва')
+			}
 		} finally {
 			setLoading(false)
 		}
+	}
+
+	if (checkingReview) {
+		return (
+			<Container sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+				<CircularProgress />
+			</Container>
+		)
 	}
 
 	return (
 		<Container maxWidth='sm' sx={{ mt: 4 }}>
 			<Paper elevation={3} sx={{ p: 4 }}>
 				<Typography variant='h4' gutterBottom>
-					Написать отзыв
+					{isEditMode ? 'Редактировать отзыв' : 'Написать отзыв'}
 				</Typography>
+
+				{existingReview?.status === 'pending' && (
+					<Alert severity='info' sx={{ mb: 2 }}>
+						Ваш отзыв находится на модерации
+					</Alert>
+				)}
+
+				{existingReview?.status === 'approved' && (
+					<Alert severity='warning' sx={{ mb: 2 }}>
+						После редактирования отзыв будет отправлен на повторную модерацию
+					</Alert>
+				)}
 
 				<Box component='form' onSubmit={handleSubmit} sx={{ mt: 3 }}>
 					<Box mb={3}>
@@ -143,7 +203,13 @@ const CreateReview = () => {
 							type='submit'
 							disabled={loading}
 						>
-							{loading ? 'Отправка...' : 'Отправить на модерацию'}
+							{loading
+								? isEditMode
+									? 'Обновление...'
+									: 'Отправка...'
+								: isEditMode
+								? 'Обновить отзыв'
+								: 'Отправить на модерацию'}
 						</Button>
 					</Box>
 				</Box>

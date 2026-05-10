@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
 	Container,
@@ -20,12 +20,42 @@ const VerifyEmail = () => {
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 	const [resending, setResending] = useState(false)
+	const autoSentRef = useRef(false)
 
 	useEffect(() => {
-		if (location.state?.email) {
-			setEmail(location.state.email)
+		const params = new URLSearchParams(location.search)
+		const emailFromQuery = params.get('email') || ''
+		setEmail(emailFromQuery)
+	}, [location.search])
+
+	useEffect(() => {
+		const autoSendCode = async () => {
+			const params = new URLSearchParams(location.search)
+			const emailFromQuery = params.get('email')
+			const shouldAutoSend = params.get('autoSendCode') === '1'
+
+			if (!emailFromQuery || !shouldAutoSend || autoSentRef.current) {
+				return
+			}
+
+			autoSentRef.current = true
+			setResending(true)
+			setError('')
+
+			try {
+				await authService.resendCode(emailFromQuery)
+				toast.success('Код подтверждения отправлен на почту')
+			} catch (error) {
+				setError(
+					error.response?.data?.error || 'Ошибка автоматической отправки кода',
+				)
+			} finally {
+				setResending(false)
+			}
 		}
-	}, [location])
+
+		autoSendCode()
+	}, [location.search])
 
 	const handleSubmit = async e => {
 		e.preventDefault()
@@ -50,6 +80,8 @@ const VerifyEmail = () => {
 		}
 
 		setResending(true)
+		setError('')
+
 		try {
 			await authService.resendCode(email)
 			toast.success('Код отправлен повторно')
@@ -78,6 +110,12 @@ const VerifyEmail = () => {
 					<Typography variant='body2' align='center' sx={{ mt: 2 }}>
 						Введите код, отправленный на вашу почту
 					</Typography>
+
+					{resending && (
+						<Alert severity='info' sx={{ mt: 2 }}>
+							Отправляем код подтверждения...
+						</Alert>
+					)}
 
 					{error && (
 						<Alert severity='error' sx={{ mt: 2 }}>

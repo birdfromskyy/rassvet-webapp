@@ -1,0 +1,166 @@
+.history-hero {
+  position: relative;
+  background: #f7f4ec;
+  padding: 100px 0 160px;
+  overflow: hidden;
+  color: #074462;
+}
+
+.history-hero__inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 70px;
+}
+
+.history-hero__content {
+  max-width: 780px;
+}
+
+.history-hero__label {
+  display: inline-block;
+  background: #f4df00;
+  color: #074462;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-size: 22px;
+  margin-bottom: 32px;
+}
+
+.history-hero__title {
+  font-family: "Merriweather", serif;
+  font-size: 68px;
+  line-height: 1.08;
+  margin-bottom: 30px;
+}
+
+.history-hero__text {
+  font-size: 28px;
+  line-height: 1.45;
+}
+
+.history-hero__image-wrap {
+  position: relative;
+  flex: 0 0 520px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
+}
+
+.history-hero__image {
+  width: 100%;
+  max-width: 460px;
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 2;
+}
+
+.history-hero__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.history-circle {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.history-circle--yellow {
+  width: 210px;
+  height: 210px;
+  background: #f4df00;
+  right: 90px;
+  top: 80px;
+}
+
+.history-circle--blue {
+  width: 80px;
+  height: 80px;
+  background: #074462;
+  right: 36px;
+  bottom: 190px;
+}
+
+.history-circle--light {
+  width: 80px;
+  height: 80px;
+  background: #dfe7ee;
+  left: 70px;
+  bottom: 80px;
+}
+
+.history-hero__wave {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 100%;
+  height: 120px;
+  line-height: 0;
+}
+
+.history-hero__wave svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (max-width: 1000px) {
+  .history-hero {
+    padding: 80px 0 140px;
+  }
+
+  .history-hero__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-hero__title {
+    font-size: 48px;
+  }
+
+  .history-hero__text {
+    font-size: 22px;
+  }
+
+  .history-hero__card {
+    width: 100%;
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 560px) {
+  .history-hero {
+    padding: 60px 0 120px;
+  }
+
+  .history-hero__title {
+    font-size: 36px;
+  }
+
+  .history-hero__text {
+    font-size: 19px;
+  }
+
+  .history-hero__label {
+    font-size: 18px;
+    padding: 12px 22px;
+  }
+
+  .history-hero__card {
+    padding: 28px;
+
+    span {
+      font-size: 56px;
+    }
+
+    p {
+      font-size: 22px;
+    }
+  }
+}

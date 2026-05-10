@@ -1,0 +1,84 @@
+.contacts {
+  background: #f7f4ec;
+  padding: 40px 0 100px;
+  color: #074462;
+}
+
+.contacts__grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* 5 в ряд */
+  gap: 20px;
+}
+
+.contactCard {
+  display: flex;
+  flex-direction: column; /* ВАЖНО */
+  align-items: center;
+  text-align: center;
+
+  background: #fff;
+  border-radius: 24px;
+  padding: 22px;
+
+  box-shadow: 0 10px 26px rgba(7, 68, 98, 0.08);
+
+  transition: 0.25s;
+}
+
+.contactCard:hover {
+  transform: translateY(-4px);
+}
+
+/* ИКОНКИ */
+
+.contactCard img {
+  width: 80px;
+  height: 80px;
+
+  background: #f4df00;
+  padding: 12px;
+  border-radius: 16px;
+
+  margin-bottom: 14px;
+}
+
+/* ТЕКСТ */
+
+.contactCard h3 {
+  font-family: "Merriweather", serif;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.contactCard p {
+  font-size: 14px;
+  line-height: 1.35;
+  margin: 4px 0;
+  color: #35586b;
+}
+
+.contactCard a {
+  color: #074462;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* АДАПТИВ */
+
+@media (max-width: 1100px) {
+  .contacts__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .contacts__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .contacts__grid {
+    grid-template-columns: 1fr;
+  }
+}

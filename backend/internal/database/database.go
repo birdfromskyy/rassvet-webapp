@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"backend/internal/models"
 	"fmt"
+	"log"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,9 +23,48 @@ func Initialize(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) {
-	db.AutoMigrate(
+	// Make previously NOT NULL columns nullable before AutoMigrate
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN assignment_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN student_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN subject_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN room_id DROP NOT NULL")
+	db.Exec("ALTER TABLE group_lessons ALTER COLUMN subject_id DROP NOT NULL")
+	db.Exec("ALTER TABLE students ALTER COLUMN funding_type DROP NOT NULL")
+	db.Exec("ALTER TABLE students ALTER COLUMN funding_type SET DEFAULT 'budget'")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN assignment_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN student_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN teacher_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN subject_id DROP NOT NULL")
+
+	err := db.AutoMigrate(
+		// Auth models
 		&models.User{},
 		&models.Review{},
 		&models.VerificationCode{},
+
+		// Schedule module models
+		&models.Subject{},
+		&models.Teacher{},
+		&models.TeacherSubject{},
+		&models.TeacherRoom{},
+		&models.Room{},
+		&models.RoomSubject{},
+		&models.Student{},
+		&models.StudentAvailability{},
+		&models.TeacherAvailability{},
+		&models.Assignment{},
+		&models.AssignmentWeekOverride{},
+		&models.GroupLesson{},
+		&models.GroupLessonEnrollment{},
+		&models.GroupLessonWeekOverride{},
+		&models.Schedule{},
+		&models.ScheduleSlot{},
+		&models.ScheduleSlotExclusion{},
+		&models.ScheduleGenerationIssue{},
+		&models.UserStudent{},
 	)
+
+	if err != nil {
+		log.Fatal("Failed to migrate database:", err)
+	}
 }
