@@ -66,17 +66,18 @@ type WeeklyTask struct {
 }
 
 type GroupWeeklyTask struct {
-	GroupLessonID      uint
-	TeacherID          uint
-	SubjectID          uint
-	GroupName          string
-	TeacherName        string
-	SubjectName        string
-	EnrolledStudentIDs []uint
-	VisitsPerWeek      int
-	DurationMin        int
-	TaskIndex          int
-	HasStrictRoom      bool
+	GroupLessonID        uint
+	TeacherID            uint
+	SubjectID            uint
+	GroupName            string
+	TeacherName          string
+	SubjectName          string
+	EnrolledStudentIDs   []uint
+	VisitsPerWeek        int
+	DurationMin          int
+	TaskIndex            int
+	HasStrictRoom        bool
+	IgnoreStudentWindows bool
 }
 
 type CandidateSlot struct {
@@ -189,6 +190,9 @@ func (g *ScheduleGenerator) GenerateScheduleWithProgress(
 		return nil, err
 	}
 
+	if err := g.BackupAutoSlots(schedule.ID); err != nil {
+		return nil, err
+	}
 	if err := g.CleanupAutoSlots(schedule.ID); err != nil {
 		return nil, err
 	}
@@ -230,6 +234,9 @@ func (g *ScheduleGenerator) ResetAutoScheduleWithProgress(
 		return nil, fmt.Errorf("failed to fetch schedule: %w", err)
 	}
 
+	if err := g.BackupAutoSlots(schedule.ID); err != nil {
+		return nil, err
+	}
 	if err := g.CleanupAutoSlots(schedule.ID); err != nil {
 		return nil, err
 	}
@@ -1174,17 +1181,18 @@ func (g *ScheduleGenerator) BuildGroupWeeklyTasks(
 
 		for i := 0; i < visitsPerWeek; i++ {
 			tasks = append(tasks, GroupWeeklyTask{
-				GroupLessonID:      lesson.ID,
-				TeacherID:          teacherID,
-				SubjectID:          subjectID,
-				GroupName:          lesson.Name,
-				TeacherName:        g.getTeacherName(teacherID, ctx),
-				SubjectName:        subjectName,
-				EnrolledStudentIDs: studentIDs,
-				VisitsPerWeek:      visitsPerWeek,
-				DurationMin:        durationMin,
-				TaskIndex:          i + 1,
-				HasStrictRoom:      hasStrictRoom,
+				GroupLessonID:        lesson.ID,
+				TeacherID:            teacherID,
+				SubjectID:            subjectID,
+				GroupName:            lesson.Name,
+				TeacherName:          g.getTeacherName(teacherID, ctx),
+				SubjectName:          subjectName,
+				EnrolledStudentIDs:   studentIDs,
+				VisitsPerWeek:        visitsPerWeek,
+				DurationMin:          durationMin,
+				TaskIndex:            i + 1,
+				HasStrictRoom:        hasStrictRoom,
+				IgnoreStudentWindows: lesson.IgnoreStudentWindows,
 			})
 		}
 	}
@@ -1278,42 +1286,49 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 			continue
 		}
 
-		// Пересечение доступности ВСЕХ учеников группы
-		studentIntersection := g.getStudentsAvailabilityIntersection(task.EnrolledStudentIDs, weekday, ctx.StudentAvailability)
-		if len(studentIntersection) == 0 {
-			continue
-		}
-
-		for _, teacherWindow := range teacherWindows {
-			for _, studentWindow := range studentIntersection {
-				intersectionStart, intersectionEnd, ok := intersectWindows(
-					teacherWindow.StartTime,
-					teacherWindow.EndTime,
-					studentWindow[0],
-					studentWindow[1],
-				)
-				if !ok {
-					continue
-				}
-
-				startMinute := hhmmToMinutes(intersectionStart)
-				endMinute := hhmmToMinutes(intersectionEnd)
-
-				if startMinute < 0 || endMinute < 0 {
-					continue
-				}
-
-				for slotStart := startMinute; slotStart+task.DurationMin <= endMinute; slotStart += 5 {
-					slotEnd := slotStart + task.DurationMin
-					startHHMM := minutesToHHMM(slotStart)
-					endHHMM := minutesToHHMM(slotEnd)
-
-					bufferedStart, bufferedEnd := g.validator.ApplyBreakBuffer(startHHMM, endHHMM, DefaultBreakMinutes)
-
-					if !g.validator.IsTeacherAvailable(task.TeacherID, weekday, startHHMM, endHHMM, ctx.TeacherAvailability) {
+		// Пересечение доступности учеников (пропускается если игнорируем окна детей)
+		type timeWindow = [2]string
+		var outerWindows []timeWindow
+		if task.IgnoreStudentWindows {
+			for _, tw := range teacherWindows {
+				outerWindows = append(outerWindows, timeWindow{tw.StartTime, tw.EndTime})
+			}
+		} else {
+			studentIntersection := g.getStudentsAvailabilityIntersection(task.EnrolledStudentIDs, weekday, ctx.StudentAvailability)
+			if len(studentIntersection) == 0 {
+				continue
+			}
+			for _, tw := range teacherWindows {
+				for _, sw := range studentIntersection {
+					iStart, iEnd, ok := intersectWindows(tw.StartTime, tw.EndTime, sw[0], sw[1])
+					if !ok {
 						continue
 					}
+					outerWindows = append(outerWindows, timeWindow{iStart, iEnd})
+				}
+			}
+		}
 
+		for _, win := range outerWindows {
+			startMinute := hhmmToMinutes(win[0])
+			endMinute := hhmmToMinutes(win[1])
+
+			if startMinute < 0 || endMinute < 0 {
+				continue
+			}
+
+			for slotStart := startMinute; slotStart+task.DurationMin <= endMinute; slotStart += 5 {
+				slotEnd := slotStart + task.DurationMin
+				startHHMM := minutesToHHMM(slotStart)
+				endHHMM := minutesToHHMM(slotEnd)
+
+				bufferedStart, bufferedEnd := g.validator.ApplyBreakBuffer(startHHMM, endHHMM, DefaultBreakMinutes)
+
+				if !g.validator.IsTeacherAvailable(task.TeacherID, weekday, startHHMM, endHHMM, ctx.TeacherAvailability) {
+					continue
+				}
+
+				if !task.IgnoreStudentWindows {
 					// Проверяем доступность каждого ученика
 					allStudentsAvailable := true
 					for _, studentID := range task.EnrolledStudentIDs {
@@ -1325,11 +1340,13 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 					if !allStudentsAvailable {
 						continue
 					}
+				}
 
-					if g.validator.ViolatesSameDayRuleForGroup(task.GroupLessonID, weekday, ctx.ExistingSlots) {
-						continue
-					}
+				if g.validator.ViolatesSameDayRuleForGroup(task.GroupLessonID, weekday, ctx.ExistingSlots) {
+					continue
+				}
 
+				if !task.IgnoreStudentWindows {
 					largeStudentGap := false
 					for _, studentID := range task.EnrolledStudentIDs {
 						if g.createsLargeStudentGap(studentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
@@ -1340,6 +1357,7 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 					if largeStudentGap {
 						continue
 					}
+				}
 
 					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 						continue
@@ -1384,7 +1402,6 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 				}
 			}
 		}
-	}
 
 	return candidates
 }
@@ -1779,6 +1796,51 @@ func (g *ScheduleGenerator) getTeacherName(teacherID uint, ctx *GenerationContex
 
 // ========== СОХРАНЕНИЕ ==========
 
+// BackupAutoSlots сохраняет текущие авто-слоты расписания в таблицу бэкапов.
+// Предыдущий бэкап для этого расписания удаляется перед сохранением нового.
+func (g *ScheduleGenerator) BackupAutoSlots(scheduleID uint) error {
+	var autoSlots []models.ScheduleSlot
+	if err := g.db.
+		Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
+		Find(&autoSlots).Error; err != nil {
+		return fmt.Errorf("failed to load auto slots for backup: %w", err)
+	}
+	if len(autoSlots) == 0 {
+		return nil
+	}
+
+	if err := g.db.Where("schedule_id = ?", scheduleID).Delete(&models.ScheduleSlotBackup{}).Error; err != nil {
+		return fmt.Errorf("failed to clear old backup: %w", err)
+	}
+
+	now := time.Now()
+	backups := make([]models.ScheduleSlotBackup, 0, len(autoSlots))
+	for _, s := range autoSlots {
+		backups = append(backups, models.ScheduleSlotBackup{
+			ScheduleID:    s.ScheduleID,
+			SlotType:      s.SlotType,
+			AssignmentID:  s.AssignmentID,
+			GroupLessonID: s.GroupLessonID,
+			StudentID:     s.StudentID,
+			TeacherID:     s.TeacherID,
+			SubjectID:     s.SubjectID,
+			RoomID:        s.RoomID,
+			RoomName:      s.RoomName,
+			Weekday:       s.Weekday,
+			StartTime:     s.StartTime,
+			EndTime:       s.EndTime,
+			Origin:        s.Origin,
+			Status:        s.Status,
+			BackedUpAt:    now,
+		})
+	}
+
+	if err := g.db.Create(&backups).Error; err != nil {
+		return fmt.Errorf("failed to save slot backup: %w", err)
+	}
+	return nil
+}
+
 func (g *ScheduleGenerator) CleanupAutoSlots(scheduleID uint) error {
 	if err := g.db.
 		Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
@@ -1877,15 +1939,19 @@ func (g *ScheduleGenerator) SaveGenerationIssue(scheduleID uint, task WeeklyTask
 func (g *ScheduleGenerator) SaveGroupGenerationIssue(scheduleID uint, task GroupWeeklyTask, reasonCode string, message string) error {
 	groupLessonID := task.GroupLessonID
 	teacherID := task.TeacherID
-	subjectID := task.SubjectID
 
 	issue := models.ScheduleGenerationIssue{
 		ScheduleID:    scheduleID,
 		GroupLessonID: &groupLessonID,
-		TeacherID:     &teacherID,
-		SubjectID:     &subjectID,
 		ReasonCode:    reasonCode,
 		Message:       message,
+	}
+	if teacherID != 0 {
+		issue.TeacherID = &teacherID
+	}
+	if task.SubjectID != 0 {
+		subjectID := task.SubjectID
+		issue.SubjectID = &subjectID
 	}
 
 	if err := g.db.Create(&issue).Error; err != nil {

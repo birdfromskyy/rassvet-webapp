@@ -61,6 +61,7 @@ func Migrate(db *gorm.DB) {
 		&models.ScheduleSlot{},
 		&models.ScheduleSlotExclusion{},
 		&models.ScheduleGenerationIssue{},
+		&models.ScheduleSlotBackup{},
 		&models.UserStudent{},
 	)
 

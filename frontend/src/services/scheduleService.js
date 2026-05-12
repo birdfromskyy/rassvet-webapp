@@ -309,9 +309,21 @@ const scheduleService = {
 	getTeacherReport: async (teacherId, startDate, endDate) => {
 		const params = { start_date: startDate, end_date: endDate }
 		if (teacherId) params.teacher_id = teacherId
-		const r = await api.get('/admin/reports/monthly', {
-			params,
-		})
+		const r = await api.get('/admin/reports/monthly', { params })
+		return r.data
+	},
+	getStudentReport: async (studentId, startDate, endDate) => {
+		const params = { start_date: startDate, end_date: endDate }
+		if (studentId) params.student_id = studentId
+		const r = await api.get('/admin/reports/monthly', { params })
+		return r.data
+	},
+	getSlotBackup: async scheduleId => {
+		const r = await api.get(`/admin/schedules/${scheduleId}/backup`)
+		return r.data
+	},
+	restoreSlotBackup: async scheduleId => {
+		const r = await api.post(`/admin/schedules/${scheduleId}/restore-backup`)
 		return r.data
 	},
 	// ========== USERS (admin) ==========

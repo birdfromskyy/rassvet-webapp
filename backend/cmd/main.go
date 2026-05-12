@@ -214,6 +214,10 @@ func main() {
 			// Clear auto schedule without regenerating
 			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
 
+			// Slot backup (save before generation, restore if needed)
+			admin.GET("/schedules/:id/backup", scheduleHandler.GetSlotBackup)
+			admin.POST("/schedules/:id/restore-backup", scheduleHandler.RestoreSlotBackup)
+
 			// Reports
 			admin.GET("/reports/monthly", reportHandler.GetMonthlyReport)
 

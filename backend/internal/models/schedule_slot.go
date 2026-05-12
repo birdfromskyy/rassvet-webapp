@@ -7,6 +7,7 @@ const (
 	ScheduleSlotOriginManual = "manual"
 
 	ScheduleSlotStatusScheduled = "scheduled"
+	ScheduleSlotStatusConducted = "conducted"
 	ScheduleSlotStatusMoved     = "moved"
 	ScheduleSlotStatusCancelled = "cancelled"
 
