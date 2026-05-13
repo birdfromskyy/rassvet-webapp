@@ -54,7 +54,7 @@
 .services__title {
   margin: 0 0 16px;
   font-family: "Merriweather", serif;
-  font-size: 40px;
+  font-size: 56px;
   line-height: 1.15;
   color: #074462;
 }
@@ -307,4 +307,92 @@
 
 .services__list li + li {
   margin-top: 8px;
+}
+
+@media (max-width: 1200px) {
+  .services {
+    padding: 68px 0 78px;
+  }
+
+  .services__title {
+    font-size: 44px;
+  }
+
+  .services__grid {
+    gap: 18px;
+  }
+
+  .services__card-top {
+    grid-template-columns: 64px 1fr 30px;
+    padding: 22px;
+  }
+}
+
+@media (max-width: 900px) {
+  .services {
+    padding: 56px 0 66px;
+  }
+
+  .services__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .services__heading {
+    margin-bottom: 30px;
+  }
+
+  .services__title {
+    font-size: 34px;
+  }
+
+  .services__subtitle {
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 560px) {
+  .services {
+    padding: 44px 0 54px;
+  }
+
+  .services__title {
+    font-size: 27px;
+  }
+
+  .services__card {
+    border-radius: 20px;
+  }
+
+  .services__card-top {
+    grid-template-columns: 48px 1fr 26px;
+    gap: 12px;
+    padding: 18px 14px;
+  }
+
+  .services__icon-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .services__icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .services__card-title {
+    font-size: 18px;
+  }
+
+  .services__card-text {
+    font-size: 14px;
+  }
+
+  .services__card-body.is-open {
+    padding: 0 14px 18px !important;
+  }
+
+  .services__list {
+    font-size: 14px;
+  }
 }

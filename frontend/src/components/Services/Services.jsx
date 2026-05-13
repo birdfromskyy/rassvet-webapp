@@ -77,8 +77,6 @@ function Services() {
 
   return (
     <section className="services">
-      <div className="services__wave-top"></div>
-
       <div className="container services__inner">
         <div className="services__heading">
           <h2 className="services__title">Наши услуги</h2>

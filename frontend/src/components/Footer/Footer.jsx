@@ -71,10 +71,9 @@ export default function Footer() {
               © Центр развития детей с задержками развития «РАСсвет» 2026 г. |
               ИП Евланова О. А.
             </p>
+          <img src={footerHouse} alt="" className="footer__decor" />
           </div>
         </div>
-
-        <img src={footerHouse} alt="" className="footer__decor" />
           </div>
       </footer>
       </>
