@@ -90,6 +90,11 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:8080/api
       - REACT_APP_DIRECTUS_URL=http://localhost:8055
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+    - ./frontend:/app
+    - /app/node_modules
 
   redis:
     image: redis:7-alpine
