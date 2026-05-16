@@ -65,19 +65,17 @@ export default function Hero() {
           <div className="hero__photo-bg"></div>
 
           <div className="hero__photo-frame">
-            <video
-              ref={videoRef}
-              className="hero__video"
-              src="/video/intro.mp4"
-              controls
-              playsInline
-              preload="metadata"
-              poster="rassvet-webapp\frontend\src\assets\video\intro.mp4"
-            />
-
-            <div className="hero__video-caption">
-    Наша видеовизитка
-  </div>
+            <div className="hero__video-card">
+              <iframe
+                src="https://vk.com/video_ext.php?oid=-228149734&id=456239094&hash=1a7c1dffa23542b1"
+                title="Видеовизитка Центра"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+              />
+              <div className="hero__video-info">
+                <span>Видеовизитка центра</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
