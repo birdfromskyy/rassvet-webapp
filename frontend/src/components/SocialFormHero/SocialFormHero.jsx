@@ -6,7 +6,7 @@ function SocialFormHero() {
     <section className="socialFormHero">
       <div className="container socialFormHero__inner">
         <div className="socialFormHero__content">
-          <span className="socialFormHero__badge">Формы обслуживания</span>
+          <span className="section-badge">Формы обслуживания</span>
 
           <h1>Форма социального обслуживания</h1>
 
@@ -15,12 +15,6 @@ function SocialFormHero() {
             помогают детям получать поддержку в комфортных и безопасных условиях.
           </p>
         </div>
-
-        <img
-          src={socialFormImg}
-          alt=""
-          className="socialFormHero__image"
-        />
       </div>
     </section>
   );

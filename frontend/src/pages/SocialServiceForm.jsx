@@ -6,17 +6,17 @@ import SocialFormList from "../components/SocialFormList/SocialFormList";
 
 function SocialServiceForm() {
       useEffect(() => {
-      document.title = 'РАСсвет | Форма социального обслуживания'
+      document.title = 'Форма социального обслуживания'
     }, [])
   return (
-    <>
+    <div className="page page--social_service_form">
       <Header />
       <main>
         <SocialFormHero />
         <SocialFormList />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

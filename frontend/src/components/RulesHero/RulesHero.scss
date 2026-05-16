@@ -5,33 +5,18 @@
 }
 
 .rulesHero__inner {
-  max-width: 1200px;
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 50px;
+  display: block;
+  gap: 70px;
   align-items: center;
+  text-align: center;
 }
-
-.rulesHero__content {
-  max-width: 760px;
-}
-
 .rulesHero__image {
   width: 100%;
   max-height: 280px;
   object-fit: contain;
 }
 
-.rulesHero__badge {
-  display: inline-flex;
-  background: #f4df00;
-  padding: 8px 18px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 18px;
-}
 
 .rulesHero h1 {
   font-family: "Merriweather", serif;
@@ -40,7 +25,7 @@
 }
 
 .rulesHero p {
-  font-size: 18px;
+  font-size: 28px;
   line-height: 1.5;
 }
 

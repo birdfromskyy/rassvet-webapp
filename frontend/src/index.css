@@ -22,8 +22,14 @@ code {
 html,
 body,
 #root {
-  background: #dbe5ee !important;
+  margin: 0;
+  min-height: 100%;
 }
+
+body {
+  background: #f7f4ec;
+}
+
 
 .footer,
 .footer *,
@@ -52,4 +58,41 @@ body,
   object-position: center bottom;
   margin: 0 0 -2px 0;
   padding: 0;
+}
+
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 45px;
+  padding: 0 20px;
+
+  margin-bottom: 10px;
+  border-radius: 999px;
+
+  background: #ffe96a;
+  color: #074462;
+
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .section-badge {
+    min-height: 54px;
+    padding: 0 24px;
+    font-size: 17px;
+  }
+}
+
+@media (max-width: 480px) {
+  .section-badge {
+    min-height: 48px;
+    padding: 0 20px;
+    font-size: 15px;
+  }
 }

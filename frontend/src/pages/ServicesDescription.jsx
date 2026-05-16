@@ -6,17 +6,17 @@ import ServicesDescriptionList from "../components/ServicesDescriptionList/Servi
 
 function ServicesDescription() {
       useEffect(() => {
-      document.title = 'РАСсвет | Описание услуг'
+      document.title = 'Описание услуг'
     }, [])
   return (
-    <>
+    <div className="page page--services_description">
       <Header />
       <main>
         <ServicesDescriptionHero />
         <ServicesDescriptionList />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

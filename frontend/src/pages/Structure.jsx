@@ -5,16 +5,16 @@ import { useEffect } from 'react'
 
 function Structure() {
       useEffect(() => {
-      document.title = 'РАСсвет | Структура организации'
+      document.title = 'Структура организации'
     }, [])
   return (
-    <>
+    <div className="page page--structure">
       <Header />
       <main>
         <StructureBlock />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

@@ -6,7 +6,7 @@ function RatingHero() {
     <section className="ratingHero">
       <div className="container ratingHero__inner">
         <div className="ratingHero__content">
-          <span className="ratingHero__badge">Документы</span>
+          <span className="section-badge">Документы</span>
 
           <h1>Независимая оценка качества</h1>
 
@@ -15,8 +15,6 @@ function RatingHero() {
             условий оказания социальных услуг Центра.
           </p>
         </div>
-
-        <img src={ratingImg} alt="" className="ratingHero__image" />
       </div>
     </section>
   );

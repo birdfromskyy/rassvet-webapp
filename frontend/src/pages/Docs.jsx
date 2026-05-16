@@ -6,16 +6,16 @@ import { useEffect } from 'react'
 
 function Docs() {
       useEffect(() => {
-      document.title = 'РАСсвет | Документы'
+      document.title = 'Документы'
     }, [])
 
   return (
-    <>
+    <div className="page page--docs">
       <Header />
       <DocsHero />
       <DocsList />
       <Footer />
-    </>
+    </div>
   );
 }
 

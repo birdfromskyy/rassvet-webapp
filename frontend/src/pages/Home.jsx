@@ -8,17 +8,17 @@ import { useEffect } from 'react'
 
 function Home() {
       useEffect(() => {
-      document.title = 'РАСсвет | Главная'
+      document.title = 'Главная'
     }, [])
   return (
-    <>
+    <div className="page page--home">
       <Header />
       <Hero />
       <About />
       <Services />
       <Reviews />
       <Footer />
-    </>
+    </div>
   );
 }
 

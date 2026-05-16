@@ -5,25 +5,10 @@
 }
 
 .availableHero__inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  display: block;
+  text-align: center;
   gap: 60px;
   align-items: center;
-}
-
-.availableHero__content {
-  max-width: 760px;
-  min-width: 0;
-}
-
-.availableHero__badge {
-  display: inline-flex;
-  width: fit-content;
-  background: #f4df00;
-  padding: 8px 18px;
-  border-radius: 999px;
-  font-weight: 800;
-  margin-bottom: 18px;
 }
 
 .availableHero h1 {

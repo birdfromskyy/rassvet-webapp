@@ -6,7 +6,7 @@ function EmployeesHero() {
     <section className="employees-hero">
       <div className="container employees-hero__inner">
         <div className="employees-hero__content">
-          <span className="employees-hero__label">Сотрудники</span>
+          <span className="section-badge">Сотрудники</span>
 
           <h1 className="employees-hero__title">
             Команда специалистов, которая помогает детям развиваться
@@ -16,14 +16,6 @@ function EmployeesHero() {
             В центре работают педагоги, психологи, специалисты по коррекционной
             помощи и сопровождению семей.
           </p>
-        </div>
-
-        <div className="employees-hero__image-wrap">
-          <img
-            src={employeesImg}
-            alt="Сотрудники центра"
-            className="employees-hero__image"
-          />
         </div>
       </div>
 

@@ -6,16 +6,16 @@ import { useEffect } from 'react'
 
 function Employees() {
       useEffect(() => {
-      document.title = 'РАСсвет | Сотрудники'
+      document.title = 'Сотрудники'
     }, [])
 
   return (
-    <>
+    <div className="page page--employees">
       <Header />
       <EmployeesHero />
       <EmployeesList />
       <Footer />
-    </>
+    </div>
   );
 }
 

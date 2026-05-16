@@ -12,7 +12,7 @@ export default function Hero() {
     <section className="hero">
       <div className="container hero__inner">
         <div className="hero__content">
-          <div className="hero__badge">Мы рядом. Мы помогаем</div>
+          <div className="section-badge">Мы рядом. Мы помогаем</div>
 
           <h1 className="hero__title">
             Маленькими
@@ -73,7 +73,7 @@ export default function Hero() {
                 allowFullScreen
               />
               <div className="hero__video-info">
-                <span>Видеовизитка центра</span>
+                <span>Видеовизитка Центра</span>
               </div>
             </div>
           </div>

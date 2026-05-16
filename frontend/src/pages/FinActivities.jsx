@@ -6,16 +6,16 @@ import { useEffect } from 'react'
 
 function FinActivities() {
       useEffect(() => {
-      document.title = 'РАСсвет | '
+      document.title = 'Материально-техническое обеспечение'
     }, [])
 
   return (
-    <>
+    <div className="page page--fin_activities">
       <Header />
       <FinHero />
       <FinGallery />
       <Footer />
-    </>
+    </div>
   );
 }
 

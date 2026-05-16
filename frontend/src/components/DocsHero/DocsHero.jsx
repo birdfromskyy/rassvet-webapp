@@ -6,7 +6,7 @@ function DocsHero() {
     <section className="docs-hero">
       <div className="container docs-hero__inner">
         <div className="docs-hero__content">
-          <span className="docs-hero__label">Документы</span>
+          <span className="section-badge">Документы</span>
 
           <h1 className="docs-hero__title">
             Важная информация о работе центра
@@ -16,10 +16,6 @@ function DocsHero() {
             Здесь собраны основные документы организации: сведения о социальных
             услугах, тарифах, правилах, планах и условиях работы центра.
           </p>
-        </div>
-
-        <div className="docs-hero__image-wrap">
-          <img src={docsImg} alt="Документы центра" className="docs-hero__image" />
         </div>
       </div>
 

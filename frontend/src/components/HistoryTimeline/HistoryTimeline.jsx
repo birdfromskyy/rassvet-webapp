@@ -41,7 +41,6 @@ function HistoryTimeline() {
     <section className="history-timeline">
       <div className="container history-timeline__inner">
         <div className="history-timeline__heading">
-          <span className="history-timeline__subtitle">Наши успехи</span>
           <h2 className="history-timeline__title">Достижения по годам</h2>
         </div>
 

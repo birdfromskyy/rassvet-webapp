@@ -12,7 +12,7 @@ function MissionGoals() {
     <section className="mission-goals">
       <div className="container mission-goals__inner">
         <div className="mission-goals__heading">
-          <span className="mission-goals__subtitle">Что важно для нас</span>
+          <span className="section-badge">Что важно для нас</span>
           <h2 className="mission-goals__title">Цели центра</h2>
         </div>
 

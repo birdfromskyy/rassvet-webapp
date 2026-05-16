@@ -6,18 +6,18 @@ import ContactsInfo from "../components/ContactsInfo/ContactsInfo";
 
 function Contacts() {
     useEffect(() => {
-    document.title = 'РАСсвет | Контакты'
+    document.title = 'Контакты'
   }, [])
 
   return (
-    <>
+    <div className="page page--contacts">
       <Header />
       <main>
         <ContactsHero />
         <ContactsInfo />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

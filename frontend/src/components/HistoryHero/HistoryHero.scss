@@ -13,10 +13,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 70px;
-}
-
-.history-hero__content {
-  max-width: 780px;
+  text-align: center;
 }
 
 .history-hero__label {
@@ -74,7 +71,7 @@
 .history-circle--yellow {
   width: 210px;
   height: 210px;
-  background: #f4df00;
+  background: #f8ef89;
   right: 90px;
   top: 80px;
 }
@@ -82,7 +79,7 @@
 .history-circle--blue {
   width: 80px;
   height: 80px;
-  background: #074462;
+  background: #61b0d8;
   right: 36px;
   bottom: 190px;
 }

@@ -9,14 +9,11 @@
 .employees-hero__inner {
   position: relative;
   z-index: 2;
-  display: flex;
+  display: block;
+  text-align: center;
   align-items: center;
   justify-content: space-between;
   gap: 70px;
-}
-
-.employees-hero__content {
-  max-width: 760px;
 }
 
 .employees-hero__label {
@@ -71,7 +68,7 @@
 .employees-circle--yellow {
   width: 210px;
   height: 210px;
-  background: #f4df00;
+  background: #fff47b;
   right: 11%;
   top: 24%;
 }
@@ -79,7 +76,7 @@
 .employees-circle--blue {
   width: 80px;
   height: 80px;
-  background: #074462;
+  background: #47a2cf;
   right: 5%;
   top: 58%;
 }

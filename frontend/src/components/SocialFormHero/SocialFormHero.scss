@@ -5,24 +5,10 @@
 }
 
 .socialFormHero__inner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  display: block;
   gap: 60px;
   align-items: center;
-}
-
-.socialFormHero__content {
-  max-width: 760px;
-}
-
-.socialFormHero__badge {
-  display: inline-flex;
-  width: fit-content;
-  background: #f4df00;
-  padding: 8px 18px;
-  border-radius: 999px;
-  font-weight: 800;
-  margin-bottom: 18px;
+  text-align: center;
 }
 
 .socialFormHero h1 {
@@ -33,15 +19,9 @@
 }
 
 .socialFormHero p {
-  font-size: 18px;
+  font-size: 28px;
   line-height: 1.5;
   margin: 0;
-}
-
-.socialFormHero__image {
-  width: 100%;
-  max-width: 360px;
-  object-fit: contain;
 }
 
 @media (max-width: 850px) {

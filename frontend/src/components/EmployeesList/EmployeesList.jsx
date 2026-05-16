@@ -134,7 +134,6 @@ function EmployeesList() {
     <section className="employees-list">
       <div className="container employees-list__inner">
         <div className="employees-list__heading">
-          <span className="employees-list__subtitle">Наша команда</span>
           <h2 className="employees-list__title">Специалисты центра</h2>
         </div>
 
@@ -207,15 +206,6 @@ function EmployeesList() {
             );
           })}
         </div>
-      </div>
-
-      <div className="employees-list__wave-bottom">
-        <svg viewBox="0 0 1440 120" preserveAspectRatio="none">
-          <path
-            d="M0,70 C240,20 480,110 720,70 C960,30 1200,90 1440,45 L1440,120 L0,120 Z"
-            fill="#074462"
-          />
-        </svg>
       </div>
     </section>
   );

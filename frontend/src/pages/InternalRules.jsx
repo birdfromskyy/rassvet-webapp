@@ -6,17 +6,17 @@ import RulesList from "../components/RulesList/RulesList";
 
 function InternalRules() {
       useEffect(() => {
-      document.title = 'РАСсвет | Правила внутреннего распорядка'
+      document.title = 'Правила внутреннего распорядка'
     }, [])
   return (
-    <>
+    <div className="page page--internal_rules">
       <Header />
       <main>
         <RulesHero />
         <RulesList />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

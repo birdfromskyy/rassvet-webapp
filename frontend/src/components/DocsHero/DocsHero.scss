@@ -9,15 +9,13 @@
 .docs-hero__inner {
   position: relative;
   z-index: 2;
-  display: flex;
+  display: block;
   align-items: center;
   justify-content: space-between;
   gap: 70px;
+  text-align: center;
 }
 
-.docs-hero__content {
-  max-width: 760px;
-}
 
 .docs-hero__label {
   display: inline-block;
@@ -71,7 +69,7 @@
 .docs-circle--yellow {
   width: 210px;
   height: 210px;
-  background: #f4df00;
+  background: #fff36c9d;
   right: 11%;
   top: 24%;
 }
@@ -79,9 +77,10 @@
 .docs-circle--blue {
   width: 80px;
   height: 80px;
-  background: #074462;
+  background: #65bbe67e;
   right: 5%;
   top: 58%;
+  z-index: -1;
 }
 
 .docs-circle--light {

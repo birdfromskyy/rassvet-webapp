@@ -7,16 +7,13 @@
 }
 
 .mission-hero__inner {
-  display: flex;
+  display: block;
   align-items: center;
+  text-align: center;
   justify-content: space-between;
   gap: 70px;
   position: relative;
   z-index: 2;
-}
-
-.mission-hero__content {
-  max-width: 760px;
 }
 
 .mission-hero__label {
@@ -149,7 +146,7 @@
 .circle--yellow {
   width: clamp(120px, 14vw, 230px);
   height: clamp(120px, 14vw, 230px);
-  background: #f4df00;
+  background: #f2e87b;
   right: clamp(40px, 10vw, 190px);
   top: clamp(120px, 22vw, 250px);
 }
@@ -157,7 +154,7 @@
 .circle--blue {
   width: clamp(34px, 5vw, 90px);
   height: clamp(34px, 5vw, 90px);
-  background: #074462;
+  background: #62afd5;
   right: clamp(20px, 6vw, 100px);
   top: clamp(430px, 42vw, 560px);
 }
@@ -179,6 +176,7 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 45px;
+    align-items: center;
   }
 
   .mission-hero__title {

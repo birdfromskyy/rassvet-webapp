@@ -6,7 +6,7 @@ function HistoryHero() {
     <section className="history-hero">
       <div className="container history-hero__inner">
         <div className="history-hero__content">
-          <span className="history-hero__label">История и достижения</span>
+          <span className="section-badge">История и достижения</span>
 
           <h1 className="history-hero__title">
             Маленькими шагами к большим возможностям
@@ -16,14 +16,6 @@ function HistoryHero() {
             Центр «РАСсвет» развивается через проекты, победы детей, поддержку
             семей и участие в социально значимых инициативах.
           </p>
-        </div>
-
-        <div className="history-hero__image-wrap">
-          <img
-            src={historyImg}
-            alt="История центра"
-            className="history-hero__image"
-          />
         </div>
       </div>
 

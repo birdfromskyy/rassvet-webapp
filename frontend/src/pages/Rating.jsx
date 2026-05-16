@@ -6,17 +6,17 @@ import RatingContent from "../components/RatingContent/RatingContent";
 
 function Rating() {
       useEffect(() => {
-      document.title = 'РАСсвет | Независимая оцена качества'
+      document.title = 'Независимая оцена качества'
     }, [])
   return (
-    <>
+    <div className="page page--rating">
       <Header />
       <main>
         <RatingHero />
         <RatingContent />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

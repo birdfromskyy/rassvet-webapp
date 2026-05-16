@@ -5,21 +5,10 @@
 }
 
 .servicesDescHero__inner {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 60px;
+  display: block;
+  gap: 70px;
   align-items: center;
-}
-
-.servicesDescHero__badge {
-  display: inline-flex;
-  background: #f4df00;
-  color: #074462;
-  padding: 8px 18px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 18px;
+  text-align: center;
 }
 
 .servicesDescHero h1 {
@@ -30,17 +19,18 @@
 }
 
 .servicesDescHero p {
-  max-width: 720px;
-  font-size: 18px;
+  font-size: 28px;
   line-height: 1.55;
   margin: 0;
 }
 
-.servicesDescHero__image {
-  width: 100%;
-  max-height: 500px;
-  object-fit: contain;
+.servicesDescHero p a {
+  text-decoration: none;
+  font-weight: 600;
+  color: #11425c;
+
 }
+
 
 @media (max-width: 850px) {
   .servicesDescHero__inner {

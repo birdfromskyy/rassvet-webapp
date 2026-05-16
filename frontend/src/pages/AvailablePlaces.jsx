@@ -7,17 +7,17 @@ import { useEffect } from 'react'
 
 function AvailablePlaces() {
   useEffect(() => {
-    document.title = 'РАСсвет | Свободные места'
+    document.title = 'Свободные места'
   }, [])
   return (
-    <>
+    <div className="page page--available_places">
       <Header />
       <main>
         <AvailableHero />
         <AvailableStats />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }
 

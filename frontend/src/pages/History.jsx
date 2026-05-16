@@ -6,15 +6,15 @@ import { useEffect } from 'react'
 
 function History() {
       useEffect(() => {
-      document.title = 'РАСсвет | История и достижения'
+      document.title = 'История и достижения'
     }, [])
   return (
-    <>
+    <div className="page page--history">
       <Header />
       <HistoryHero />
       <HistoryTimeline />
       <Footer />
-    </>
+    </div>
   );
 }
 

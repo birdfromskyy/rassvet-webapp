@@ -6,15 +6,15 @@ import { useEffect } from 'react'
 
 function Mission() {
       useEffect(() => {
-      document.title = 'РАСсвет | Миссия и цели'
+      document.title = 'Миссия и цели'
     }, [])
   return (
-    <>
+    <div className="page page--mission">
       <Header />
       <MissionHero />
       <MissionGoals />
       <Footer />
-    </>
+    </div>
   );
 }
 

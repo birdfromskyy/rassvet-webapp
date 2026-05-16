@@ -23,7 +23,6 @@ function DocsList() {
     <section className="docs-list">
       <div className="container docs-list__inner">
         <div className="docs-list__heading">
-          <span className="docs-list__subtitle">Открытая информация</span>
           <h2 className="docs-list__title">Документы центра</h2>
         </div>
 

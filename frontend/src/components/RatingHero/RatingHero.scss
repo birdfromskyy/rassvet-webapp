@@ -5,8 +5,8 @@
 }
 
 .ratingHero__inner {
-  display: grid;
-  grid-template-columns: 1fr 360px;
+  display: block;
+  text-align: center;
   gap: 60px;
   align-items: center;
 }
@@ -29,8 +29,7 @@
 }
 
 .ratingHero p {
-  max-width: 680px;
-  font-size: 18px;
+  font-size: 28px;
   line-height: 1.5;
   margin: 0;
 }

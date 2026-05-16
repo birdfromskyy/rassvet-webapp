@@ -6,7 +6,7 @@ function FinHero() {
     <section className="fin-hero">
       <div className="container fin-hero__inner">
         <div className="fin-hero__content">
-          <span className="fin-hero__label">О центре</span>
+          <span className="section-badge">О центре</span>
 
           <h1 className="fin-hero__title">
             Материально-техническое обеспечение

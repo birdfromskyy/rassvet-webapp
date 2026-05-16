@@ -15,7 +15,7 @@ function MissionHero() {
 
 
         <div className="mission-hero__content">
-          <span className="mission-hero__label">Миссия центра</span>
+          <span className="section-badge">Миссия центра</span>
 
           <h1 className="mission-hero__title">
             Помогаем детям развиваться, а семьям чувствовать поддержку
@@ -26,14 +26,6 @@ function MissionHero() {
             воспитывающих детей с расстройствами аутистического спектра и
             другими ментальными нарушениями.
           </p>
-        </div>
-
-        <div className="mission-hero__image-wrap">
-          <img
-            src={missionImg}
-            alt="Миссия центра"
-            className="mission-hero__image"
-          />
         </div>
       </div>
 
