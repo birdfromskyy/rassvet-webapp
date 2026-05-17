@@ -4,6 +4,7 @@
 .env.*.local
 .claude
 backend/.env
+backend/main
 frontend/.env
 frontend/.env.local
 frontend/.env.development.local

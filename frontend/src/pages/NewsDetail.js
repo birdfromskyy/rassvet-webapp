@@ -16,12 +16,12 @@ import {
 import {
 	ArrowBack,
 	CalendarToday,
-	Visibility,
 	Category,
 	Download,
 } from '@mui/icons-material'
 import NewsCard from '../components/NewsCard'
 import newsService from '../services/newsService'
+import { getUploadUrl } from '../services/cmsService'
 
 const NewsDetail = () => {
 	const { slug } = useParams()
@@ -96,91 +96,59 @@ const NewsDetail = () => {
 	}
 
 	const renderBlock = (block, index) => {
-		if (!block?.collection || !block?.item) return null
+		if (!block?.type) return null
 
-		switch (block.collection) {
-			case 'block_text':
+		switch (block.type) {
+			case 'text':
 				return (
-					<Box
-						key={`${block.collection}-${block.id}-${index}`}
-						sx={{
-							mb: 3,
-							'& p': { marginBottom: 2 },
-							'& h2': { marginTop: 3, marginBottom: 2 },
-							'& h3': { marginTop: 2, marginBottom: 1 },
-							'& ul, & ol': { marginLeft: 3, marginBottom: 2 },
-							'& blockquote': {
-								borderLeft: '4px solid',
-								borderColor: 'primary.main',
-								paddingLeft: 2,
-								marginLeft: 0,
-								fontStyle: 'italic',
-							},
-						}}
-						dangerouslySetInnerHTML={{ __html: block.item.text || '' }}
-					/>
+					<Box key={block.id || index} sx={{ mb: 3 }}>
+						{block.content.split('\n').filter(p => p.trim()).map((para, i) => (
+							<Typography key={i} variant="body1" paragraph>
+								{para}
+							</Typography>
+						))}
+					</Box>
 				)
 
-			case 'block_image': {
-				const imageUrl = newsService.getAssetUrl(
-					block.item.image?.id || block.item.image,
-				)
+			case 'image': {
+				const imageUrl = getUploadUrl(block.content)
 				if (!imageUrl) return null
-
 				return (
-					<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
+					<Box key={block.id || index} mb={3}>
 						<img
 							src={imageUrl}
-							alt='Изображение новости'
-							style={{
-								width: '100%',
-								height: 'auto',
-								borderRadius: '8px',
-							}}
+							alt='Изображение'
+							style={{ width: '100%', height: 'auto', borderRadius: '8px' }}
 						/>
 					</Box>
 				)
 			}
 
-			case 'block_video': {
-				const embedUrl = getVkEmbedUrl(block.item.video_url)
+			case 'video': {
+				const embedUrl = getVkEmbedUrl(block.content)
 				if (!embedUrl) {
 					return (
-						<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
-							<Link
-								href={block.item.video_url}
-								target='_blank'
-								rel='noopener noreferrer'
-							>
+						<Box key={block.id || index} mb={3}>
+							<Link href={block.content} target='_blank' rel='noopener noreferrer'>
 								Открыть видео
 							</Link>
 						</Box>
 					)
 				}
-
 				return (
-					<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
-						<Box
-							sx={{
-								position: 'relative',
-								paddingBottom: '56.25%',
-								height: 0,
-								overflow: 'hidden',
-								borderRadius: '8px',
-							}}
-						>
+					<Box key={block.id || index} mb={3}>
+						<Box sx={{
+							position: 'relative', paddingBottom: '56.25%',
+							height: 0, overflow: 'hidden', borderRadius: '8px',
+						}}>
 							<iframe
 								src={embedUrl}
 								title='Видео'
 								allow='autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock;'
 								allowFullScreen
 								style={{
-									position: 'absolute',
-									top: 0,
-									left: 0,
-									width: '100%',
-									height: '100%',
-									border: 'none',
+									position: 'absolute', top: 0, left: 0,
+									width: '100%', height: '100%', border: 'none',
 								}}
 							/>
 						</Box>
@@ -188,26 +156,16 @@ const NewsDetail = () => {
 				)
 			}
 
-			case 'block_file': {
-				const fileUrl = newsService.getAssetDownloadUrl(
-					block.item.file?.id || block.item.file,
-				)
+			case 'file': {
+				const fileUrl = getUploadUrl(block.content)
 				if (!fileUrl) return null
-
 				return (
-					<Box key={`${block.collection}-${block.id}-${index}`} mb={3}>
+					<Box key={block.id || index} mb={3}>
 						<Paper variant='outlined' sx={{ p: 2 }}>
 							<Box display='flex' alignItems='center' gap={1}>
 								<Download />
-								<Link
-									href={fileUrl}
-									target='_blank'
-									rel='noopener noreferrer'
-									underline='hover'
-								>
-									{block.item.title ||
-										block.item.file?.filename_download ||
-										'Скачать файл'}
+								<Link href={fileUrl} target='_blank' rel='noopener noreferrer' underline='hover'>
+									{block.title || 'Скачать файл'}
 								</Link>
 							</Box>
 						</Paper>
@@ -289,20 +247,12 @@ const NewsDetail = () => {
 							</Box>
 						</Box>
 
-						{newsService.getImageUrl(
-							article.featured_image?.id || article.featured_image,
-						) && (
+						{getUploadUrl(article.featured_image) && (
 							<Box mb={3}>
 								<img
-									src={newsService.getImageUrl(
-										article.featured_image?.id || article.featured_image,
-									)}
+									src={getUploadUrl(article.featured_image)}
 									alt={article.title}
-									style={{
-										width: '100%',
-										height: 'auto',
-										borderRadius: '8px',
-									}}
+									style={{ width: '100%', height: 'auto', borderRadius: '8px' }}
 								/>
 							</Box>
 						)}
