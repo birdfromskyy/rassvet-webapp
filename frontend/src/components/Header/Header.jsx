@@ -36,7 +36,7 @@ const dropdowns = [
     title: "Услуги",
     small: true,
     links: [
-      { title: "Перечень соц. услуг", path: "/services" },
+      { title: "Перечень соц. услуг", path: "/services-list" },
       { title: "Описание услуг", path: "/services-description" },
     ],
   },
@@ -206,7 +206,9 @@ function Header() {
             </NavLink>
           </nav>
 
-<Link to="/login" className="header__login" aria-label="Войти">            <FiUser />
+          <Link to="/login" className="header__login" aria-label="Войти">
+            {" "}
+            <FiUser />
           </Link>
         </div>
       </div>

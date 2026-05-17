@@ -4,6 +4,7 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Home from './pages/Home';
 
+import ServicesListPage from "./pages/ServicesListPage";
 import Mission from './pages/Mission'
 import History from './pages/History'
 import Docs from './pages/Docs'
@@ -172,6 +173,7 @@ function App() {
 
 				<Route path='/main' element={<Home />} />
 <Route path='/mission' element={<Mission />} />
+<Route path='/services-list' element={<ServicesListPage />} />
 <Route path='/history' element={<History />} />
 <Route path='/docs' element={<Docs />} />
 <Route path='/employees' element={<Employees />} />
