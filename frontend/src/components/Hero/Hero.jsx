@@ -51,7 +51,7 @@ export default function Hero() {
               Записаться на консультацию
             </a>
 
-            <a href="#" className="hero__btn hero__btn--secondary">
+            <a href="/history" className="hero__btn hero__btn--secondary">
               Узнать больше
             </a>
           </div>

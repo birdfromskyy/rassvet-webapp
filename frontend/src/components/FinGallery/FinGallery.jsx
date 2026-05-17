@@ -111,7 +111,7 @@ function FinGallery() {
     <section className="fin-gallery">
       <div className="container">
         <div className="fin-gallery__head">
-          <span>Материальная база</span>
+          <span className="section-badge">Материальная база</span>
           <h2>Помещения и оборудование Центра</h2>
           <p>
             Информация сгруппирована по зонам, чтобы родителям было проще

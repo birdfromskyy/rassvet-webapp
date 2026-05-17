@@ -1,5 +1,4 @@
 import "./FinHero.scss";
-import finHero from "../../assets/fin-hero.png";
 
 function FinHero() {
   return (
@@ -27,14 +26,6 @@ function FinHero() {
               Игровая площадка с игровым комплексом для несовершеннолетних.
             </li>
           </ul>
-        </div>
-
-        <div className="fin-hero__image-wrap">
-          <img
-            src={finHero}
-            alt="Помещение Центра РАСсвет"
-            className="fin-hero__image"
-          />
         </div>
       </div>
     </section>

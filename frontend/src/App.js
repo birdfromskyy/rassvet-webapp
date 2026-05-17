@@ -45,6 +45,7 @@ import PrivateRoute from './components/PrivateRoute'
 import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword'
 import Profile from './pages/Profile'
+import FinActivities from './pages/FinActivities';
 
 function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -173,6 +174,7 @@ function App() {
 
 				<Route path='/main' element={<Home />} />
 <Route path='/mission' element={<Mission />} />
+<Route path='/fin-activities' element={<FinActivities />} />
 <Route path='/services-list' element={<ServicesListPage />} />
 <Route path='/history' element={<History />} />
 <Route path='/docs' element={<Docs />} />

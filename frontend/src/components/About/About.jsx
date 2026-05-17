@@ -39,7 +39,7 @@ function About() {
             </li>
           </ul>
 
-          <a href="#" className="about__btn">
+          <a href="/mission" className="about__btn">
             Подробнее о центре
           </a>
         </div>

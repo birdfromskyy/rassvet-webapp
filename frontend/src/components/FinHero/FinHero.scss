@@ -1,12 +1,12 @@
 .fin-hero {
   background: #f7f4ec;
-  padding: 90px 0 70px;
+  padding: 40px 0 70px;
   color: #074462;
 }
 
 .fin-hero__inner {
-  display: grid;
-  grid-template-columns: 1fr 520px;
+  display: block;
+  text-align: center;
   align-items: center;
   gap: 70px;
 }
@@ -26,15 +26,13 @@
   font-family: "Merriweather", serif;
   font-size: 64px;
   line-height: 1.05;
-  margin: 0 0 28px;
-  max-width: 760px;
+  margin: 0 0 40px;
 }
 
 .fin-hero__text {
-  font-size: 22px;
+  font-size: 28px;
   line-height: 1.45;
-  margin: 0 0 24px;
-  max-width: 720px;
+  margin: 0 0 36px;
 }
 
 .fin-hero__list {
@@ -48,16 +46,17 @@
   li {
     position: relative;
     padding-left: 34px;
-    font-size: 18px;
+    font-size: 23px;
     line-height: 1.45;
+    text-align: left;
 
     &::before {
       content: "✓";
       position: absolute;
       left: 0;
       top: 1px;
-      width: 24px;
-      height: 24px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: #f4df00;
       display: grid;

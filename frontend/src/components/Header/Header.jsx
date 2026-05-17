@@ -24,7 +24,7 @@ const dropdowns = [
       { title: "Сотрудники", path: "/employees" },
       {
         title: "Материально-техническое обеспечение",
-        path: "/available-places",
+        path: "/fin-activities",
       },
       { title: "О правилах внутреннего распорядка", path: "/internal-rules" },
       { title: "Структура организации", path: "/structure" },
