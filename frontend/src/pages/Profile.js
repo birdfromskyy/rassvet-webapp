@@ -16,6 +16,9 @@ import { toast } from 'react-toastify'
 import authService from '../services/authService'
 
 const Profile = ({ user, onUpdateUser, onLogout }) => {
+				  useEffect(() => {
+				  document.title = 'Профиль'
+				}, [])
 	const navigate = useNavigate()
 	const [formData, setFormData] = useState({
 		first_name: '',

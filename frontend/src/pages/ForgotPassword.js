@@ -14,8 +14,12 @@ import {
 } from '@mui/material'
 import { toast } from 'react-toastify'
 import authService from '../services/authService'
+import { useEffect } from 'react'
 
 const ForgotPassword = () => {
+			  useEffect(() => {
+			  document.title = 'Восстановление пароля'
+			}, [])
 	const navigate = useNavigate()
 	const [activeStep, setActiveStep] = useState(0)
 	const [email, setEmail] = useState('')

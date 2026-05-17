@@ -11,8 +11,12 @@ import {
 } from '@mui/material'
 import { toast } from 'react-toastify'
 import authService from '../services/authService'
+import { useEffect } from 'react'
 
 const Login = ({ onLogin }) => {
+		  useEffect(() => {
+		  document.title = 'Вход'
+		}, [])
 	const navigate = useNavigate()
 	const [formData, setFormData] = useState({
 		email: '',

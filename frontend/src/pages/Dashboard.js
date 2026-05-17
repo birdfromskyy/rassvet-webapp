@@ -26,6 +26,9 @@ import scheduleService from '../services/scheduleService'
 import NewsSection from '../components/NewsSection'
 
 const Dashboard = ({ user, onLogout }) => {
+				  useEffect(() => {
+				  document.title = 'Обзор'
+				}, [])
 	const navigate = useNavigate()
 	const [hasChildren, setHasChildren] = useState(false)
 
@@ -65,7 +68,7 @@ const Dashboard = ({ user, onLogout }) => {
 							variant='contained'
 							color='primary'
 							onClick={() =>
-								window.open('http://localhost:8080/main', '_blank')
+								window.open('http://localhost:3000/main', '_blank')
 							}
 							sx={{
 								borderRadius: '12px',
