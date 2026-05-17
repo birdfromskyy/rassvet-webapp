@@ -284,7 +284,7 @@ const AdminUsers = () => {
 						>
 							Создать пользователя
 						</Button>
-						<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')}>
+						<Button startIcon={<BackIcon />} onClick={() => navigate(-1)}>
 							Назад
 						</Button>
 					</Box>

@@ -1,42 +1,18 @@
+import { useState, useEffect } from "react";
 import "./HistoryTimeline.scss";
+import { historyService } from "../../services/cmsService";
 
-const timeline = [
-  {
-    year: "2022",
-    items: [
-      "1 июля — создание организации.",
-      "Реализован проект «Тренировочная квартира для детей с РАС» на средства гранта губернатора ХМАО-Югры.",
-    ],
-  },
-  {
-    year: "2023",
-    items: [
-      "Реализован проект «Включение в городскую среду детей с РАС» на средства гранта «Родные города».",
-      "Победа в региональном этапе конкурса «Мой добрый бизнес — 2023».",
-      "Победа в премии «Признание» в номинации «Милосердие без границ».",
-      "Участие во Всероссийском инклюзивном фестивале «#ЛюдиКакЛюди».",
-    ],
-  },
-  {
-    year: "2024",
-    items: [
-      "ТОП-1000 проекта «Сильные идеи для нового времени».",
-      "Реализован проект «Отпуск как отпуск» на средства гранта губернатора ХМАО-Югры.",
-      "Сотрудничество со студентами ЮГУ в рамках проекта «Обучение служением».",
-      "Участие во Всероссийском инклюзивном фестивале «#ЛюдиКакЛюди».",
-    ],
-  },
-  {
-    year: "2025",
-    items: [
-      "Участие во Всероссийском инклюзивном фестивале «#ЛюдиКакЛюди».",
-      "Сотрудничество со студентами ЮГУ в рамках проекта «Обучение служением».",
-      "Организация рабочих мест для несовершеннолетних совместно с Центром занятости населения Югры.",
-    ],
-  },
-];
+const parseJson = (str, fallback = []) => {
+  try { return JSON.parse(str); } catch { return fallback; }
+};
 
 function HistoryTimeline() {
+  const [events, setEvents] = useState([]);
+
+  useEffect(() => {
+    historyService.getAll().then(setEvents).catch(() => {});
+  }, []);
+
   return (
     <section className="history-timeline">
       <div className="container history-timeline__inner">
@@ -46,12 +22,12 @@ function HistoryTimeline() {
         </div>
 
         <div className="history-timeline__list">
-          {timeline.map((block) => (
-            <article className="history-year" key={block.year}>
+          {events.map((block) => (
+            <article className="history-year" key={block.id}>
               <div className="history-year__date">{block.year}</div>
 
               <div className="history-year__content">
-                {block.items.map((item, index) => (
+                {parseJson(block.items).map((item, index) => (
                   <p key={index}>{item}</p>
                 ))}
               </div>

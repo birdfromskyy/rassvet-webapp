@@ -38,6 +38,12 @@ import AdminSchedule from './pages/AdminSchedule'
 import AdminGroupLessons from './pages/AdminGroupLessons'
 import AdminUsers from './pages/AdminUsers'
 import AdminReports from './pages/AdminReports'
+import AdminCmsFiles from './pages/AdminCmsFiles'
+import AdminHistory from './pages/AdminHistory'
+import AdminFinZones from './pages/AdminFinZones'
+import AdminServices from './pages/AdminServices'
+import AdminSiteSettings from './pages/AdminSiteSettings'
+import AdminCMSPanel from './pages/AdminCMSPanel'
 import ChildSchedule from './pages/ChildSchedule'
 import TeacherSchedule from './pages/TeacherSchedule'
 import PrivateRoute from './components/PrivateRoute'
@@ -167,6 +173,19 @@ function App() {
 						<Route path='/admin/schedule/weekly' element={<AdminSchedule />} />
 						<Route path='/admin/schedule/reports' element={<AdminReports />} />
 						<Route path='/admin/users' element={<AdminUsers />} />
+
+						{/* CMS hub */}
+						<Route path='/admin/cms' element={<AdminCMSPanel />} />
+
+						{/* CMS routes */}
+						<Route path='/admin/cms/news' element={<AdminNews />} />
+						<Route path='/admin/cms/docs' element={<AdminCmsFiles section="docs" title="Документы" />} />
+						<Route path='/admin/cms/rules' element={<AdminCmsFiles section="rules" title="Правила внутреннего распорядка" />} />
+						<Route path='/admin/cms/rating' element={<AdminCmsFiles section="rating" title="Независимая оценка качества" />} />
+						<Route path='/admin/cms/history' element={<AdminHistory />} />
+						<Route path='/admin/cms/fin-zones' element={<AdminFinZones />} />
+						<Route path='/admin/cms/services' element={<AdminServices />} />
+						<Route path='/admin/cms/settings' element={<AdminSiteSettings />} />
 					</Route>
 				</Route>
 
