@@ -20,17 +20,17 @@ export default function Footer() {
 
           <div className="footer__col">
             <h4>О центре</h4>
-            <a href="#">Миссия и цели</a>
-            <a href="#">История и достижения</a>
-            <a href="#">Документы</a>
-            <a href="#">Сотрудники</a>
-            <a href="#">Структура организации</a>
+            <a href="/mission">Миссия и цели</a>
+            <a href="/history">История и достижения</a>
+            <a href="/docs">Документы</a>
+            <a href="/employees">Сотрудники</a>
+            <a href="/structure">Структура организации</a>
           </div>
 
           <div className="footer__col">
             <h4>Услуги</h4>
-            <a href="#">Перечень услуг</a>
-            <a href="#">Описание услуг</a>
+            <a href="/services-list">Перечень услуг</a>
+            <a href="/services-description">Описание услуг</a>
           </div>
 
           <div className="footer__col">
@@ -55,7 +55,7 @@ export default function Footer() {
             </a>
 
             <div className="footer__socials">
-              <a href="#" className="footer__social-link" aria-label="VK">
+              <a target="_blank" href="https://vk.com/rassvethm?w=club228149734" className="footer__social-link" aria-label="VK">
                 <img src={vkIcon} alt="VK" />
               </a>
               <a href="#" className="footer__social-link" aria-label="MAX">
