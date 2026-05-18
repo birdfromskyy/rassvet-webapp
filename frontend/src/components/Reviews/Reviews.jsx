@@ -50,7 +50,7 @@ function Reviews() {
           ))}
         </div>
 
-        <a href="#" className="reviews__btn">
+        <a href="/reviews" className="reviews__btn">
           Все отзывы
         </a>
       </div>
