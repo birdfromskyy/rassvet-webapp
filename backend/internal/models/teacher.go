@@ -11,6 +11,15 @@ type Teacher struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
+	// CMS fields for public /employees page
+	Category       string `json:"category" gorm:"type:varchar(100)"`            // "Руководство" | "Специалисты"
+	PhotoURL       string `json:"photo_url" gorm:"type:text"`
+	Qualifications string `json:"qualifications" gorm:"type:text"`               // JSON array of strings
+	Education      string `json:"education" gorm:"type:text"`                    // JSON array of strings
+	Experience     string `json:"experience" gorm:"type:varchar(255)"`
+	SortOrderCMS   int    `json:"sort_order_cms" gorm:"default:0"`
+	ShowOnSite     bool   `json:"show_on_site" gorm:"default:false"`
+
 	Subjects         []TeacherSubject          `json:"subjects,omitempty" gorm:"foreignKey:TeacherID"`
 	Rooms            []TeacherRoom             `json:"rooms,omitempty" gorm:"foreignKey:TeacherID"`
 	Availability     []TeacherAvailability     `json:"availability,omitempty" gorm:"foreignKey:TeacherID"`

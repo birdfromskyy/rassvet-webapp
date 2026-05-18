@@ -1,13 +1,18 @@
+import { useState, useEffect } from "react";
 import "./MissionGoals.scss";
-
-const goals = [
-  "Развивать самостоятельность ребёнка через формирование бытовых, социальных и коммуникативных навыков.",
-  "Повышать компетентность родителей в вопросах развития, воспитания и поддержки ребёнка.",
-  "Создавать условия, при которых родители могут сохранять активную социальную и трудовую жизнь.",
-  "Формировать профессиональное сообщество специалистов, работающих с детьми с особенностями развития.",
-];
+import { siteSettingService } from "../../services/cmsService";
 
 function MissionGoals() {
+  const [goals, setGoals] = useState([]);
+
+  useEffect(() => {
+    siteSettingService.getByKey("mission_goals")
+      .then(({ value }) => {
+        try { setGoals(JSON.parse(value)); } catch { setGoals([]); }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="mission-goals">
       <div className="container mission-goals__inner">
@@ -22,7 +27,6 @@ function MissionGoals() {
               <div className="mission-goal__number">
                 {String(index + 1).padStart(2, "0")}
               </div>
-
               <p>{goal}</p>
             </article>
           ))}

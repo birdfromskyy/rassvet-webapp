@@ -19,27 +19,29 @@ func NewGroupLessonHandler(db *gorm.DB) *GroupLessonHandler {
 }
 
 type CreateGroupLessonRequest struct {
-	Name             string  `json:"name" binding:"required"`
-	SubjectID        *uint   `json:"subject_id"`
-	DefaultTeacherID *uint   `json:"default_teacher_id"`
-	RoomName         string  `json:"room_name"`
-	VisitsPerWeek    int     `json:"visits_per_week" binding:"required"`
-	DurationMin      int     `json:"duration_min" binding:"required"`
-	MaxStudents      int     `json:"max_students"`
-	Status           string  `json:"status"`
-	Notes            *string `json:"notes"`
+	Name                 string  `json:"name" binding:"required"`
+	SubjectID            *uint   `json:"subject_id"`
+	DefaultTeacherID     *uint   `json:"default_teacher_id"`
+	RoomName             string  `json:"room_name"`
+	VisitsPerWeek        int     `json:"visits_per_week" binding:"required"`
+	DurationMin          int     `json:"duration_min" binding:"required"`
+	MaxStudents          int     `json:"max_students"`
+	Status               string  `json:"status"`
+	IgnoreStudentWindows bool    `json:"ignore_student_windows"`
+	Notes                *string `json:"notes"`
 }
 
 type UpdateGroupLessonRequest struct {
-	Name             string  `json:"name"`
-	SubjectID        *uint   `json:"subject_id"`
-	DefaultTeacherID *uint   `json:"default_teacher_id"`
-	RoomName         *string `json:"room_name"`
-	VisitsPerWeek    *int    `json:"visits_per_week"`
-	DurationMin      *int    `json:"duration_min"`
-	MaxStudents      *int    `json:"max_students"`
-	Status           string  `json:"status"`
-	Notes            *string `json:"notes"`
+	Name                 string  `json:"name"`
+	SubjectID            *uint   `json:"subject_id"`
+	DefaultTeacherID     *uint   `json:"default_teacher_id"`
+	RoomName             *string `json:"room_name"`
+	VisitsPerWeek        *int    `json:"visits_per_week"`
+	DurationMin          *int    `json:"duration_min"`
+	MaxStudents          *int    `json:"max_students"`
+	Status               string  `json:"status"`
+	IgnoreStudentWindows *bool   `json:"ignore_student_windows"`
+	Notes                *string `json:"notes"`
 }
 
 type CreateGroupLessonWeekOverrideRequest struct {
@@ -115,15 +117,16 @@ func (h *GroupLessonHandler) CreateGroupLesson(c *gin.Context) {
 	}
 
 	lesson := models.GroupLesson{
-		Name:             req.Name,
-		SubjectID:        req.SubjectID,
-		DefaultTeacherID: req.DefaultTeacherID,
-		RoomName:         strings.TrimSpace(req.RoomName),
-		VisitsPerWeek:    req.VisitsPerWeek,
-		DurationMin:      req.DurationMin,
-		MaxStudents:      maxStudents,
-		Status:           status,
-		Notes:            req.Notes,
+		Name:                 req.Name,
+		SubjectID:            req.SubjectID,
+		DefaultTeacherID:     req.DefaultTeacherID,
+		RoomName:             strings.TrimSpace(req.RoomName),
+		VisitsPerWeek:        req.VisitsPerWeek,
+		DurationMin:          req.DurationMin,
+		MaxStudents:          maxStudents,
+		Status:               status,
+		IgnoreStudentWindows: req.IgnoreStudentWindows,
+		Notes:                req.Notes,
 	}
 
 	if err := h.db.Create(&lesson).Error; err != nil {
@@ -180,6 +183,9 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.Status) != "" {
 		lesson.Status = req.Status
+	}
+	if req.IgnoreStudentWindows != nil {
+		lesson.IgnoreStudentWindows = *req.IgnoreStudentWindows
 	}
 	if req.Notes != nil {
 		lesson.Notes = req.Notes

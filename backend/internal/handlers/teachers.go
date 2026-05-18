@@ -18,11 +18,26 @@ func NewTeacherHandler(db *gorm.DB) *TeacherHandler {
 	return &TeacherHandler{db: db}
 }
 
+// GetPublicTeachers returns teachers marked as show_on_site=true, ordered for the public /employees page.
+func (h *TeacherHandler) GetPublicTeachers(c *gin.Context) {
+	var teachers []models.Teacher
+	h.db.Where("show_on_site = ?", true).Order("sort_order_cms ASC, id ASC").Find(&teachers)
+	c.JSON(http.StatusOK, teachers)
+}
+
 type CreateTeacherRequest struct {
 	FullName string  `json:"full_name" binding:"required"`
 	Phone    *string `json:"phone"`
 	IsActive *bool   `json:"is_active"`
 	Notes    *string `json:"notes"`
+	// CMS fields
+	Category       string `json:"category"`
+	PhotoURL       string `json:"photo_url"`
+	Qualifications string `json:"qualifications"`
+	Education      string `json:"education"`
+	Experience     string `json:"experience"`
+	SortOrderCMS   int    `json:"sort_order_cms"`
+	ShowOnSite     *bool  `json:"show_on_site"`
 }
 
 type UpdateTeacherRequest struct {
@@ -30,6 +45,14 @@ type UpdateTeacherRequest struct {
 	Phone    *string `json:"phone"`
 	IsActive *bool   `json:"is_active"`
 	Notes    *string `json:"notes"`
+	// CMS fields
+	Category       string `json:"category"`
+	PhotoURL       string `json:"photo_url"`
+	Qualifications string `json:"qualifications"`
+	Education      string `json:"education"`
+	Experience     string `json:"experience"`
+	SortOrderCMS   int    `json:"sort_order_cms"`
+	ShowOnSite     *bool  `json:"show_on_site"`
 }
 
 type UpdateTeacherSubjectsRequest struct {
@@ -111,14 +134,26 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 		isActive = *req.IsActive
 	}
 
-	teacher := models.Teacher{
-		FullName: req.FullName,
-		Phone:    normalizeOptionalString(req.Phone),
-		IsActive: isActive,
-		Notes:    normalizeOptionalString(req.Notes),
+	showOnSite := false
+	if req.ShowOnSite != nil {
+		showOnSite = *req.ShowOnSite
 	}
 
-	if err := h.db.Select("FullName", "Phone", "IsActive", "Notes").Create(&teacher).Error; err != nil {
+	teacher := models.Teacher{
+		FullName:       req.FullName,
+		Phone:          normalizeOptionalString(req.Phone),
+		IsActive:       isActive,
+		Notes:          normalizeOptionalString(req.Notes),
+		Category:       req.Category,
+		PhotoURL:       req.PhotoURL,
+		Qualifications: req.Qualifications,
+		Education:      req.Education,
+		Experience:     req.Experience,
+		SortOrderCMS:   req.SortOrderCMS,
+		ShowOnSite:     showOnSite,
+	}
+
+	if err := h.db.Create(&teacher).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher"})
 		return
 	}
@@ -179,6 +214,17 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 
 	if req.Notes != nil {
 		teacher.Notes = normalizeOptionalString(req.Notes)
+	}
+
+	// CMS fields — always update (allow clearing)
+	teacher.Category = req.Category
+	teacher.PhotoURL = req.PhotoURL
+	teacher.Qualifications = req.Qualifications
+	teacher.Education = req.Education
+	teacher.Experience = req.Experience
+	teacher.SortOrderCMS = req.SortOrderCMS
+	if req.ShowOnSite != nil {
+		teacher.ShowOnSite = *req.ShowOnSite
 	}
 
 	if err := h.db.Save(&teacher).Error; err != nil {

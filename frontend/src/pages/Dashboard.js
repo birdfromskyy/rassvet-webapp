@@ -19,6 +19,7 @@ import {
 	Person as PersonIcon,
 	CalendarMonth as ScheduleIcon,
 	ChildCare as ChildIcon,
+	Web as WebIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import authService from '../services/authService'
@@ -200,21 +201,6 @@ const Dashboard = ({ user, onLogout }) => {
 									>
 										Отзывы
 									</Button>
-									<Button
-										size='small'
-										variant='contained'
-										color='secondary'
-										onClick={() =>
-											window.open(
-												process.env.REACT_APP_DIRECTUS_URL ||
-													'http://localhost:8055',
-												'_blank',
-											)
-										}
-										sx={{ ml: 1 }}
-									>
-										Статьи
-									</Button>
 								</CardActions>
 							</Card>
 						</Grid>
@@ -240,6 +226,32 @@ const Dashboard = ({ user, onLogout }) => {
 										variant='contained'
 										color='success'
 										onClick={() => navigate('/admin/schedule')}
+									>
+										Открыть
+									</Button>
+								</CardActions>
+							</Card>
+						</Grid>
+					)}
+
+					{user?.role === 'admin' && (
+						<Grid item xs={12} md={4}>
+							<Card>
+								<CardContent>
+									<Box display='flex' alignItems='center' mb={2}>
+										<WebIcon sx={{ fontSize: 40, mr: 2, color: 'info.main' }} />
+										<Typography variant='h5'>Сайт</Typography>
+									</Box>
+									<Typography variant='body2' color='text.secondary'>
+										Управление контентом публичных страниц
+									</Typography>
+								</CardContent>
+								<CardActions>
+									<Button
+										size='small'
+										variant='contained'
+										color='info'
+										onClick={() => navigate('/admin/cms')}
 									>
 										Открыть
 									</Button>
