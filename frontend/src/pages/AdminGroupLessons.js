@@ -4,6 +4,7 @@ import {
 	Alert,
 	Box,
 	Button,
+	Checkbox,
 	Chip,
 	CircularProgress,
 	Container,
@@ -13,6 +14,7 @@ import {
 	DialogTitle,
 	Divider,
 	FormControl,
+	FormControlLabel,
 	IconButton,
 	InputLabel,
 	List,
@@ -37,8 +39,10 @@ import {
 	ArrowBack as BackIcon,
 	Delete as DeleteIcon,
 	Edit as EditIcon,
+	Pause as PauseIcon,
 	PersonAdd as PersonAddIcon,
 	PersonRemove as PersonRemoveIcon,
+	PlayArrow as PlayIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -52,6 +56,7 @@ const EMPTY_FORM = {
 	max_students: 10,
 	status: 'active',
 	notes: '',
+	ignore_student_windows: false,
 }
 
 const AdminGroupLessons = () => {
@@ -109,6 +114,7 @@ const AdminGroupLessons = () => {
 			max_students: group.max_students || 10,
 			status: group.status || 'active',
 			notes: group.notes || '',
+			ignore_student_windows: group.ignore_student_windows || false,
 		})
 		setFormOpen(true)
 	}
@@ -129,6 +135,7 @@ const AdminGroupLessons = () => {
 			max_students: Number(formData.max_students),
 			status: formData.status,
 			notes: formData.notes.trim() || null,
+			ignore_student_windows: formData.ignore_student_windows,
 		}
 
 		try {
@@ -143,6 +150,17 @@ const AdminGroupLessons = () => {
 			load()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка сохранения')
+		}
+	}
+
+	const toggleStatus = async group => {
+		const newStatus = group.status === 'active' ? 'paused' : 'active'
+		try {
+			await scheduleService.updateGroupLesson(group.id, { status: newStatus })
+			toast.success(newStatus === 'active' ? 'Группа возобновлена' : 'Группа приостановлена')
+			load()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка')
 		}
 	}
 
@@ -263,6 +281,11 @@ const AdminGroupLessons = () => {
 										<Tooltip title='Состав группы'>
 											<IconButton size='small' onClick={() => openEnroll(g)}><PersonAddIcon fontSize='small' /></IconButton>
 										</Tooltip>
+										<Tooltip title={g.status === 'active' ? 'Приостановить' : 'Возобновить'}>
+											<IconButton size='small' color={g.status === 'active' ? 'warning' : 'success'} onClick={() => toggleStatus(g)}>
+												{g.status === 'active' ? <PauseIcon fontSize='small' /> : <PlayIcon fontSize='small' />}
+											</IconButton>
+										</Tooltip>
 										<Tooltip title='Редактировать'>
 											<IconButton size='small' onClick={() => openEdit(g)}><EditIcon fontSize='small' /></IconButton>
 										</Tooltip>
@@ -338,6 +361,15 @@ const AdminGroupLessons = () => {
 						label='Примечания' fullWidth multiline rows={2}
 						value={formData.notes}
 						onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
+					/>
+					<FormControlLabel
+						control={
+							<Checkbox
+								checked={formData.ignore_student_windows}
+								onChange={e => setFormData(p => ({ ...p, ignore_student_windows: e.target.checked }))}
+							/>
+						}
+						label='Игнорировать окна детей при расстановке (не проверять пересечение доступности и максимальный разрыв)'
 					/>
 				</DialogContent>
 				<DialogActions>

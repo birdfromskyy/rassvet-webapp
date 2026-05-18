@@ -554,6 +554,16 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if claims, err := utils.ValidateToken(tokenString, h.cfg.JWTSecret); err == nil {
+			ttl := time.Until(claims.ExpiresAt.Time)
+			if ttl > 0 {
+				_ = h.rdb.Set(context.Background(), "blacklist:"+tokenString, "1", ttl).Err()
+			}
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 

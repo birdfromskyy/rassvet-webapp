@@ -662,7 +662,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 
 	if strings.TrimSpace(req.Status) != "" {
 		switch req.Status {
-		case models.ScheduleSlotStatusScheduled, models.ScheduleSlotStatusMoved, models.ScheduleSlotStatusCancelled:
+		case models.ScheduleSlotStatusScheduled, models.ScheduleSlotStatusMoved, models.ScheduleSlotStatusCancelled, models.ScheduleSlotStatusConducted:
 			slot.Status = req.Status
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot status"})
@@ -670,11 +670,13 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		}
 	}
 
-	slot.Origin = models.ScheduleSlotOriginManual
-
-	if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		return
+	structuralChange := req.RoomID != nil || req.Weekday != nil || req.StartTime != "" || req.EndTime != "" || strings.TrimSpace(req.RoomName) != ""
+	if structuralChange {
+		slot.Origin = models.ScheduleSlotOriginManual
+		if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	if err := h.db.Save(&slot).Error; err != nil {
@@ -822,6 +824,87 @@ func (h *ScheduleHandler) ClearAutoSchedule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear generation issues"})
 		return
 	}
+
+	h.respondWithSchedule(c, &schedule)
+}
+
+func (h *ScheduleHandler) GetSlotBackup(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	var backups []models.ScheduleSlotBackup
+	if err := h.db.Where("schedule_id = ?", scheduleID).Order("weekday ASC, start_time ASC").Find(&backups).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch backup"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"backups": backups, "count": len(backups)})
+}
+
+func (h *ScheduleHandler) RestoreSlotBackup(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	var schedule models.Schedule
+	if err := h.db.First(&schedule, scheduleID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		return
+	}
+
+	var backups []models.ScheduleSlotBackup
+	if err := h.db.Where("schedule_id = ?", scheduleID).Find(&backups).Error; err != nil || len(backups) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Нет сохранённого бэкапа для этого расписания"})
+		return
+	}
+
+	if err := h.generator.CleanupAutoSlots(schedule.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось очистить авто-слоты"})
+		return
+	}
+	if err := h.generator.CleanupGenerationIssues(schedule.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось очистить диагностику"})
+		return
+	}
+
+	slots := make([]models.ScheduleSlot, 0, len(backups))
+	for _, b := range backups {
+		slots = append(slots, models.ScheduleSlot{
+			ScheduleID:    b.ScheduleID,
+			SlotType:      b.SlotType,
+			AssignmentID:  b.AssignmentID,
+			GroupLessonID: b.GroupLessonID,
+			StudentID:     b.StudentID,
+			TeacherID:     b.TeacherID,
+			SubjectID:     b.SubjectID,
+			RoomID:        b.RoomID,
+			RoomName:      b.RoomName,
+			Weekday:       b.Weekday,
+			StartTime:     b.StartTime,
+			EndTime:       b.EndTime,
+			Origin:        b.Origin,
+			Status:        b.Status,
+		})
+	}
+
+	if err := h.db.Create(&slots).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить слоты из бэкапа"})
+		return
+	}
+
+	now := time.Now()
+	schedule.GeneratedAt = &now
+	schedule.Status = models.ScheduleStatusDraft
+	h.db.Save(&schedule)
 
 	h.respondWithSchedule(c, &schedule)
 }

@@ -47,6 +47,7 @@ import {
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import scheduleService from "../services/scheduleService";
+import { uploadFile, getUploadUrl } from "../services/cmsService";
 
 const WEEKDAY_FULL = {
   1: "Понедельник",
@@ -63,6 +64,13 @@ const EMPTY_TEACHER = {
   phone: "",
   is_active: true,
   notes: "",
+  category: "",
+  photo_url: "",
+  qualifications: "",
+  education: "",
+  experience: "",
+  sort_order_cms: 0,
+  show_on_site: false,
 };
 
 const EMPTY_AVAIL = { weekday: 1, start_time: "09:00", end_time: "18:00" };
@@ -130,17 +138,31 @@ const AdminTeachers = () => {
     setEditDialog({ open: true, item: null });
   };
 
+  const parseJsonToLines = (str) => {
+    try { return JSON.parse(str || "[]").join("\n"); } catch { return str || ""; }
+  };
+
   const openEdit = (item) => {
     setForm({
       full_name: item.full_name,
       phone: item.phone || "",
       is_active: item.is_active,
       notes: item.notes || "",
+      category: item.category || "",
+      photo_url: item.photo_url || "",
+      qualifications: parseJsonToLines(item.qualifications),
+      education: parseJsonToLines(item.education),
+      experience: item.experience || "",
+      sort_order_cms: item.sort_order_cms ?? 0,
+      show_on_site: item.show_on_site ?? false,
     });
     setEditDialog({ open: true, item });
   };
 
   const closeEdit = () => setEditDialog({ open: false, item: null });
+
+  const linesToJson = (str) =>
+    JSON.stringify(str.split("\n").map((s) => s.trim()).filter(Boolean));
 
   const saveTeacher = async () => {
     if (!form.full_name.trim()) {
@@ -153,6 +175,13 @@ const AdminTeachers = () => {
         phone: form.phone || null,
         is_active: form.is_active,
         notes: form.notes || null,
+        category: form.category || "",
+        photo_url: form.photo_url || "",
+        qualifications: linesToJson(form.qualifications),
+        education: linesToJson(form.education),
+        experience: form.experience || "",
+        sort_order_cms: Number(form.sort_order_cms) || 0,
+        show_on_site: form.show_on_site,
       };
       if (editDialog.item) {
         await scheduleService.updateTeacher(editDialog.item.id, data);
@@ -165,6 +194,18 @@ const AdminTeachers = () => {
       loadAll();
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка сохранения");
+    }
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const url = await uploadFile(file);
+      setForm((f) => ({ ...f, photo_url: url }));
+      toast.success("Фото загружено");
+    } catch {
+      toast.error("Ошибка загрузки фото");
     }
   };
 
@@ -340,7 +381,7 @@ const AdminTeachers = () => {
             </Button>
             <Button
               startIcon={<BackIcon />}
-              onClick={() => navigate("/admin/schedule")}
+              onClick={() => navigate(-1)}
             >
               Назад
             </Button>
@@ -373,8 +414,10 @@ const AdminTeachers = () => {
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>ФИО</TableCell>
+                  <TableCell>Категория</TableCell>
                   <TableCell>Телефон</TableCell>
                   <TableCell>Статус</TableCell>
+                  <TableCell>На сайте</TableCell>
                   <TableCell align="center">Действия</TableCell>
                 </TableRow>
               </TableHead>
@@ -387,11 +430,19 @@ const AdminTeachers = () => {
                     <TableRow key={t.id}>
                       <TableCell>{t.id}</TableCell>
                       <TableCell>{t.full_name}</TableCell>
+                      <TableCell>{t.category || "—"}</TableCell>
                       <TableCell>{t.phone || "—"}</TableCell>
                       <TableCell>
                         <Chip
                           label={t.is_active ? "Активен" : "Неактивен"}
                           color={t.is_active ? "success" : "default"}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={t.show_on_site ? "Да" : "Нет"}
+                          color={t.show_on_site ? "primary" : "default"}
                           size="small"
                         />
                       </TableCell>
@@ -453,7 +504,7 @@ const AdminTeachers = () => {
                   ))}
                 {!teachers.length && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={7} align="center">
                       <Typography color="text.secondary">
                         Преподаватели не найдены
                       </Typography>
@@ -470,7 +521,7 @@ const AdminTeachers = () => {
       <Dialog
         open={editDialog.open}
         onClose={closeEdit}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>
@@ -512,6 +563,99 @@ const AdminTeachers = () => {
               }
               label="Активен"
             />
+
+            <Divider textAlign="left">
+              <Typography variant="caption" color="text.secondary">
+                Данные для сайта
+              </Typography>
+            </Divider>
+
+            <FormControl fullWidth>
+              <InputLabel>Категория</InputLabel>
+              <Select
+                value={form.category}
+                label="Категория"
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+              >
+                <MenuItem value="">— не указано —</MenuItem>
+                <MenuItem value="Руководство">Руководство</MenuItem>
+                <MenuItem value="Специалисты">Специалисты</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Фото
+              </Typography>
+              <Box display="flex" alignItems="center" gap={2}>
+                {form.photo_url && (
+                  <img
+                    src={getUploadUrl(form.photo_url)}
+                    alt="preview"
+                    style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 4 }}
+                  />
+                )}
+                <Button variant="outlined" component="label" size="small">
+                  Загрузить фото
+                  <input type="file" accept="image/*" hidden onChange={handlePhotoUpload} />
+                </Button>
+                {form.photo_url && (
+                  <Button size="small" color="error" onClick={() => setForm((f) => ({ ...f, photo_url: "" }))}>
+                    Удалить
+                  </Button>
+                )}
+              </Box>
+            </Box>
+
+            <TextField
+              label="Квалификация / должность (каждая строчка — отдельный пункт)"
+              value={form.qualifications}
+              onChange={(e) => setForm({ ...form, qualifications: e.target.value })}
+              fullWidth
+              multiline
+              rows={3}
+              placeholder={"Педагог дополнительного образования\nМетодист"}
+            />
+
+            <TextField
+              label="Образование (каждая строчка — отдельный пункт)"
+              value={form.education}
+              onChange={(e) => setForm({ ...form, education: e.target.value })}
+              fullWidth
+              multiline
+              rows={3}
+              placeholder={"Московский педагогический университет, 2005\nКурсы повышения квалификации, 2020"}
+            />
+
+            <TextField
+              label="Опыт работы"
+              value={form.experience}
+              onChange={(e) => setForm({ ...form, experience: e.target.value })}
+              fullWidth
+              placeholder="15 лет"
+            />
+
+            <Box display="flex" gap={2} alignItems="center">
+              <TextField
+                label="Порядок сортировки на сайте"
+                type="number"
+                value={form.sort_order_cms}
+                onChange={(e) => setForm({ ...form, sort_order_cms: e.target.value })}
+                sx={{ width: 220 }}
+                inputProps={{ min: 0 }}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.show_on_site}
+                    onChange={(e) =>
+                      setForm({ ...form, show_on_site: e.target.checked })
+                    }
+                  />
+                }
+                label="Показывать на сайте"
+              />
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>

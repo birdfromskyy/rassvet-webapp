@@ -61,10 +61,24 @@ func Migrate(db *gorm.DB) {
 		&models.ScheduleSlot{},
 		&models.ScheduleSlotExclusion{},
 		&models.ScheduleGenerationIssue{},
+		&models.ScheduleSlotBackup{},
 		&models.UserStudent{},
+
+		// CMS models (Employee removed — teachers table is used instead)
+		&models.CmsFile{},
+		&models.HistoryEvent{},
+		&models.Article{},
+		&models.ArticleBlock{},
+		&models.ServiceItem{},
+		&models.FinZone{},
+		&models.SiteSetting{},
 	)
 
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
+
+	// Create unique indexes manually to avoid GORM's DROP CONSTRAINT without IF EXISTS bug
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_key ON site_settings(key)")
 }

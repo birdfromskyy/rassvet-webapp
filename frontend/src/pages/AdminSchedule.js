@@ -50,7 +50,9 @@ import {
 	Edit as EditIcon,
 	Delete as DeleteIcon,
 	CheckCircle as ApproveIcon,
+	CheckCircleOutline as ConductedIcon,
 	Cancel as UnapproveIcon,
+	CancelOutlined as CancelSlotIcon,
 	Refresh as ResetIcon,
 	AutoAwesome as GenerateIcon,
 	ExpandMore as ExpandIcon,
@@ -60,6 +62,8 @@ import {
 	TableChart as ExcelIcon,
 	Lock as LockIcon,
 	LockOpen as LockOpenIcon,
+	Schedule as ScheduledIcon,
+	PeopleAlt as AttendanceIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -85,12 +89,14 @@ const STATUS_LABELS = {
 	archived: 'Архив',
 }
 const SLOT_STATUS_COLORS = {
-	scheduled: 'success',
+	scheduled: 'default',
+	conducted: 'success',
 	moved: 'warning',
 	cancelled: 'error',
 }
 const SLOT_STATUS_LABELS = {
 	scheduled: 'Запланировано',
+	conducted: 'Проведено',
 	moved: 'Перенесено',
 	cancelled: 'Отменено',
 }
@@ -143,9 +149,15 @@ const getSlotDuration = slot => {
 
 const formatWeekLabel = weekStart => {
 	const weekEnd = new Date(weekStart)
-	weekEnd.setDate(weekEnd.getDate() + 5)
+	weekEnd.setDate(weekEnd.getDate() + 6)
 	const opts = { day: 'numeric', month: 'long' }
 	return `${weekStart.toLocaleDateString('ru-RU', opts)} — ${weekEnd.toLocaleDateString('ru-RU', { ...opts, year: 'numeric' })}`
+}
+
+const getWeekdayDate = (weekStart, day) => {
+	const d = new Date(weekStart)
+	d.setDate(d.getDate() + day - 1)
+	return d
 }
 
 const AdminSchedule = () => {
@@ -155,6 +167,10 @@ const AdminSchedule = () => {
 	const [loading, setLoading] = useState(false)
 	const [generating, setGenerating] = useState(false)
 	const [generationProgress, setGenerationProgress] = useState(null)
+	const [pastWeekConfirm, setPastWeekConfirm] = useState({ open: false, message: '' })
+	const [pastWeekCountdown, setPastWeekCountdown] = useState(0)
+	const pendingPastWeekAction = useRef(null)
+	const [attendanceDialog, setAttendanceDialog] = useState({ open: false, slot: null })
 
 	// Reference data for dialogs and filters
 	const [assignments, setAssignments] = useState([])
@@ -273,13 +289,29 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const generate = async () => {
-		if (
-			!window.confirm(
-				`Сгенерировать расписание на неделю ${formatWeekLabel(weekStart)}?`,
-			)
-		)
-			return
+	const isPastWeek = weekStart < getMonday(new Date())
+
+	const openPastWeekConfirm = (message, action) => {
+		pendingPastWeekAction.current = action
+		setPastWeekCountdown(5)
+		setPastWeekConfirm({ open: true, message })
+		const timer = setInterval(() => {
+			setPastWeekCountdown(prev => {
+				if (prev <= 1) { clearInterval(timer); return 0 }
+				return prev - 1
+			})
+		}, 1000)
+	}
+
+	const confirmPastWeekAction = () => {
+		setPastWeekConfirm({ open: false, message: '' })
+		if (pendingPastWeekAction.current) {
+			pendingPastWeekAction.current()
+			pendingPastWeekAction.current = null
+		}
+	}
+
+	const doGenerate = async () => {
 		setGenerating(true)
 		setGenerationProgress({ percent: 0, message: 'Запуск генерации...' })
 		try {
@@ -291,6 +323,40 @@ const AdminSchedule = () => {
 		} finally {
 			setGenerating(false)
 			setGenerationProgress(null)
+		}
+	}
+
+	const generate = () => {
+		if (isPastWeek) {
+			openPastWeekConfirm(
+				`Сгенерировать расписание на прошедшую неделю ${formatWeekLabel(weekStart)}? Авто-слоты будут пересозданы.`,
+				doGenerate,
+			)
+		} else {
+			if (!window.confirm(`Сгенерировать расписание на неделю ${formatWeekLabel(weekStart)}?`)) return
+			doGenerate()
+		}
+	}
+
+	const restoreBackup = async () => {
+		if (!scheduleData?.schedule?.id) return
+		if (!window.confirm('Восстановить предыдущую авто-генерацию? Текущие авто-слоты будут заменены.')) return
+		try {
+			const data = await scheduleService.restoreSlotBackup(scheduleData.schedule.id)
+			if (data.slots) setScheduleData(data)
+			else await loadSchedule()
+			toast.success('Предыдущая генерация восстановлена')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Нет сохранённого бэкапа или ошибка восстановления')
+		}
+	}
+
+	const markSlotStatus = async (slot, newStatus) => {
+		try {
+			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, { status: newStatus })
+			loadSchedule()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка обновления статуса')
 		}
 	}
 
@@ -316,19 +382,11 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const resetAuto = async () => {
-		if (
-			!window.confirm(
-				'Удалить авто-слоты и перегенерировать? Ручные слоты сохранятся.',
-			)
-		)
-			return
+	const doResetAuto = async () => {
 		setGenerating(true)
 		setGenerationProgress({ percent: 0, message: 'Запуск пересчёта...' })
 		try {
-			const job = await scheduleService.startResetAutoSchedule(
-				scheduleData.schedule.id,
-			)
+			const job = await scheduleService.startResetAutoSchedule(scheduleData.schedule.id)
 			setGenerationProgress(job)
 			await pollGenerationJob(job.id, 'Авто-слоты сброшены и пересчитаны')
 		} catch (e) {
@@ -339,15 +397,33 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const clearAuto = async () => {
-		if (!window.confirm('Удалить все авто-слоты? Ручные слоты сохранятся. Перегенерации не будет.'))
-			return
+	const resetAuto = () => {
+		const doIt = () => doResetAuto()
+		if (isPastWeek) {
+			openPastWeekConfirm('Удалить авто-слоты прошедшей недели и перегенерировать? Ручные слоты сохранятся.', doIt)
+		} else {
+			if (!window.confirm('Удалить авто-слоты и перегенерировать? Ручные слоты сохранятся.')) return
+			doIt()
+		}
+	}
+
+	const doClearAuto = async () => {
 		try {
 			const data = await scheduleService.clearAutoSchedule(scheduleData.schedule.id)
 			setScheduleData(data)
 			toast.success('Авто-слоты очищены')
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка очистки')
+		}
+	}
+
+	const clearAuto = () => {
+		const doIt = () => doClearAuto()
+		if (isPastWeek) {
+			openPastWeekConfirm('Удалить все авто-слоты прошедшей недели? Ручные слоты сохранятся. Перегенерации не будет.', doIt)
+		} else {
+			if (!window.confirm('Удалить все авто-слоты? Ручные слоты сохранятся. Перегенерации не будет.')) return
+			doIt()
 		}
 	}
 
@@ -811,6 +887,23 @@ const AdminSchedule = () => {
 		}
 	}
 
+	const handleToggleAttendance = async (studentId, isCurrentlyExcluded) => {
+		const slot = attendanceDialog.slot
+		try {
+			if (isCurrentlyExcluded) {
+				await scheduleService.removeSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
+			} else {
+				await scheduleService.addSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
+			}
+			const data = await scheduleService.getScheduleByWeek(weekStartISO)
+			setScheduleData(data)
+			const updatedSlot = data.slots?.find(s => s.id === slot.id)
+			if (updatedSlot) setAttendanceDialog(prev => ({ ...prev, slot: updatedSlot }))
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка')
+		}
+	}
+
 	const handleAddStudentToGroupSlot = async () => {
 		const slot = editDialog.slot
 		if (!slot?.group_lesson_id || !addGroupStudentId) return
@@ -979,8 +1072,9 @@ const AdminSchedule = () => {
 							startIcon={<GenerateIcon />}
 							onClick={generate}
 							disabled={generating}
+							color={isPastWeek ? 'warning' : 'primary'}
 						>
-							{generating ? 'Генерация...' : 'Сгенерировать расписание'}
+							{generating ? 'Генерация...' : isPastWeek ? '⚠ Сгенерировать расписание' : 'Сгенерировать расписание'}
 						</Button>
 					)}
 
@@ -999,17 +1093,27 @@ const AdminSchedule = () => {
 								startIcon={<ResetIcon />}
 								onClick={resetAuto}
 								disabled={generating}
+								color={isPastWeek ? 'warning' : 'inherit'}
 							>
-								{generating ? 'Пересчёт...' : 'Сбросить авто'}
+								{generating ? 'Пересчёт...' : isPastWeek ? '⚠ Сбросить авто' : 'Сбросить авто'}
 							</Button>
 							<Button
 								variant='outlined'
-								color='error'
 								startIcon={<ClearIcon />}
 								onClick={clearAuto}
 								disabled={generating}
+								color={isPastWeek ? 'warning' : 'error'}
 							>
-								Очистить авто
+								{isPastWeek ? '⚠ Очистить авто' : 'Очистить авто'}
+							</Button>
+							<Button
+								variant='outlined'
+								color='secondary'
+								onClick={restoreBackup}
+								disabled={generating}
+								title='Восстановить предыдущую авто-генерацию'
+							>
+								↩ Восстановить бэкап
 							</Button>
 						</>
 					)}
@@ -1246,7 +1350,10 @@ const AdminSchedule = () => {
 									variant='h6'
 									sx={{ mb: 1, color: 'primary.main', fontWeight: 600 }}
 								>
-									{WEEKDAY_NAMES[day]}
+									{WEEKDAY_NAMES[day]}{' '}
+									<Typography component='span' variant='body1' color='text.secondary' fontWeight={400}>
+										{getWeekdayDate(weekStart, day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
+									</Typography>
 								</Typography>
 								<TableContainer>
 									<Table size='small'>
@@ -1328,6 +1435,28 @@ const AdminSchedule = () => {
 															>
 																<LockOpenIcon fontSize='small' />
 															</IconButton>
+														)}
+														{/* Attendance quick actions */}
+														{slot.slot_type === 'group' && (
+															<Tooltip title='Посещаемость группы'>
+																<IconButton size='small' color='info' onClick={() => setAttendanceDialog({ open: true, slot })}>
+																	<AttendanceIcon fontSize='small' />
+																</IconButton>
+															</Tooltip>
+														)}
+														{slot.status !== 'cancelled' && (
+															<Tooltip title='Отменить занятие'>
+																<IconButton size='small' color='error' onClick={() => markSlotStatus(slot, 'cancelled')}>
+																	<CancelSlotIcon fontSize='small' />
+																</IconButton>
+															</Tooltip>
+														)}
+														{slot.status === 'cancelled' && (
+															<Tooltip title='Занятие всё же было — вернуть'>
+																<IconButton size='small' color='success' onClick={() => markSlotStatus(slot, 'scheduled')}>
+																	<ConductedIcon fontSize='small' />
+																</IconButton>
+															</Tooltip>
 														)}
 														<IconButton
 															size='small'
@@ -1807,6 +1936,7 @@ const AdminSchedule = () => {
 								}
 							>
 								<MenuItem value='scheduled'>Запланировано</MenuItem>
+								<MenuItem value='conducted'>Проведено</MenuItem>
 								<MenuItem value='moved'>Перенесено</MenuItem>
 								<MenuItem value='cancelled'>Отменено</MenuItem>
 							</Select>
@@ -1905,6 +2035,79 @@ const AdminSchedule = () => {
 					<Button onClick={saveEditSlot} variant='contained'>
 						Сохранить
 					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Past Week Confirmation Dialog */}
+			<Dialog
+				open={pastWeekConfirm.open}
+				onClose={() => setPastWeekConfirm({ open: false, message: '' })}
+				maxWidth='xs'
+				fullWidth
+			>
+				<DialogTitle sx={{ color: 'warning.main' }}>⚠ Прошедшая неделя</DialogTitle>
+				<DialogContent>
+					<Typography>{pastWeekConfirm.message}</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setPastWeekConfirm({ open: false, message: '' })}>Отмена</Button>
+					<Button
+						variant='contained'
+						color='warning'
+						disabled={pastWeekCountdown > 0}
+						onClick={confirmPastWeekAction}
+					>
+						{pastWeekCountdown > 0 ? `Подтвердить (${pastWeekCountdown})` : 'Подтвердить'}
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Attendance Dialog for group slots */}
+			<Dialog
+				open={attendanceDialog.open}
+				onClose={() => setAttendanceDialog({ open: false, slot: null })}
+				maxWidth='xs'
+				fullWidth
+			>
+				<DialogTitle>
+					Посещаемость
+					<Typography variant='caption' display='block' color='text.secondary'>
+						{attendanceDialog.slot?.group_lesson?.name} · {WEEKDAY_NAMES[attendanceDialog.slot?.weekday]} {attendanceDialog.slot?.start_time}–{attendanceDialog.slot?.end_time}
+					</Typography>
+				</DialogTitle>
+				<DialogContent>
+					{(!attendanceDialog.slot?.group_lesson?.enrollments || attendanceDialog.slot.group_lesson.enrollments.length === 0) && (
+						<Typography variant='body2' color='text.secondary'>В группе нет учеников</Typography>
+					)}
+					<List dense disablePadding>
+						{(attendanceDialog.slot?.group_lesson?.enrollments || []).map(enr => {
+							const isAbsent = attendanceDialog.slot?.exclusions?.some(ex => ex.student_id === enr.student_id)
+							return (
+								<ListItem key={enr.id} disableGutters>
+									<ListItemText
+										primary={enr.student?.full_name || `Ученик #${enr.student_id}`}
+										secondary={isAbsent ? 'Отсутствовал' : 'Присутствовал'}
+										primaryTypographyProps={{ sx: isAbsent ? { color: 'text.secondary', textDecoration: 'line-through' } : {} }}
+										secondaryTypographyProps={{ color: isAbsent ? 'error' : 'success.main' }}
+									/>
+									<ListItemSecondaryAction>
+										<Tooltip title={isAbsent ? 'Отметить присутствие' : 'Отметить отсутствие'}>
+											<IconButton
+												size='small'
+												color={isAbsent ? 'success' : 'error'}
+												onClick={() => handleToggleAttendance(enr.student_id, isAbsent)}
+											>
+												{isAbsent ? <IncludeIcon fontSize='small' /> : <ExcludeIcon fontSize='small' />}
+											</IconButton>
+										</Tooltip>
+									</ListItemSecondaryAction>
+								</ListItem>
+							)
+						})}
+					</List>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setAttendanceDialog({ open: false, slot: null })}>Закрыть</Button>
 				</DialogActions>
 			</Dialog>
 
