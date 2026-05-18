@@ -19,7 +19,7 @@ import Donation from './pages/Donation'
 import SocialServiceForm from './pages/SocialServiceForm'
 
 import Login from './pages/Login'
-import Register from './pages/Register'
+import Register from './pages/Register/Register'
 import VerifyEmail from './pages/VerifyEmail'
 import Dashboard from './pages/Dashboard'
 import Reviews from './pages/Reviews'
