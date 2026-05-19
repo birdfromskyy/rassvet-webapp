@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const DefaultBreakMinutes = 10
+const DefaultBreakMinutes = 5
 const IdealStudentGapMinutes = 10
 const MaxStudentGapMinutes = 30
 const TeacherGapMinutes = 10

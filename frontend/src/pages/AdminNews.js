@@ -159,15 +159,14 @@ export default function AdminNews() {
     setBlocks(next)
   }
 
-  const handleBlockFileUpload = async (idx, e) => {
+  const handleBlockImageUpload = async (idx, e) => {
     const file = e.target.files?.[0]
     if (!file) return
     try {
       const url = await uploadFile(file)
       updateBlock(idx, { content: url })
-      toast.success('Файл загружен')
     } catch {
-      toast.error('Ошибка загрузки')
+      toast.error('Ошибка загрузки изображения')
     }
   }
 
@@ -294,7 +293,7 @@ export default function AdminNews() {
               onChange={(patch) => updateBlock(idx, patch)}
               onRemove={() => removeBlock(idx)}
               onMove={(dir) => moveBlock(idx, dir)}
-              onFileUpload={(e) => handleBlockFileUpload(idx, e)}
+              onImageUpload={(e) => handleBlockImageUpload(idx, e)}
             />
           ))}
 
@@ -327,7 +326,7 @@ export default function AdminNews() {
 
 // ── Single block editor component ──────────────────────────────────────────
 
-function BlockEditor({ block, idx, total, onChange, onRemove, onMove, onFileUpload }) {
+function BlockEditor({ block, idx, total, onChange, onRemove, onMove, onImageUpload }) {
   const typeInfo = BLOCK_TYPES.find(t => t.type === block.type) || BLOCK_TYPES[0]
   const Icon = typeInfo.icon
 
@@ -375,7 +374,7 @@ function BlockEditor({ block, idx, total, onChange, onRemove, onMove, onFileUplo
           )}
           <Button variant="outlined" component="label" size="small">
             {block.content ? 'Заменить изображение' : 'Загрузить изображение'}
-            <input type="file" accept="image/*" hidden onChange={onFileUpload} />
+            <input type="file" accept="image/*" hidden onChange={onImageUpload} />
           </Button>
           {block.content && (
             <Button size="small" color="error" sx={{ ml: 1 }}
@@ -405,15 +404,14 @@ function BlockEditor({ block, idx, total, onChange, onRemove, onMove, onFileUplo
             fullWidth
             placeholder="Скачать документ"
           />
-          <Box display="flex" alignItems="center" gap={1}>
-            <Button variant="outlined" component="label" size="small">
-              {block.content ? 'Заменить файл' : 'Загрузить файл'}
-              <input type="file" hidden onChange={onFileUpload} />
-            </Button>
-            {block.content && (
-              <Typography variant="caption" color="success.main">Файл загружен</Typography>
-            )}
-          </Box>
+          <TextField
+            label="URL файла"
+            value={block.content}
+            onChange={e => onChange({ content: e.target.value })}
+            fullWidth
+            placeholder="https://..."
+            helperText="Прямая ссылка на файл (Яндекс Диск, Google Drive и т.д.)"
+          />
         </Box>
       )}
     </Paper>

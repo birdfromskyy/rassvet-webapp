@@ -557,9 +557,12 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		slot.GroupLessonID = &req.GroupLessonID
 	}
 
-	if err := h.ensureSlotHasNoConflicts(slot, 0); err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		return
+	force := c.Query("force") == "true"
+	if !force {
+		if err := h.ensureSlotHasNoConflicts(slot, 0); err != nil {
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	if err := h.db.Create(&slot).Error; err != nil {
@@ -673,6 +676,18 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	structuralChange := req.RoomID != nil || req.Weekday != nil || req.StartTime != "" || req.EndTime != "" || strings.TrimSpace(req.RoomName) != ""
 	if structuralChange {
 		slot.Origin = models.ScheduleSlotOriginManual
+		// Validate room-subject compatibility when room changes on individual slots
+		if req.RoomID != nil && slot.SubjectID != nil && slot.SlotType == models.SlotTypeIndividual {
+			var roomSubject models.RoomSubject
+			if err := h.db.Where("room_id = ? AND subject_id = ?", *req.RoomID, *slot.SubjectID).First(&roomSubject).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "room is not allowed for this subject"})
+					return
+				}
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate room-subject"})
+				return
+			}
+		}
 		if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
@@ -828,23 +843,7 @@ func (h *ScheduleHandler) ClearAutoSchedule(c *gin.Context) {
 	h.respondWithSchedule(c, &schedule)
 }
 
-func (h *ScheduleHandler) GetSlotBackup(c *gin.Context) {
-	scheduleID, err := strconv.Atoi(c.Param("id"))
-	if err != nil || scheduleID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
-		return
-	}
-
-	var backups []models.ScheduleSlotBackup
-	if err := h.db.Where("schedule_id = ?", scheduleID).Order("weekday ASC, start_time ASC").Find(&backups).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch backup"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"backups": backups, "count": len(backups)})
-}
-
-func (h *ScheduleHandler) RestoreSlotBackup(c *gin.Context) {
+func (h *ScheduleHandler) ClearManualSlots(c *gin.Context) {
 	scheduleID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || scheduleID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
@@ -861,50 +860,105 @@ func (h *ScheduleHandler) RestoreSlotBackup(c *gin.Context) {
 		return
 	}
 
-	var backups []models.ScheduleSlotBackup
-	if err := h.db.Where("schedule_id = ?", scheduleID).Find(&backups).Error; err != nil || len(backups) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Нет сохранённого бэкапа для этого расписания"})
+	if err := h.db.Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginManual).
+		Delete(&models.ScheduleSlot{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete manual slots"})
 		return
 	}
 
-	if err := h.generator.CleanupAutoSlots(schedule.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось очистить авто-слоты"})
-		return
-	}
-	if err := h.generator.CleanupGenerationIssues(schedule.ID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось очистить диагностику"})
-		return
-	}
+	h.respondWithSchedule(c, &schedule)
+}
 
-	slots := make([]models.ScheduleSlot, 0, len(backups))
-	for _, b := range backups {
-		slots = append(slots, models.ScheduleSlot{
-			ScheduleID:    b.ScheduleID,
-			SlotType:      b.SlotType,
-			AssignmentID:  b.AssignmentID,
-			GroupLessonID: b.GroupLessonID,
-			StudentID:     b.StudentID,
-			TeacherID:     b.TeacherID,
-			SubjectID:     b.SubjectID,
-			RoomID:        b.RoomID,
-			RoomName:      b.RoomName,
-			Weekday:       b.Weekday,
-			StartTime:     b.StartTime,
-			EndTime:       b.EndTime,
-			Origin:        b.Origin,
-			Status:        b.Status,
-		})
+func (h *ScheduleHandler) CreateEmptySchedule(c *gin.Context) {
+	var req struct {
+		WeekStartDate string `json:"week_start_date" binding:"required"`
 	}
-
-	if err := h.db.Create(&slots).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить слоты из бэкапа"})
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	now := time.Now()
-	schedule.GeneratedAt = &now
-	schedule.Status = models.ScheduleStatusDraft
-	h.db.Save(&schedule)
+	weekStart, err := time.Parse("2006-01-02", req.WeekStartDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start_date must be in YYYY-MM-DD format"})
+		return
+	}
+
+	var existing models.Schedule
+	if err := h.db.Where("week_start_date = ?", weekStart).First(&existing).Error; err == nil {
+		h.respondWithSchedule(c, &existing)
+		return
+	}
+
+	weekEnd := weekStart.AddDate(0, 0, 6)
+	schedule := models.Schedule{
+		WeekStartDate: weekStart,
+		WeekEndDate:   weekEnd,
+		Status:        models.ScheduleStatusDraft,
+	}
+	if err := h.db.Create(&schedule).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create schedule"})
+		return
+	}
+
+	h.respondWithSchedule(c, &schedule)
+}
+
+func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule id"})
+		return
+	}
+
+	var schedule models.Schedule
+	if err := h.db.First(&schedule, scheduleID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		return
+	}
+
+	prevWeekStart := schedule.WeekStartDate.AddDate(0, 0, -7)
+	var prevSchedule models.Schedule
+	if err := h.db.Where("week_start_date = ?", prevWeekStart).First(&prevSchedule).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Расписание прошлой недели не найдено"})
+		return
+	}
+
+	var prevManualSlots []models.ScheduleSlot
+	if err := h.db.Where("schedule_id = ? AND origin = ?", prevSchedule.ID, models.ScheduleSlotOriginManual).
+		Find(&prevManualSlots).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch previous week slots"})
+		return
+	}
+
+	if len(prevManualSlots) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Нет ручных слотов в расписании прошлой недели"})
+		return
+	}
+
+	for _, s := range prevManualSlots {
+		newSlot := models.ScheduleSlot{
+			ScheduleID:    schedule.ID,
+			SlotType:      s.SlotType,
+			AssignmentID:  s.AssignmentID,
+			GroupLessonID: s.GroupLessonID,
+			StudentID:     s.StudentID,
+			TeacherID:     s.TeacherID,
+			SubjectID:     s.SubjectID,
+			RoomID:        s.RoomID,
+			RoomName:      s.RoomName,
+			Weekday:       s.Weekday,
+			StartTime:     s.StartTime,
+			EndTime:       s.EndTime,
+			Origin:        models.ScheduleSlotOriginManual,
+			Status:        models.ScheduleSlotStatusScheduled,
+		}
+		h.db.Create(&newSlot)
+	}
 
 	h.respondWithSchedule(c, &schedule)
 }
@@ -943,8 +997,18 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		return
 	}
 
-	totalRequested := h.countRequestedVisitsFromSchedule(schedule)
-	scheduled := len(slots)
+	indRequested, grpRequested := h.countRequestedVisitsFromSchedule(schedule)
+	var indScheduled, grpScheduled int
+	for _, s := range slots {
+		if s.Status == models.ScheduleSlotStatusCancelled {
+			continue
+		}
+		if s.GroupLessonID != nil {
+			grpScheduled++
+		} else {
+			indScheduled++
+		}
+	}
 	unplaced := len(issues)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -961,15 +1025,20 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		"slots":  slots,
 		"issues": issues,
 		"stats": gin.H{
-			"total_requested": totalRequested,
-			"scheduled":       scheduled,
-			"unplaced":        unplaced,
+			"total_requested":  indRequested + grpRequested,
+			"ind_requested":    indRequested,
+			"grp_requested":    grpRequested,
+			"scheduled":        indScheduled + grpScheduled,
+			"ind_scheduled":    indScheduled,
+			"grp_scheduled":    grpScheduled,
+			"unplaced":         unplaced,
 		},
 	})
 }
 
-func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Schedule) int {
-	total := 0
+func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Schedule) (int, int) {
+	individual := 0
+	group := 0
 
 	assignmentOverrides := map[uint]models.AssignmentWeekOverride{}
 	var overrides []models.AssignmentWeekOverride
@@ -986,10 +1055,10 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 				if override.Status == models.AssignmentStatusPaused {
 					continue
 				}
-				total += override.PlannedVisits
+				individual += override.PlannedVisits
 				continue
 			}
-			total += a.VisitsPerWeek
+			individual += a.VisitsPerWeek
 		}
 	}
 
@@ -1009,17 +1078,17 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 					continue
 				}
 				if override.PlannedVisits != nil {
-					total += *override.PlannedVisits
+					group += *override.PlannedVisits
 				} else {
-					total += g.VisitsPerWeek
+					group += g.VisitsPerWeek
 				}
 				continue
 			}
-			total += g.VisitsPerWeek
+			group += g.VisitsPerWeek
 		}
 	}
 
-	return total
+	return individual, group
 }
 
 func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, teacherID, subjectID, roomID uint) error {
@@ -1080,8 +1149,7 @@ func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, exc
 			continue
 		}
 
-		existingStart, existingEnd := applyManualBreakBuffer(existing.StartTime, existing.EndTime, services.DefaultBreakMinutes)
-		if !manualTimesOverlap(bufferedStart, bufferedEnd, existingStart, existingEnd) {
+		if !manualTimesOverlap(bufferedStart, bufferedEnd, existing.StartTime, existing.EndTime) {
 			continue
 		}
 
