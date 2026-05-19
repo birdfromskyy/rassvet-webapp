@@ -209,6 +209,13 @@ const AdminSchedule = () => {
 	const [conflictDialog, setConflictDialog] = useState({ open: false, conflicts: [], deleteConflicts: true })
 	const pendingSlotAction = useRef(null)
 
+	// Approve-blocking conflict dialog
+	const [approveConflictDialog, setApproveConflictDialog] = useState({ open: false, pairs: [] })
+
+	// Delete manual slots confirmation dialog
+	const [deleteManualDialog, setDeleteManualDialog] = useState({ open: false, countdown: 5 })
+	const deleteManualTimerRef = useRef(null)
+
 	const weekStartISO = formatDateISO(weekStart)
 
 	const loadSchedule = useCallback(async () => {
@@ -289,7 +296,9 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const isPastWeek = weekStart < getMonday(new Date())
+	const currentMonday = getMonday(new Date())
+	const isPastWeek = weekStart < currentMonday
+	const isCurrentWeek = weekStart.getTime() === currentMonday.getTime()
 
 	const openPastWeekConfirm = (message, action) => {
 		pendingPastWeekAction.current = action
@@ -333,21 +342,7 @@ const AdminSchedule = () => {
 				doGenerate,
 			)
 		} else {
-			if (!window.confirm(`Сгенерировать расписание на неделю ${formatWeekLabel(weekStart)}?`)) return
 			doGenerate()
-		}
-	}
-
-	const restoreBackup = async () => {
-		if (!scheduleData?.schedule?.id) return
-		if (!window.confirm('Восстановить предыдущую авто-генерацию? Текущие авто-слоты будут заменены.')) return
-		try {
-			const data = await scheduleService.restoreSlotBackup(scheduleData.schedule.id)
-			if (data.slots) setScheduleData(data)
-			else await loadSchedule()
-			toast.success('Предыдущая генерация восстановлена')
-		} catch (e) {
-			toast.error(e.response?.data?.error || 'Нет сохранённого бэкапа или ошибка восстановления')
 		}
 	}
 
@@ -360,8 +355,38 @@ const AdminSchedule = () => {
 		}
 	}
 
+	const findAllConflictPairs = () => {
+		const slots = scheduleData?.slots?.filter(s => s.status !== 'cancelled') || []
+		const pairs = []
+		for (let i = 0; i < slots.length; i++) {
+			for (let j = i + 1; j < slots.length; j++) {
+				const a = slots[i]
+				const b = slots[j]
+				if (a.weekday !== b.weekday) continue
+				const aStart = timeToMinutes(a.start_time)
+				const aEnd = timeToMinutes(a.end_time)
+				const bStart = timeToMinutes(b.start_time)
+				const bEnd = timeToMinutes(b.end_time)
+				if (!(aStart < bEnd + 5 && aEnd > bStart - 5)) continue
+				const sameTeacher = a.teacher_id === b.teacher_id
+				const sameRoom = a.room_id && b.room_id && a.room_id === b.room_id
+				const studentA = getSlotStudentIds(a)
+				const studentB = getSlotStudentIds(b)
+				const sameStudent = studentA.some(id => studentB.includes(id))
+				if (sameTeacher || sameRoom || sameStudent) {
+					pairs.push({ a, b })
+				}
+			}
+		}
+		return pairs
+	}
+
 	const approve = async () => {
-		if (!window.confirm('Утвердить расписание?')) return
+		const pairs = findAllConflictPairs()
+		if (pairs.length > 0) {
+			setApproveConflictDialog({ open: true, pairs })
+			return
+		}
 		try {
 			await scheduleService.approveSchedule(scheduleData.schedule.id)
 			toast.success('Расписание утверждено')
@@ -372,7 +397,6 @@ const AdminSchedule = () => {
 	}
 
 	const unapprove = async () => {
-		if (!window.confirm('Снять утверждение? Расписание вернётся в статус "Черновик".')) return
 		try {
 			await scheduleService.unapproveSchedule(scheduleData.schedule.id)
 			toast.success('Утверждение снято')
@@ -402,7 +426,6 @@ const AdminSchedule = () => {
 		if (isPastWeek) {
 			openPastWeekConfirm('Удалить авто-слоты прошедшей недели и перегенерировать? Ручные слоты сохранятся.', doIt)
 		} else {
-			if (!window.confirm('Удалить авто-слоты и перегенерировать? Ручные слоты сохранятся.')) return
 			doIt()
 		}
 	}
@@ -422,8 +445,50 @@ const AdminSchedule = () => {
 		if (isPastWeek) {
 			openPastWeekConfirm('Удалить все авто-слоты прошедшей недели? Ручные слоты сохранятся. Перегенерации не будет.', doIt)
 		} else {
-			if (!window.confirm('Удалить все авто-слоты? Ручные слоты сохранятся. Перегенерации не будет.')) return
 			doIt()
+		}
+	}
+
+	const copyManualFromPrevWeek = async () => {
+		if (!scheduleData?.schedule?.id) return
+		try {
+			const data = await scheduleService.copyManualSlotsFromPrevWeek(scheduleData.schedule.id)
+			setScheduleData(data)
+			toast.success('Ручные слоты из прошлой недели скопированы')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Нет ручных слотов в прошлой неделе или ошибка')
+		}
+	}
+
+	const openDeleteManualDialog = () => {
+		setDeleteManualDialog({ open: true, countdown: 5 })
+		let count = 5
+		deleteManualTimerRef.current = setInterval(() => {
+			count -= 1
+			setDeleteManualDialog(prev => ({ ...prev, countdown: count }))
+			if (count <= 0) {
+				clearInterval(deleteManualTimerRef.current)
+				deleteManualTimerRef.current = null
+			}
+		}, 1000)
+	}
+
+	const closeDeleteManualDialog = () => {
+		if (deleteManualTimerRef.current) {
+			clearInterval(deleteManualTimerRef.current)
+			deleteManualTimerRef.current = null
+		}
+		setDeleteManualDialog({ open: false, countdown: 5 })
+	}
+
+	const doDeleteManualSlots = async () => {
+		closeDeleteManualDialog()
+		try {
+			const data = await scheduleService.clearManualSlots(scheduleData.schedule.id)
+			setScheduleData(data)
+			toast.success('Ручные слоты удалены')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления ручных слотов')
 		}
 	}
 
@@ -653,10 +718,18 @@ const AdminSchedule = () => {
 		setCreateDialog(true)
 	}
 
-	const doCreateSlot = async () => {
+	const doCreateSlot = async (force = false) => {
 		let assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
 		const groupLesson = groupLessons.find(g => g.id === Number(slotForm.group_lesson_id))
 		try {
+			// Create empty schedule for the week if none exists yet
+			let scheduleId = scheduleData?.schedule?.id
+			if (!scheduleId) {
+				const newSchedule = await scheduleService.createEmptySchedule(weekStartISO)
+				setScheduleData(newSchedule)
+				scheduleId = newSchedule.schedule.id
+			}
+
 			if (slotForm.slot_type === 'individual' && !assignment) {
 				assignment = assignments.find(a =>
 					a.student_id === Number(slotForm.student_id) &&
@@ -700,7 +773,7 @@ const AdminSchedule = () => {
 					start_time: slotForm.start_time,
 					end_time: slotForm.end_time,
 				}
-			await scheduleService.createSlot(scheduleData.schedule.id, payload)
+			await scheduleService.createSlot(scheduleId, payload, force)
 			toast.success('Слот добавлен')
 			setCreateDialog(false)
 			loadSchedule()
@@ -828,7 +901,6 @@ const AdminSchedule = () => {
 
 	const pinSlotAsManual = async slot => {
 		if (slot.origin !== 'auto') return
-		if (!window.confirm('Закрепить это занятие как ручное? При следующей генерации оно не будет удалено.')) return
 		try {
 			await scheduleService.pinSlot(scheduleData.schedule.id, slot.id)
 			toast.success('Занятие закреплено')
@@ -840,7 +912,6 @@ const AdminSchedule = () => {
 
 	const unpinSlotAsAuto = async slot => {
 		if (slot.origin !== 'manual') return
-		if (!window.confirm('\u041f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u044d\u0442\u043e \u0437\u0430\u043d\u044f\u0442\u0438\u0435 \u0432 \u0430\u0432\u0442\u043e? \u041f\u0440\u0438 \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0439 \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u0438 \u043e\u043d\u043e \u043c\u043e\u0436\u0435\u0442 \u0431\u044b\u0442\u044c \u0443\u0434\u0430\u043b\u0435\u043d\u043e \u0438 \u043f\u0435\u0440\u0435\u0441\u043e\u0437\u0434\u0430\u043d\u043e.')) return
 		try {
 			await scheduleService.unpinSlot(scheduleData.schedule.id, slot.id)
 			toast.success('\u0417\u0430\u043d\u044f\u0442\u0438\u0435 \u0441\u043d\u043e\u0432\u0430 \u0430\u0432\u0442\u043e')
@@ -960,6 +1031,7 @@ const AdminSchedule = () => {
 	}
 
 	const handleConflictConfirm = async () => {
+		const force = !conflictDialog.deleteConflicts
 		try {
 			if (conflictDialog.deleteConflicts) {
 				for (const s of conflictDialog.conflicts) {
@@ -968,7 +1040,7 @@ const AdminSchedule = () => {
 			}
 			setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })
 			if (pendingSlotAction.current) {
-				await pendingSlotAction.current()
+				await pendingSlotAction.current(force)
 				pendingSlotAction.current = null
 			}
 		} catch (e) {
@@ -1047,9 +1119,20 @@ const AdminSchedule = () => {
 					</IconButton>
 					<Typography
 						variant='h6'
-						sx={{ minWidth: 320, textAlign: 'center', fontWeight: 500 }}
+						sx={{
+							minWidth: 320, textAlign: 'center', fontWeight: 500,
+							...(isCurrentWeek && {
+								color: 'primary.main',
+								fontWeight: 700,
+							}),
+						}}
 					>
 						{formatWeekLabel(weekStart)}
+						{isCurrentWeek && (
+							<Typography component='span' variant='caption' sx={{ ml: 1, color: 'primary.main', fontWeight: 400 }}>
+								(текущая неделя)
+							</Typography>
+						)}
 					</Typography>
 					<IconButton onClick={nextWeek} size='large'>
 						<ChevronRight />
@@ -1066,9 +1149,10 @@ const AdminSchedule = () => {
 						/>
 					)}
 
-					{!schedule && !loading && (
+					{/* Generate — visible when no schedule or draft */}
+					{(isDraft || (!schedule && !loading)) && (
 						<Button
-							variant='contained'
+							variant={!schedule ? 'contained' : 'outlined'}
 							startIcon={<GenerateIcon />}
 							onClick={generate}
 							disabled={generating}
@@ -1078,42 +1162,42 @@ const AdminSchedule = () => {
 						</Button>
 					)}
 
-					{isDraft && (
+					{/* Draft-mode buttons — visible in draft OR when no schedule (disabled when no schedule) */}
+					{(isDraft || (!schedule && !loading)) && (
 						<>
 							<Button
 								variant='contained'
 								color='success'
 								startIcon={<ApproveIcon />}
 								onClick={approve}
+								disabled={!schedule}
 							>
 								Утвердить
 							</Button>
 							<Button
 								variant='outlined'
-								startIcon={<ResetIcon />}
-								onClick={resetAuto}
-								disabled={generating}
-								color={isPastWeek ? 'warning' : 'inherit'}
-							>
-								{generating ? 'Пересчёт...' : isPastWeek ? '⚠ Сбросить авто' : 'Сбросить авто'}
-							</Button>
-							<Button
-								variant='outlined'
 								startIcon={<ClearIcon />}
 								onClick={clearAuto}
-								disabled={generating}
+								disabled={!schedule || generating}
 								color={isPastWeek ? 'warning' : 'error'}
 							>
 								{isPastWeek ? '⚠ Очистить авто' : 'Очистить авто'}
 							</Button>
 							<Button
 								variant='outlined'
-								color='secondary'
-								onClick={restoreBackup}
-								disabled={generating}
-								title='Восстановить предыдущую авто-генерацию'
+								color='inherit'
+								onClick={copyManualFromPrevWeek}
+								disabled={!schedule || generating}
 							>
-								↩ Восстановить бэкап
+								Скопировать ручные слоты
+							</Button>
+							<Button
+								variant='outlined'
+								color='error'
+								onClick={openDeleteManualDialog}
+								disabled={!schedule}
+							>
+								Удалить ручные слоты
 							</Button>
 						</>
 					)}
@@ -1129,7 +1213,8 @@ const AdminSchedule = () => {
 						</Button>
 					)}
 
-					{canAddSlot && (
+					{/* Add Slot — always visible, creates schedule if needed */}
+					{(canAddSlot || (!schedule && !loading)) && (
 						<Button
 							variant='outlined'
 							startIcon={<AddIcon />}
@@ -1138,25 +1223,49 @@ const AdminSchedule = () => {
 							Добавить слот
 						</Button>
 					)}
-					{schedule && (
-						<Button
-							variant='outlined'
-							color='success'
-							startIcon={<ExcelIcon />}
-							onClick={exportTeachersToExcel}
-						>
-							Экспорт преподавателей
-						</Button>
+
+					{/* Export — visible in draft or no-schedule states, disabled when no schedule */}
+					{(isDraft || (!schedule && !loading)) && (
+						<>
+							<Button
+								variant='outlined'
+								color='success'
+								startIcon={<ExcelIcon />}
+								onClick={exportTeachersToExcel}
+								disabled={!schedule}
+							>
+								Экспорт преподавателей
+							</Button>
+							<Button
+								variant='outlined'
+								color='success'
+								startIcon={<ExcelIcon />}
+								onClick={exportStudentsToExcel}
+								disabled={!schedule}
+							>
+								Экспорт детей
+							</Button>
+						</>
 					)}
-					{schedule && (
-						<Button
-							variant='outlined'
-							color='success'
-							startIcon={<ExcelIcon />}
-							onClick={exportStudentsToExcel}
-						>
-							Экспорт детей
-						</Button>
+					{isApproved && (
+						<>
+							<Button
+								variant='outlined'
+								color='success'
+								startIcon={<ExcelIcon />}
+								onClick={exportTeachersToExcel}
+							>
+								Экспорт преподавателей
+							</Button>
+							<Button
+								variant='outlined'
+								color='success'
+								startIcon={<ExcelIcon />}
+								onClick={exportStudentsToExcel}
+							>
+								Экспорт детей
+							</Button>
+						</>
 					)}
 				</Box>
 
@@ -1298,6 +1407,9 @@ const AdminSchedule = () => {
 								<Typography variant='body2' color='text.secondary'>
 									Запрошено занятий
 								</Typography>
+								<Typography variant='caption' color='text.disabled'>
+									{stats.ind_requested} инд. + {stats.grp_requested} групп.
+								</Typography>
 							</Grid>
 							<Grid item xs={4}>
 								<Typography variant='h4' color='success.main'>
@@ -1305,6 +1417,9 @@ const AdminSchedule = () => {
 								</Typography>
 								<Typography variant='body2' color='text.secondary'>
 									Поставлено
+								</Typography>
+								<Typography variant='caption' color='text.disabled'>
+									{stats.ind_scheduled} инд. + {stats.grp_scheduled} групп.
 								</Typography>
 							</Grid>
 							<Grid item xs={4}>
@@ -2152,6 +2267,70 @@ const AdminSchedule = () => {
 					</Button>
 					<Button onClick={handleConflictConfirm} variant='contained' color='error'>
 						Поставить занятие
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Approve: conflicts exist dialog */}
+			<Dialog
+				open={approveConflictDialog.open}
+				onClose={() => setApproveConflictDialog({ open: false, pairs: [] })}
+				maxWidth='sm'
+				fullWidth
+			>
+				<DialogTitle>Нельзя утвердить: есть конфликты</DialogTitle>
+				<DialogContent>
+					<Alert severity='error' sx={{ mb: 2 }}>
+						Найдено {approveConflictDialog.pairs.length} конфликтующих пар занятий. Исправьте их перед утверждением.
+					</Alert>
+					<List dense>
+						{approveConflictDialog.pairs.map(({ a, b }, i) => (
+							<ListItem key={i} disableGutters sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+								<ListItemText
+									primary={`Конфликт ${i + 1}`}
+									secondary={
+										<>
+											<span style={{ display: 'block' }}>• {describeConflictingSlot(a)}</span>
+											<span style={{ display: 'block' }}>• {describeConflictingSlot(b)}</span>
+										</>
+									}
+								/>
+								<Divider sx={{ width: '100%', mt: 1 }} />
+							</ListItem>
+						))}
+					</List>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setApproveConflictDialog({ open: false, pairs: [] })}>
+						Закрыть
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Delete manual slots confirmation dialog */}
+			<Dialog
+				open={deleteManualDialog.open}
+				onClose={closeDeleteManualDialog}
+				maxWidth='xs'
+				fullWidth
+			>
+				<DialogTitle>Удалить ручные слоты?</DialogTitle>
+				<DialogContent>
+					<Typography variant='body2'>
+						Вы уверены, что хотите удалить все ручные слоты? Авто-слоты останутся без изменений.
+					</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={closeDeleteManualDialog}>Отмена</Button>
+					<Button
+						variant='contained'
+						color='error'
+						onClick={doDeleteManualSlots}
+						disabled={deleteManualDialog.countdown > 0}
+					>
+						{deleteManualDialog.countdown > 0
+							? `Удалить (${deleteManualDialog.countdown})`
+							: 'Удалить'}
 					</Button>
 				</DialogActions>
 			</Dialog>

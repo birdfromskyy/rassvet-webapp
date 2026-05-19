@@ -270,8 +270,15 @@ const scheduleService = {
 	},
 
 	// ========== SCHEDULE SLOTS ==========
-	createSlot: async (scheduleId, data) => {
-		const r = await api.post(`/admin/schedules/${scheduleId}/slots`, data)
+	createEmptySchedule: async (weekStartDate) => {
+		const r = await api.post('/admin/schedules', { week_start_date: weekStartDate })
+		return r.data
+	},
+	createSlot: async (scheduleId, data, force = false) => {
+		const url = force
+			? `/admin/schedules/${scheduleId}/slots?force=true`
+			: `/admin/schedules/${scheduleId}/slots`
+		const r = await api.post(url, data)
 		return r.data
 	},
 	updateSlot: async (scheduleId, slotId, data) => {
@@ -318,12 +325,12 @@ const scheduleService = {
 		const r = await api.get('/admin/reports/monthly', { params })
 		return r.data
 	},
-	getSlotBackup: async scheduleId => {
-		const r = await api.get(`/admin/schedules/${scheduleId}/backup`)
+	clearManualSlots: async scheduleId => {
+		const r = await api.post(`/admin/schedules/${scheduleId}/clear-manual`)
 		return r.data
 	},
-	restoreSlotBackup: async scheduleId => {
-		const r = await api.post(`/admin/schedules/${scheduleId}/restore-backup`)
+	copyManualSlotsFromPrevWeek: async scheduleId => {
+		const r = await api.post(`/admin/schedules/${scheduleId}/copy-manual-from-prev-week`)
 		return r.data
 	},
 	// ========== USERS (admin) ==========

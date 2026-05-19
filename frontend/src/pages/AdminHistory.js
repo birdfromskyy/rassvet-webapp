@@ -30,7 +30,7 @@ export default function AdminHistory() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm(emptyForm)
+    setForm({ ...emptyForm, sort_order: events.length })
     setItemsText('')
     setOpen(true)
   }

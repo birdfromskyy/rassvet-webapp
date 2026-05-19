@@ -7,7 +7,7 @@ import {
   Switch, FormControlLabel, Chip, CircularProgress,
 } from '@mui/material'
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, ArrowBack as BackIcon } from '@mui/icons-material'
-import { cmsFileService, uploadFile, getUploadUrl } from '../services/cmsService'
+import { cmsFileService, getUploadUrl } from '../services/cmsService'
 
 const emptyForm = { title: '', description: '', file_url: '', sort_order: 0, is_active: true }
 
@@ -19,7 +19,6 @@ export default function AdminCmsFiles({ section, title }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -38,18 +37,6 @@ export default function AdminCmsFiles({ section, title }) {
     setEditing(file)
     setForm({ ...file })
     setOpen(true)
-  }
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const url = await uploadFile(file)
-      setForm(f => ({ ...f, file_url: url }))
-    } finally {
-      setUploading(false)
-    }
   }
 
   const handleSave = async () => {
@@ -152,20 +139,14 @@ export default function AdminCmsFiles({ section, title }) {
           <TextField label="Описание (необязательно)" value={form.description} fullWidth multiline rows={2}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
 
-          <Box>
-            <Typography variant="body2" color="text.secondary" mb={1}>Файл PDF</Typography>
-            {form.file_url && (
-              <Box mb={1}>
-                <a href={getUploadUrl(form.file_url)} target="_blank" rel="noreferrer">
-                  Текущий файл
-                </a>
-              </Box>
-            )}
-            <Button variant="outlined" component="label" disabled={uploading}>
-              {uploading ? 'Загружается...' : 'Загрузить файл'}
-              <input type="file" accept=".pdf,.doc,.docx" hidden onChange={handleFileUpload} />
-            </Button>
-          </Box>
+          <TextField
+            label="URL файла"
+            value={form.file_url}
+            fullWidth
+            onChange={e => setForm(f => ({ ...f, file_url: e.target.value }))}
+            helperText="Вставьте прямую ссылку на файл (Яндекс Диск, Google Drive и т.д.)"
+            placeholder="https://..."
+          />
 
           <TextField label="Порядок отображения" type="number" value={form.sort_order}
             helperText="Меньшее число — выше в списке"

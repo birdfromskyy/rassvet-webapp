@@ -95,6 +95,14 @@ const NewsDetail = () => {
 		return `https://vk.com/video_ext.php?oid=${ownerId}&id=${videoId}&hd=2`
 	}
 
+	const getUrlBasename = (url) => {
+		try {
+			return decodeURIComponent(url.split('/').pop().split('?')[0]) || null
+		} catch {
+			return null
+		}
+	}
+
 	const renderBlock = (block, index) => {
 		if (!block?.type) return null
 
@@ -165,7 +173,7 @@ const NewsDetail = () => {
 							<Box display='flex' alignItems='center' gap={1}>
 								<Download />
 								<Link href={fileUrl} target='_blank' rel='noopener noreferrer' underline='hover'>
-									{block.title || 'Скачать файл'}
+									{block.title || getUrlBasename(block.content) || 'Скачать файл'}
 								</Link>
 							</Box>
 						</Paper>

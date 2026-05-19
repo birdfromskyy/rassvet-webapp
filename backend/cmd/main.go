@@ -211,6 +211,7 @@ func main() {
 			// Schedules
 			admin.GET("/schedules", scheduleHandler.GetScheduleByWeek)
 			admin.GET("/schedules/:id", scheduleHandler.GetScheduleByID)
+			admin.POST("/schedules", scheduleHandler.CreateEmptySchedule)
 			admin.POST("/schedules/generate", scheduleHandler.GenerateSchedule)
 			admin.POST("/schedules/generate/async", scheduleHandler.StartGenerateSchedule)
 			admin.GET("/schedule-generation-jobs/:jobId", scheduleHandler.GetGenerationJob)
@@ -226,8 +227,8 @@ func main() {
 			admin.POST("/schedules/:id/slots/:slotId/exclusions", scheduleHandler.AddSlotExclusion)
 			admin.DELETE("/schedules/:id/slots/:slotId/exclusions/:studentId", scheduleHandler.RemoveSlotExclusion)
 			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
-			admin.GET("/schedules/:id/backup", scheduleHandler.GetSlotBackup)
-			admin.POST("/schedules/:id/restore-backup", scheduleHandler.RestoreSlotBackup)
+			admin.POST("/schedules/:id/clear-manual", scheduleHandler.ClearManualSlots)
+			admin.POST("/schedules/:id/copy-manual-from-prev-week", scheduleHandler.CopyManualSlotsFromPrevWeek)
 
 			// Group lessons
 			admin.GET("/group-lessons", groupLessonHandler.GetGroupLessons)
