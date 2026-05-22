@@ -27,8 +27,7 @@ type CreateAssignmentRequest struct {
 	VisitsPerWeek   int     `json:"visits_per_week" binding:"required"`
 	DurationMin     int     `json:"duration_min" binding:"required"`
 	Status          string  `json:"status"`
-	AllowSubstitute *bool   `json:"allow_substitute"`
-	Notes           *string `json:"notes"`
+	AllowSubstitute *bool `json:"allow_substitute"`
 }
 
 type UpdateAssignmentRequest struct {
@@ -39,8 +38,7 @@ type UpdateAssignmentRequest struct {
 	VisitsPerWeek   *int    `json:"visits_per_week"`
 	DurationMin     *int    `json:"duration_min"`
 	Status          string  `json:"status"`
-	AllowSubstitute *bool   `json:"allow_substitute"`
-	Notes           *string `json:"notes"`
+	AllowSubstitute *bool `json:"allow_substitute"`
 }
 
 type CreateAssignmentWeekOverrideRequest struct {
@@ -300,7 +298,6 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		DurationMin:     req.DurationMin,
 		Status:          status,
 		AllowSubstitute: allowSubstitute,
-		Notes:           normalizeOptionalString(req.Notes),
 	}
 
 	if err := h.db.Create(&assignment).Error; err != nil {
@@ -408,10 +405,6 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if req.AllowSubstitute != nil {
 		assignment.AllowSubstitute = *req.AllowSubstitute
-	}
-
-	if req.Notes != nil {
-		assignment.Notes = normalizeOptionalString(req.Notes)
 	}
 
 	if newStudentID != assignment.StudentID {

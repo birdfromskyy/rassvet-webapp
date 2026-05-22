@@ -6,7 +6,6 @@ type Room struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	Name      string    `json:"name" gorm:"type:varchar(255);not null;uniqueIndex"`
 	IsActive  bool      `json:"is_active" gorm:"not null;default:true"`
-	Notes     *string   `json:"notes,omitempty" gorm:"type:text"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 

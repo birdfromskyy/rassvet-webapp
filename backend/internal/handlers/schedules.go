@@ -570,6 +570,10 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		return
 	}
 
+	if slot.SlotType == models.SlotTypeGroup && slot.GroupLessonID != nil {
+		h.populateGroupAttendance(slot.ID, *slot.GroupLessonID)
+	}
+
 	if err := h.db.
 		Preload("Student").
 		Preload("Teacher").
@@ -804,6 +808,10 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 		return
 	}
 
+	// Delete attendance records first (cascade may not be applied in all DB states)
+	h.db.Where("schedule_slot_id = ?", slot.ID).Delete(&models.GroupLessonAttendance{})
+	h.db.Where("schedule_slot_id = ?", slot.ID).Delete(&models.ScheduleSlotExclusion{})
+
 	if err := h.db.Delete(&slot).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete schedule slot"})
 		return
@@ -1009,6 +1017,22 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 			indScheduled++
 		}
 	}
+
+	configErrorCodes := map[string]bool{
+		models.IssueReasonNoTeacherTime:      true,
+		models.IssueReasonNoStudentTime:      true,
+		models.IssueReasonNoRoom:             true,
+		models.IssueReasonStrictRoomNoSubject: true,
+		models.IssueReasonDistributionFailed: true,
+	}
+	var configErrors, conflictErrors int
+	for _, issue := range issues {
+		if configErrorCodes[issue.ReasonCode] {
+			configErrors++
+		} else {
+			conflictErrors++
+		}
+	}
 	unplaced := len(issues)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -1032,6 +1056,8 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 			"ind_scheduled":    indScheduled,
 			"grp_scheduled":    grpScheduled,
 			"unplaced":         unplaced,
+			"config_errors":    configErrors,
+			"conflict_errors":  conflictErrors,
 		},
 	})
 }
@@ -1059,32 +1085,6 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 				continue
 			}
 			individual += a.VisitsPerWeek
-		}
-	}
-
-	groupOverrides := map[uint]models.GroupLessonWeekOverride{}
-	var groupWeekOverrides []models.GroupLessonWeekOverride
-	if err := h.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&groupWeekOverrides).Error; err == nil {
-		for _, o := range groupWeekOverrides {
-			groupOverrides[o.GroupLessonID] = o
-		}
-	}
-
-	var groupLessons []models.GroupLesson
-	if err := h.db.Where("status = ?", models.GroupLessonStatusActive).Find(&groupLessons).Error; err == nil {
-		for _, g := range groupLessons {
-			if override, ok := groupOverrides[g.ID]; ok {
-				if override.Status == models.GroupLessonStatusPaused {
-					continue
-				}
-				if override.PlannedVisits != nil {
-					group += *override.PlannedVisits
-				} else {
-					group += g.VisitsPerWeek
-				}
-				continue
-			}
-			group += g.VisitsPerWeek
 		}
 	}
 
@@ -1382,4 +1382,17 @@ func (h *ScheduleHandler) RemoveSlotExclusion(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Исключение снято"})
+}
+
+func (h *ScheduleHandler) populateGroupAttendance(slotID, groupLessonID uint) {
+	var enrollments []models.GroupLessonEnrollment
+	if err := h.db.Where("group_lesson_id = ?", groupLessonID).Find(&enrollments).Error; err != nil {
+		return
+	}
+	for _, e := range enrollments {
+		h.db.Create(&models.GroupLessonAttendance{
+			ScheduleSlotID: slotID,
+			StudentID:      e.StudentID,
+		})
+	}
 }

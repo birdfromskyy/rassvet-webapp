@@ -10,10 +10,8 @@ const (
 type Student struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`
 	FullName    string    `json:"full_name" gorm:"type:varchar(255);not null"`
-	ParentPhone *string   `json:"parent_phone,omitempty" gorm:"type:varchar(50)"`
 	FundingType string    `json:"funding_type" gorm:"type:varchar(20);not null;index"`
 	IsActive    bool      `json:"is_active" gorm:"not null;default:true"`
-	Notes       *string   `json:"notes,omitempty" gorm:"type:text"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 

@@ -93,6 +93,8 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
+		Preload("GroupLessonAttendance").
+		Preload("GroupLessonAttendance.Student").
 		Preload("Exclusions").
 		Where("schedules.status = ?", models.ScheduleStatusApproved).
 		Where("schedule_slots.status <> ?", models.ScheduleSlotStatusCancelled).
@@ -302,6 +304,23 @@ func reportHours(durationMin int) float64 {
 
 func slotReportStudents(slot models.ScheduleSlot) []models.Student {
 	if slot.SlotType == models.SlotTypeGroup {
+		// Prefer per-session attendance records when available
+		if len(slot.GroupLessonAttendance) > 0 {
+			students := make([]models.Student, 0, len(slot.GroupLessonAttendance))
+			for _, att := range slot.GroupLessonAttendance {
+				// Skip students explicitly marked absent
+				if att.Attended != nil && !*att.Attended {
+					continue
+				}
+				student := att.Student
+				if student.ID == 0 {
+					student.ID = att.StudentID
+				}
+				students = append(students, student)
+			}
+			return students
+		}
+		// Fall back to group enrollments minus exclusions
 		if slot.GroupLesson == nil {
 			return nil
 		}
@@ -309,7 +328,6 @@ func slotReportStudents(slot models.ScheduleSlot) []models.Student {
 		for _, exclusion := range slot.Exclusions {
 			excluded[exclusion.StudentID] = true
 		}
-
 		students := make([]models.Student, 0, len(slot.GroupLesson.Enrollments))
 		for _, enrollment := range slot.GroupLesson.Enrollments {
 			if excluded[enrollment.StudentID] {

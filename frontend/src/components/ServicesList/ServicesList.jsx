@@ -1,52 +1,26 @@
+import { useEffect, useState } from "react";
 import "./ServicesList.scss";
 
-const services = [
-  {
-    category: "Социально-бытовые",
-    accent: "Поддержка в повседневной жизни",
-    items: [
-      "Уход и присмотр за детьми",
-      "Помощь в приёме пищи",
-      "Организация досуга",
-      "Сопровождение детей",
-    ],
-  },
-
-  {
-    category: "Социально-медицинские",
-    accent: "Поддержка здоровья и развития",
-    items: [
-      "Контроль состояния ребёнка",
-      "Содействие в оздоровительных мероприятиях",
-      "Поддержка двигательной активности",
-      "Сенсорно-моторная интеграция",
-    ],
-  },
-
-  {
-    category: "Социально-психологические",
-    accent: "Эмоциональная и психологическая помощь",
-    items: [
-      "Психологическое консультирование",
-      "Психологическая коррекция",
-      "Поддержка семьи",
-      "Развитие коммуникативных навыков",
-    ],
-  },
-
-  {
-    category: "Социально-педагогические",
-    accent: "Обучение и развитие навыков",
-    items: [
-      "АВА-терапия",
-      "Логопедия",
-      "Обучение компьютерной грамотности",
-      "Развитие академических навыков",
-    ],
-  },
-];
-
 function ServicesList() {
+  const [services, setServices] = useState([]);
+
+  useEffect(() => {
+    fetch(`${process.env.REACT_APP_API_URL}/services`)
+      .then((r) => r.json())
+      .then((data) => {
+        const items = (data.services || data || [])
+          .filter((s) => s.is_active)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((s) => ({
+            category: s.title,
+            accent: s.text,
+            items: (() => { try { return JSON.parse(s.items || "[]"); } catch { return []; } })(),
+          }));
+        setServices(items);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="servicesList">
 

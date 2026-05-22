@@ -55,9 +55,7 @@ const WEEKDAY_FULL = {
 
 const EMPTY_STUDENT = {
   full_name: "",
-  parent_phone: "",
   is_active: true,
-  notes: "",
 };
 
 const EMPTY_AVAIL = { weekday: 1, start_time: "09:00", end_time: "18:00" };
@@ -104,9 +102,7 @@ const AdminStudents = () => {
   const openEdit = (item) => {
     setForm({
       full_name: item.full_name,
-      parent_phone: item.parent_phone || "",
       is_active: item.is_active,
-      notes: item.notes || "",
     });
     setEditDialog({ open: true, item });
   };
@@ -121,9 +117,7 @@ const AdminStudents = () => {
     try {
       const data = {
         full_name: form.full_name.trim(),
-        parent_phone: form.parent_phone || null,
         is_active: form.is_active,
-        notes: form.notes || null,
       };
       if (editDialog.item) {
         await scheduleService.updateStudent(editDialog.item.id, data);
@@ -290,7 +284,6 @@ const AdminStudents = () => {
                 <TableRow>
                   <TableCell>ID</TableCell>
                   <TableCell>ФИО</TableCell>
-                  <TableCell>Телефон родителя</TableCell>
                   <TableCell>Статус</TableCell>
                   <TableCell align="center">Действия</TableCell>
                 </TableRow>
@@ -304,7 +297,6 @@ const AdminStudents = () => {
                     <TableRow key={s.id}>
                       <TableCell>{s.id}</TableCell>
                       <TableCell>{s.full_name}</TableCell>
-                      <TableCell>{s.parent_phone || "—"}</TableCell>
                       <TableCell>
                         <Chip
                           label={s.is_active ? "Активен" : "Неактивен"}
@@ -354,7 +346,7 @@ const AdminStudents = () => {
                   ))}
                 {!students.length && (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">
+                    <TableCell colSpan={4} align="center">
                       <Typography color="text.secondary">
                         Ученики не найдены
                       </Typography>
@@ -385,22 +377,6 @@ const AdminStudents = () => {
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
               fullWidth
               required
-            />
-            <TextField
-              label="Телефон родителя"
-              value={form.parent_phone}
-              onChange={(e) =>
-                setForm({ ...form, parent_phone: e.target.value })
-              }
-              fullWidth
-            />
-            <TextField
-              label="Примечания"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              fullWidth
-              multiline
-              rows={2}
             />
             <FormControlLabel
               control={

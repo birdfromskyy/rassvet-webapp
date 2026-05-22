@@ -147,12 +147,11 @@ type ScheduleStrategy struct {
 }
 
 type generationRunResult struct {
-	Strategy           ScheduleStrategy
-	UnplacedTasks      []WeeklyTask
-	UnplacedGroupTasks []GroupWeeklyTask
-	AutoSlots          []models.ScheduleSlot
-	ScheduledCount     int
-	QualityScore       int
+	Strategy       ScheduleStrategy
+	UnplacedTasks  []WeeklyTask
+	AutoSlots      []models.ScheduleSlot
+	ScheduledCount int
+	QualityScore   int
 }
 
 func reportGenerationProgress(progress ScheduleGenerationProgressFunc, percent int, message string, strategy string) {
@@ -322,7 +321,7 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 	}
 
 	var existingSlots []models.ScheduleSlot
-	if err := g.db.Where("schedule_id = ?", schedule.ID).Find(&existingSlots).Error; err != nil {
+	if err := g.db.Where("schedule_id = ?", schedule.ID).Preload("GroupLesson").Find(&existingSlots).Error; err != nil {
 		return nil, fmt.Errorf("failed to load existing schedule slots: %w", err)
 	}
 
@@ -393,10 +392,10 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 		reportGenerationProgress(
 			progress,
 			finishPercent,
-			fmt.Sprintf("Стратегия %q: поставлено %d, не поставлено %d", strategy.Name, result.ScheduledCount, len(result.UnplacedTasks)+len(result.UnplacedGroupTasks)),
+			fmt.Sprintf("Стратегия %q: поставлено %d, не поставлено %d", strategy.Name, result.ScheduledCount, len(result.UnplacedTasks)),
 			strategy.Name,
 		)
-		if len(result.UnplacedTasks)+len(result.UnplacedGroupTasks) <= EarlyStopUnplacedLessons {
+		if len(result.UnplacedTasks) <= EarlyStopUnplacedLessons {
 			break
 		}
 	}
@@ -426,11 +425,6 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 			return err
 		}
 	}
-	for _, task := range best.UnplacedGroupTasks {
-		if err := g.SaveGroupGenerationIssue(schedule.ID, task, "NO_CANDIDATE", g.DiagnoseNoGroupCandidates(task, ctx)); err != nil {
-			return err
-		}
-	}
 
 	return nil
 }
@@ -441,43 +435,21 @@ func (g *ScheduleGenerator) RunGenerationStrategy(
 	strategy ScheduleStrategy,
 ) (generationRunResult, error) {
 	tasks := g.BuildWeeklyTasks(ctx.Assignments, ctx.Overrides, ctx.Schedule.WeekStartDate, ctx)
-	groupTasks := g.BuildGroupWeeklyTasks(ctx.GroupLessons, ctx.GroupLessonWeekOverrides, ctx.GroupLessonEnrollments, ctx.Schedule.WeekStartDate, ctx)
 	g.SortTasksByStrategy(tasks, strategy.IndividualOrder)
-	g.SortGroupTasksByStrategy(groupTasks, strategy.GroupOrder)
 
-	var unplacedTasks []WeeklyTask
-	var unplacedGroupTasks []GroupWeeklyTask
-	var err error
-
-	if strategy.GroupsFirst {
-		unplacedGroupTasks, err = g.runGroupTaskPipeline(scheduleID, groupTasks, ctx)
-		if err != nil {
-			return generationRunResult{}, err
-		}
-		unplacedTasks, err = g.runIndividualTaskPipeline(scheduleID, tasks, ctx)
-		if err != nil {
-			return generationRunResult{}, err
-		}
-	} else {
-		unplacedTasks, err = g.runIndividualTaskPipeline(scheduleID, tasks, ctx)
-		if err != nil {
-			return generationRunResult{}, err
-		}
-		unplacedGroupTasks, err = g.runGroupTaskPipeline(scheduleID, groupTasks, ctx)
-		if err != nil {
-			return generationRunResult{}, err
-		}
+	unplacedTasks, err := g.runIndividualTaskPipeline(scheduleID, tasks, ctx)
+	if err != nil {
+		return generationRunResult{}, err
 	}
 
 	scheduledCount := g.countScheduledSlots(ctx.ExistingSlots)
 	autoSlots := g.copyAutoSlots(ctx.ExistingSlots)
 	return generationRunResult{
-		Strategy:           strategy,
-		UnplacedTasks:      unplacedTasks,
-		UnplacedGroupTasks: unplacedGroupTasks,
-		AutoSlots:          autoSlots,
-		ScheduledCount:     scheduledCount,
-		QualityScore:       g.scoreGeneratedSchedule(ctx, scheduledCount, len(unplacedTasks)+len(unplacedGroupTasks)),
+		Strategy:      strategy,
+		UnplacedTasks: unplacedTasks,
+		AutoSlots:     autoSlots,
+		ScheduledCount: scheduledCount,
+		QualityScore:  g.scoreGeneratedSchedule(ctx, scheduledCount, len(unplacedTasks)),
 	}, nil
 }
 
@@ -1908,6 +1880,16 @@ func (g *ScheduleGenerator) SaveGeneratedGroupSlot(scheduleID uint, candidate Gr
 
 	if err := g.db.Create(slot).Error; err != nil {
 		return nil, fmt.Errorf("failed to save generated group slot: %w", err)
+	}
+
+	var enrollments []models.GroupLessonEnrollment
+	if err := g.db.Where("group_lesson_id = ?", groupLessonID).Find(&enrollments).Error; err == nil {
+		for _, e := range enrollments {
+			g.db.Create(&models.GroupLessonAttendance{
+				ScheduleSlotID: slot.ID,
+				StudentID:      e.StudentID,
+			})
+		}
 	}
 
 	return slot, nil

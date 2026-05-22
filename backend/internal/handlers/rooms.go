@@ -19,15 +19,13 @@ func NewRoomHandler(db *gorm.DB) *RoomHandler {
 }
 
 type CreateRoomRequest struct {
-	Name     string  `json:"name" binding:"required"`
-	IsActive *bool   `json:"is_active"`
-	Notes    *string `json:"notes"`
+	Name     string `json:"name" binding:"required"`
+	IsActive *bool  `json:"is_active"`
 }
 
 type UpdateRoomRequest struct {
-	Name     string  `json:"name"`
-	IsActive *bool   `json:"is_active"`
-	Notes    *string `json:"notes"`
+	Name     string `json:"name"`
+	IsActive *bool  `json:"is_active"`
 }
 
 type UpdateRoomSubjectsRequest struct {
@@ -106,19 +104,12 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 		isActive = *req.IsActive
 	}
 
-	var notes *string
-	if req.Notes != nil {
-		trimmed := strings.TrimSpace(*req.Notes)
-		notes = &trimmed
-	}
-
 	room := models.Room{
 		Name:     req.Name,
 		IsActive: isActive,
-		Notes:    notes,
 	}
 
-	if err := h.db.Select("Name", "IsActive", "Notes").Create(&room).Error; err != nil {
+	if err := h.db.Select("Name", "IsActive").Create(&room).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create room"})
 		return
 	}
@@ -181,11 +172,6 @@ func (h *RoomHandler) UpdateRoom(c *gin.Context) {
 
 	if req.IsActive != nil {
 		room.IsActive = *req.IsActive
-	}
-
-	if req.Notes != nil {
-		trimmed := strings.TrimSpace(*req.Notes)
-		room.Notes = &trimmed
 	}
 
 	if err := h.db.Save(&room).Error; err != nil {

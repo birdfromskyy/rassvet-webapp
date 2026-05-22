@@ -40,7 +40,6 @@ func Migrate(db *gorm.DB) {
 		// Auth models
 		&models.User{},
 		&models.Review{},
-		&models.VerificationCode{},
 
 		// Schedule module models
 		&models.Subject{},
@@ -62,6 +61,7 @@ func Migrate(db *gorm.DB) {
 		&models.ScheduleSlotExclusion{},
 		&models.ScheduleGenerationIssue{},
 		&models.ScheduleSlotBackup{},
+		&models.GroupLessonAttendance{},
 		&models.UserStudent{},
 
 		// CMS models (Employee removed — teachers table is used instead)

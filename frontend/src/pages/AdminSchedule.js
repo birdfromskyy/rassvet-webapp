@@ -105,14 +105,12 @@ const EMPTY_SLOT_FORM = {
 	slot_type: 'individual',
 	assignment_id: '',
 	group_lesson_id: '',
-	student_id: '',
-	teacher_id: '',
-	subject_id: '',
 	room_id: '',
 	room_name: '',
 	weekday: 1,
 	start_time: '09:00',
 	end_time: '09:50',
+	ignore_student_windows: false,
 }
 
 const EMPTY_EDIT_FORM = {
@@ -121,6 +119,7 @@ const EMPTY_EDIT_FORM = {
 	end_time: '09:50',
 	room_id: '',
 	status: 'scheduled',
+	ignore_student_windows: false,
 }
 
 // Row background colors: green=group, red=paid individual, blue=budget individual
@@ -170,7 +169,7 @@ const AdminSchedule = () => {
 	const [pastWeekConfirm, setPastWeekConfirm] = useState({ open: false, message: '' })
 	const [pastWeekCountdown, setPastWeekCountdown] = useState(0)
 	const pendingPastWeekAction = useRef(null)
-	const [attendanceDialog, setAttendanceDialog] = useState({ open: false, slot: null })
+	const [attendanceDialog, setAttendanceDialog] = useState({ open: false, slot: null, attendance: [], loading: false })
 
 	// Reference data for dialogs and filters
 	const [assignments, setAssignments] = useState([])
@@ -201,7 +200,7 @@ const AdminSchedule = () => {
 	const [slotForm, setSlotForm] = useState(EMPTY_SLOT_FORM)
 
 	// Edit slot dialog
-	const [editDialog, setEditDialog] = useState({ open: false, slot: null })
+	const [editDialog, setEditDialog] = useState({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
 	const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM)
 	const [addGroupStudentId, setAddGroupStudentId] = useState('')
 
@@ -214,6 +213,8 @@ const AdminSchedule = () => {
 
 	// Delete manual slots confirmation dialog
 	const [deleteManualDialog, setDeleteManualDialog] = useState({ open: false, countdown: 5 })
+	// Delete single slot confirmation dialog
+	const [deleteSlotDialog, setDeleteSlotDialog] = useState({ open: false, slotId: null, slotLabel: '' })
 	const deleteManualTimerRef = useRef(null)
 
 	const weekStartISO = formatDateISO(weekStart)
@@ -730,28 +731,6 @@ const AdminSchedule = () => {
 				scheduleId = newSchedule.schedule.id
 			}
 
-			if (slotForm.slot_type === 'individual' && !assignment) {
-				assignment = assignments.find(a =>
-					a.student_id === Number(slotForm.student_id) &&
-					a.teacher_id === Number(slotForm.teacher_id) &&
-					a.subject_id === Number(slotForm.subject_id),
-				)
-			}
-			if (slotForm.slot_type === 'individual' && !assignment) {
-				const duration = timeToMinutes(slotForm.end_time) - timeToMinutes(slotForm.start_time)
-				assignment = await scheduleService.createAssignment({
-					student_id: Number(slotForm.student_id),
-					teacher_id: Number(slotForm.teacher_id),
-					subject_id: Number(slotForm.subject_id),
-					funding_type: 'budget',
-					visits_per_week: 1,
-					duration_min: duration,
-					status: 'active',
-				})
-				setAssignments(prev => [...prev, assignment])
-				setSlotForm(prev => ({ ...prev, assignment_id: assignment.id }))
-			}
-
 			const payload = slotForm.slot_type === 'group'
 				? {
 					slot_type: 'group',
@@ -773,6 +752,9 @@ const AdminSchedule = () => {
 					start_time: slotForm.start_time,
 					end_time: slotForm.end_time,
 				}
+			if (slotForm.slot_type === 'group' && groupLesson && slotForm.ignore_student_windows !== groupLesson.ignore_student_windows) {
+				await scheduleService.updateGroupLesson(groupLesson.id, { ignore_student_windows: slotForm.ignore_student_windows })
+			}
 			await scheduleService.createSlot(scheduleId, payload, force)
 			toast.success('Слот добавлен')
 			setCreateDialog(false)
@@ -812,39 +794,18 @@ const AdminSchedule = () => {
 			return
 		}
 
+		const assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
+		if (!assignment) {
+			toast.error('Выберите назначение')
+			return
+		}
 		if (!slotForm.room_id) {
 			toast.error('???????? ?????????? ? ???????')
 			return
 		}
-		let assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
-		if (!assignment) {
-			if (!slotForm.student_id || !slotForm.teacher_id || !slotForm.subject_id) {
-				toast.error('Выберите ребёнка, преподавателя и предмет')
-				return
-			}
-			assignment = assignments.find(a =>
-				a.student_id === Number(slotForm.student_id) &&
-				a.teacher_id === Number(slotForm.teacher_id) &&
-				a.subject_id === Number(slotForm.subject_id),
-			)
-			if (!assignment) {
-				if (!window.confirm('Такого назначения не существует. Создать его и добавить ручное занятие?')) {
-					return
-				}
-				const duration = timeToMinutes(slotForm.end_time) - timeToMinutes(slotForm.start_time)
-				if (duration !== 30 && duration !== 50) {
-					toast.error('Для нового назначения длительность должна быть 30 или 50 минут')
-					return
-				}
-			} else {
-				setSlotForm(prev => ({ ...prev, assignment_id: assignment.id }))
-			}
-		}
-		const studentId = assignment ? assignment.student_id : Number(slotForm.student_id)
-		const teacherId = assignment ? assignment.teacher_id : Number(slotForm.teacher_id)
 		const conflicts = findConflictingSlots(
 			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
-			Number(slotForm.room_id), teacherId, [studentId],
+			Number(slotForm.room_id), assignment.teacher_id, [assignment.student_id],
 		)
 		if (conflicts.length > 0) {
 			pendingSlotAction.current = doCreateSlot
@@ -853,27 +814,36 @@ const AdminSchedule = () => {
 		}
 		await doCreateSlot()
 	}
-	const openEditSlot = slot => {
+	const openEditSlot = async slot => {
 		setEditForm({
 			weekday: slot.weekday,
 			start_time: slot.start_time,
 			end_time: slot.end_time,
 			room_id: slot.room_id,
 			status: slot.status,
+			ignore_student_windows: slot.group_lesson?.ignore_student_windows || false,
 		})
 		setAddGroupStudentId('')
-		setEditDialog({ open: true, slot })
+		setEditDialog({ open: true, slot, groupAttendance: [], groupAttendanceLoading: slot.slot_type === 'group' })
+		if (slot.slot_type === 'group') {
+			try {
+				const att = await scheduleService.getSlotAttendance(scheduleData.schedule.id, slot.id)
+				setEditDialog(prev => ({ ...prev, groupAttendance: att, groupAttendanceLoading: false }))
+			} catch {
+				setEditDialog(prev => ({ ...prev, groupAttendanceLoading: false }))
+			}
+		}
 	}
 
 	const doSaveEditSlot = async () => {
 		try {
-			await scheduleService.updateSlot(
-				scheduleData.schedule.id,
-				editDialog.slot.id,
-				editForm,
-			)
+			const slot = editDialog.slot
+			if (slot.slot_type === 'group' && slot.group_lesson && editForm.ignore_student_windows !== slot.group_lesson.ignore_student_windows) {
+				await scheduleService.updateGroupLesson(slot.group_lesson.id, { ignore_student_windows: editForm.ignore_student_windows })
+			}
+			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, editForm)
 			toast.success('Слот обновлён')
-			setEditDialog({ open: false, slot: null })
+			setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
 			loadSchedule()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка обновления')
@@ -920,8 +890,16 @@ const AdminSchedule = () => {
 			toast.error(e.response?.data?.error || '\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u0437\u0430\u043d\u044f\u0442\u0438\u0435 \u0432 \u0430\u0432\u0442\u043e')
 		}
 	}
-	const deleteSlot = async slotId => {
-		if (!window.confirm('Удалить слот?')) return
+	const confirmDeleteSlot = slot => {
+		const label = slot.slot_type === 'group'
+			? `Групповое занятие «${slot.group_lesson?.name || '—'}»`
+			: `${slot.student?.full_name || '—'} · ${slot.subject?.name || '—'}`
+		setDeleteSlotDialog({ open: true, slotId: slot.id, slotLabel: label })
+	}
+
+	const deleteSlot = async () => {
+		const slotId = deleteSlotDialog.slotId
+		setDeleteSlotDialog({ open: false, slotId: null, slotLabel: '' })
 		try {
 			await scheduleService.deleteSlot(scheduleData.schedule.id, slotId)
 			toast.success('Слот удалён')
@@ -931,65 +909,80 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const handleExcludeStudent = async (slot, studentId) => {
+	const handleAddToEditSession = async studentId => {
+		const slot = editDialog.slot
+		const id = Number(studentId || addGroupStudentId)
+		if (!id) return
 		try {
-			await scheduleService.addSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
-			toast.success('Ученик исключён из занятия')
-			// Reload and update editDialog slot
-			const data = await scheduleService.getScheduleByWeek(weekStartISO)
-			setScheduleData(data)
-			const updatedSlot = data.slots?.find(s => s.id === slot.id)
-			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
+			const rec = await scheduleService.addSlotStudent(scheduleData.schedule.id, slot.id, id)
+			setEditDialog(prev => ({ ...prev, groupAttendance: [...prev.groupAttendance, rec] }))
+			setAddGroupStudentId('')
+			toast.success('Ученик добавлен в занятие')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Уже в занятии или ошибка')
+		}
+	}
+
+	const handleRemoveFromEditSession = async studentId => {
+		const slot = editDialog.slot
+		try {
+			await scheduleService.removeSlotStudent(scheduleData.schedule.id, slot.id, studentId)
+			setEditDialog(prev => ({ ...prev, groupAttendance: prev.groupAttendance.filter(r => r.student_id !== studentId) }))
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка')
 		}
 	}
 
-	const handleIncludeStudent = async (slot, studentId) => {
+	const openAttendanceDialog = async slot => {
+		setAttendanceDialog({ open: true, slot, attendance: [], loading: true })
 		try {
-			await scheduleService.removeSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
-			toast.success('Ученик возвращён в занятие')
-			const data = await scheduleService.getScheduleByWeek(weekStartISO)
-			setScheduleData(data)
-			const updatedSlot = data.slots?.find(s => s.id === slot.id)
-			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
+			const att = await scheduleService.getSlotAttendance(scheduleData.schedule.id, slot.id)
+			setAttendanceDialog(prev => ({ ...prev, attendance: att, loading: false }))
+		} catch {
+			setAttendanceDialog(prev => ({ ...prev, loading: false }))
+		}
+	}
+
+	const handleToggleAttendance = async record => {
+		const slot = attendanceDialog.slot
+		const newVal = record.attended === false ? true : false
+		try {
+			await scheduleService.updateAttendance(scheduleData.schedule.id, slot.id, record.student_id, newVal)
+			setAttendanceDialog(prev => ({
+				...prev,
+				attendance: prev.attendance.map(r =>
+					r.student_id === record.student_id ? { ...r, attended: newVal } : r
+				),
+			}))
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка')
 		}
 	}
 
-	const handleToggleAttendance = async (studentId, isCurrentlyExcluded) => {
+	const handleAddToSession = async studentId => {
 		const slot = attendanceDialog.slot
 		try {
-			if (isCurrentlyExcluded) {
-				await scheduleService.removeSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
-			} else {
-				await scheduleService.addSlotExclusion(scheduleData.schedule.id, slot.id, studentId)
-			}
-			const data = await scheduleService.getScheduleByWeek(weekStartISO)
-			setScheduleData(data)
-			const updatedSlot = data.slots?.find(s => s.id === slot.id)
-			if (updatedSlot) setAttendanceDialog(prev => ({ ...prev, slot: updatedSlot }))
+			const rec = await scheduleService.addSlotStudent(scheduleData.schedule.id, slot.id, Number(studentId))
+			setAttendanceDialog(prev => ({ ...prev, attendance: [...prev.attendance, rec] }))
+			toast.success('Ученик добавлен в занятие')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Уже в занятии или ошибка')
+		}
+	}
+
+	const handleRemoveFromSession = async studentId => {
+		const slot = attendanceDialog.slot
+		try {
+			await scheduleService.removeSlotStudent(scheduleData.schedule.id, slot.id, studentId)
+			setAttendanceDialog(prev => ({
+				...prev,
+				attendance: prev.attendance.filter(r => r.student_id !== studentId),
+			}))
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка')
 		}
 	}
 
-	const handleAddStudentToGroupSlot = async () => {
-		const slot = editDialog.slot
-		if (!slot?.group_lesson_id || !addGroupStudentId) return
-		try {
-			await scheduleService.addGroupEnrollment(slot.group_lesson_id, Number(addGroupStudentId))
-			toast.success('Ученик добавлен в группу')
-			setAddGroupStudentId('')
-			const data = await scheduleService.getScheduleByWeek(weekStartISO)
-			setScheduleData(data)
-			const updatedSlot = data.slots?.find(s => s.id === slot.id)
-			if (updatedSlot) setEditDialog(prev => ({ ...prev, slot: updatedSlot }))
-		} catch (e) {
-			toast.error(e.response?.data?.error || 'Ошибка добавления ученика')
-		}
-	}
 
 	const timeToMinutes = t => {
 		const [h, m] = t.split(':').map(Number)
@@ -1407,9 +1400,6 @@ const AdminSchedule = () => {
 								<Typography variant='body2' color='text.secondary'>
 									Запрошено занятий
 								</Typography>
-								<Typography variant='caption' color='text.disabled'>
-									{stats.ind_requested} инд. + {stats.grp_requested} групп.
-								</Typography>
 							</Grid>
 							<Grid item xs={4}>
 								<Typography variant='h4' color='success.main'>
@@ -1432,6 +1422,13 @@ const AdminSchedule = () => {
 								<Typography variant='body2' color='text.secondary'>
 									Не поставлено
 								</Typography>
+								{stats.unplaced > 0 && (
+									<Typography variant='caption' color='text.secondary' display='block'>
+										{stats.config_errors > 0 && `${stats.config_errors} конфиг.`}
+										{stats.config_errors > 0 && stats.conflict_errors > 0 && ' + '}
+										{stats.conflict_errors > 0 && `${stats.conflict_errors} конфликт.`}
+									</Typography>
+								)}
 							</Grid>
 						</Grid>
 					</Paper>
@@ -1554,7 +1551,7 @@ const AdminSchedule = () => {
 														{/* Attendance quick actions */}
 														{slot.slot_type === 'group' && (
 															<Tooltip title='Посещаемость группы'>
-																<IconButton size='small' color='info' onClick={() => setAttendanceDialog({ open: true, slot })}>
+																<IconButton size='small' color='info' onClick={() => openAttendanceDialog(slot)}>
 																	<AttendanceIcon fontSize='small' />
 																</IconButton>
 															</Tooltip>
@@ -1583,7 +1580,7 @@ const AdminSchedule = () => {
 														<IconButton
 															size='small'
 															color='error'
-															onClick={() => deleteSlot(slot.id)}
+															onClick={() => confirmDeleteSlot(slot)}
 															title='Удалить'
 														>
 															<DeleteIcon fontSize='small' />
@@ -1810,9 +1807,6 @@ const AdminSchedule = () => {
 										slot_type: e.target.value,
 										assignment_id: '',
 										group_lesson_id: '',
-										student_id: '',
-										teacher_id: '',
-										subject_id: '',
 									})
 								}
 							>
@@ -1837,44 +1831,6 @@ const AdminSchedule = () => {
 								)}
 							/>
 						)}
-						{slotForm.slot_type === 'individual' && !slotForm.assignment_id && (
-							<>
-								<Autocomplete
-									options={students.filter(s => s.is_active)}
-									value={students.find(s => s.id === Number(slotForm.student_id)) || null}
-									getOptionLabel={s => s?.full_name || ''}
-									onChange={(event, value) =>
-										setSlotForm({ ...slotForm, student_id: value?.id || '' })
-									}
-									renderInput={params => (
-										<TextField {...params} label={'\u0423\u0447\u0435\u043d\u0438\u043a'} required />
-									)}
-								/>
-								<Autocomplete
-									options={teachers.filter(t => t.is_active)}
-									value={teachers.find(t => t.id === Number(slotForm.teacher_id)) || null}
-									getOptionLabel={t => t?.full_name || ''}
-									onChange={(event, value) =>
-										setSlotForm({ ...slotForm, teacher_id: value?.id || '' })
-									}
-									renderInput={params => (
-										<TextField {...params} label={'\u041f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c'} required />
-									)}
-								/>
-								<Autocomplete
-									options={subjects}
-									value={subjects.find(s => s.id === Number(slotForm.subject_id)) || null}
-									getOptionLabel={s => s?.name || ''}
-									onChange={(event, value) =>
-										setSlotForm({ ...slotForm, subject_id: value?.id || '' })
-									}
-									renderInput={params => (
-										<TextField {...params} label={'\u041f\u0440\u0435\u0434\u043c\u0435\u0442'} required />
-									)}
-								/>
-								<Alert severity='info'>Если назначения нет, система предложит создать его перед добавлением занятия.</Alert>
-							</>
-						)}
 						{slotForm.slot_type === 'group' && (
 							<>
 								<Autocomplete
@@ -1890,6 +1846,7 @@ const AdminSchedule = () => {
 										subject_id: value?.subject_id || '',
 										teacher_id: value?.default_teacher_id || '',
 										room_name: value?.room_name || '',
+										ignore_student_windows: value?.ignore_student_windows || false,
 									})
 								}
 									renderInput={params => (
@@ -1910,6 +1867,15 @@ const AdminSchedule = () => {
 										))}
 									</Select>
 								</FormControl>
+								<FormControlLabel
+									control={
+										<Checkbox
+											checked={slotForm.ignore_student_windows}
+											onChange={e => setSlotForm({ ...slotForm, ignore_student_windows: e.target.checked })}
+										/>
+									}
+									label='Игнорировать окна учеников при расстановке'
+								/>
 							</>
 						)}
 						{slotForm.slot_type === 'group' ? (
@@ -1980,7 +1946,7 @@ const AdminSchedule = () => {
 			{/* Edit Slot Dialog */}
 			<Dialog
 				open={editDialog.open}
-				onClose={() => setEditDialog({ open: false, slot: null })}
+				onClose={() => setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })}
 				maxWidth='sm'
 				fullWidth
 			>
@@ -2057,94 +2023,88 @@ const AdminSchedule = () => {
 							</Select>
 						</FormControl>
 
-						{/* Group slot: enrollment + exclusion management */}
+						{/* Group slot: attendance-based session management */}
 						{editDialog.slot?.slot_type === 'group' && (
 							<>
 								<Divider />
-								<Typography variant='subtitle2'>
-									Состав группы на это занятие
-								</Typography>
-								{(!editDialog.slot.group_lesson?.enrollments ||
-									editDialog.slot.group_lesson.enrollments.length === 0) && (
-									<Typography variant='body2' color='text.secondary'>
-										В группе нет учеников
-									</Typography>
-								)}
-								<Box display='flex' gap={1} alignItems='center'>
-									<Autocomplete
-										fullWidth
-										size='small'
-										options={students.filter(s =>
-											!(editDialog.slot.group_lesson?.enrollments || []).some(enr => enr.student_id === s.id)
+								<FormControlLabel
+									control={
+										<Checkbox
+											checked={editForm.ignore_student_windows}
+											onChange={e => setEditForm(prev => ({ ...prev, ignore_student_windows: e.target.checked }))}
+										/>
+									}
+									label='Игнорировать окна учеников при расстановке'
+								/>
+								<Divider />
+								<Typography variant='subtitle2'>Состав на это занятие</Typography>
+								{editDialog.groupAttendanceLoading ? (
+									<Box display='flex' justifyContent='center' p={1}><CircularProgress size={20} /></Box>
+								) : (
+									<>
+										{editDialog.groupAttendance.length === 0 && (
+											<Typography variant='body2' color='text.secondary'>Нет учеников в этом занятии</Typography>
 										)}
-										value={students.find(s => s.id === Number(addGroupStudentId)) || null}
-										getOptionLabel={s => s?.full_name || ''}
-										onChange={(event, value) => setAddGroupStudentId(value?.id || '')}
-										renderInput={params => (
-											<TextField {...params} label='Добавить ученика' />
-										)}
-									/>
-									<Button
-										variant='outlined'
-										onClick={handleAddStudentToGroupSlot}
-										disabled={!addGroupStudentId}
-									>
-										Добавить
-									</Button>
-								</Box>
-								<List dense disablePadding>
-									{(editDialog.slot.group_lesson?.enrollments || []).map(enr => {
-										const isExcluded = editDialog.slot.exclusions?.some(
-											ex => ex.student_id === enr.student_id,
-										)
-										return (
-											<ListItem key={enr.id} disableGutters>
-												<ListItemText
-													primary={enr.student?.full_name || enr.student_id}
-													secondary={isExcluded ? 'Исключён из этого занятия' : 'Присутствует'}
-													primaryTypographyProps={{
-														sx: isExcluded
-															? { textDecoration: 'line-through', color: 'text.secondary' }
-															: {},
-													}}
-												/>
-												<ListItemSecondaryAction>
-													{isExcluded ? (
-														<Tooltip title='Вернуть на занятие'>
-															<IconButton
-																size='small'
-																color='success'
-																onClick={() =>
-																	handleIncludeStudent(editDialog.slot, enr.student_id)
-																}
-															>
-																<IncludeIcon fontSize='small' />
+										<List dense disablePadding>
+											{editDialog.groupAttendance.map(rec => (
+												<ListItem key={rec.id} disableGutters>
+													<ListItemText primary={rec.student?.full_name || `#${rec.student_id}`} />
+													<ListItemSecondaryAction>
+														<Tooltip title='Убрать из занятия'>
+															<IconButton size='small' color='error' onClick={() => handleRemoveFromEditSession(rec.student_id)}>
+																<DeleteIcon fontSize='small' />
 															</IconButton>
 														</Tooltip>
-													) : (
-														<Tooltip title='Исключить из занятия'>
-															<IconButton
-																size='small'
-																color='warning'
-																onClick={() =>
-																	handleExcludeStudent(editDialog.slot, enr.student_id)
-																}
-															>
-																<ExcludeIcon fontSize='small' />
-															</IconButton>
-														</Tooltip>
+													</ListItemSecondaryAction>
+												</ListItem>
+											))}
+										</List>
+										{(() => {
+											const inSession = new Set(editDialog.groupAttendance.map(r => r.student_id))
+											const notInSession = (editDialog.slot?.group_lesson?.enrollments || []).filter(enr => !inSession.has(enr.student_id))
+											return (
+												<Box display='flex' flexDirection='column' gap={1}>
+													<Box display='flex' gap={1} alignItems='center'>
+														<Autocomplete
+															fullWidth
+															size='small'
+															options={students.filter(s => !inSession.has(s.id))}
+															value={students.find(s => s.id === Number(addGroupStudentId)) || null}
+															getOptionLabel={s => s?.full_name || ''}
+															onChange={(_, value) => setAddGroupStudentId(value?.id || '')}
+															renderInput={params => <TextField {...params} label='Добавить ученика в занятие' />}
+														/>
+														<Button variant='outlined' onClick={() => handleAddToEditSession()} disabled={!addGroupStudentId}>
+															Добавить
+														</Button>
+													</Box>
+													{notInSession.length > 0 && (
+														<Box>
+															<Typography variant='caption' color='text.secondary'>Из состава группы:</Typography>
+															<Box display='flex' flexWrap='wrap' gap={0.5} mt={0.5}>
+																{notInSession.map(enr => (
+																	<Chip
+																		key={enr.student_id}
+																		label={enr.student?.full_name || `#${enr.student_id}`}
+																		size='small'
+																		onClick={() => handleAddToEditSession(enr.student_id)}
+																		icon={<IncludeIcon />}
+																	/>
+																))}
+															</Box>
+														</Box>
 													)}
-												</ListItemSecondaryAction>
-											</ListItem>
-										)
-									})}
-								</List>
+												</Box>
+											)
+										})()}
+									</>
+								)}
 							</>
 						)}
 					</Box>
 				</DialogContent>
 				<DialogActions>
-					<Button onClick={() => setEditDialog({ open: false, slot: null })}>
+					<Button onClick={() => setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })}>
 						Отмена
 					</Button>
 					<Button onClick={saveEditSlot} variant='contained'>
@@ -2180,7 +2140,7 @@ const AdminSchedule = () => {
 			{/* Attendance Dialog for group slots */}
 			<Dialog
 				open={attendanceDialog.open}
-				onClose={() => setAttendanceDialog({ open: false, slot: null })}
+				onClose={() => setAttendanceDialog({ open: false, slot: null, attendance: [], loading: false })}
 				maxWidth='xs'
 				fullWidth
 			>
@@ -2191,38 +2151,81 @@ const AdminSchedule = () => {
 					</Typography>
 				</DialogTitle>
 				<DialogContent>
-					{(!attendanceDialog.slot?.group_lesson?.enrollments || attendanceDialog.slot.group_lesson.enrollments.length === 0) && (
-						<Typography variant='body2' color='text.secondary'>В группе нет учеников</Typography>
+					{attendanceDialog.loading ? (
+						<Box display='flex' justifyContent='center' p={2}><CircularProgress size={24} /></Box>
+					) : attendanceDialog.attendance.length === 0 ? (
+						<Typography variant='body2' color='text.secondary'>Нет учеников на этом занятии</Typography>
+					) : (
+						<List dense disablePadding>
+							{attendanceDialog.attendance.map(rec => {
+								const isAbsent = rec.attended === false
+								const isPresent = rec.attended === true
+								return (
+									<ListItem key={rec.id} disableGutters>
+										<ListItemText
+											primary={rec.student?.full_name || `Ученик #${rec.student_id}`}
+											secondary={isAbsent ? 'Отсутствовал' : isPresent ? 'Присутствовал' : 'Не отмечено'}
+											primaryTypographyProps={{ sx: isAbsent ? { color: 'text.secondary', textDecoration: 'line-through' } : {} }}
+											secondaryTypographyProps={{ color: isAbsent ? 'error' : isPresent ? 'success.main' : 'text.disabled' }}
+										/>
+										<ListItemSecondaryAction>
+											<Tooltip title={isAbsent ? 'Отметить присутствие' : 'Отметить отсутствие'}>
+												<IconButton size='small' color={isAbsent ? 'success' : 'error'} onClick={() => handleToggleAttendance(rec)}>
+													{isAbsent ? <IncludeIcon fontSize='small' /> : <ExcludeIcon fontSize='small' />}
+												</IconButton>
+											</Tooltip>
+											<Tooltip title='Убрать из занятия'>
+												<IconButton size='small' onClick={() => handleRemoveFromSession(rec.student_id)}>
+													<DeleteIcon fontSize='small' />
+												</IconButton>
+											</Tooltip>
+										</ListItemSecondaryAction>
+									</ListItem>
+								)
+							})}
+						</List>
 					)}
-					<List dense disablePadding>
-						{(attendanceDialog.slot?.group_lesson?.enrollments || []).map(enr => {
-							const isAbsent = attendanceDialog.slot?.exclusions?.some(ex => ex.student_id === enr.student_id)
-							return (
-								<ListItem key={enr.id} disableGutters>
-									<ListItemText
-										primary={enr.student?.full_name || `Ученик #${enr.student_id}`}
-										secondary={isAbsent ? 'Отсутствовал' : 'Присутствовал'}
-										primaryTypographyProps={{ sx: isAbsent ? { color: 'text.secondary', textDecoration: 'line-through' } : {} }}
-										secondaryTypographyProps={{ color: isAbsent ? 'error' : 'success.main' }}
-									/>
-									<ListItemSecondaryAction>
-										<Tooltip title={isAbsent ? 'Отметить присутствие' : 'Отметить отсутствие'}>
-											<IconButton
-												size='small'
-												color={isAbsent ? 'success' : 'error'}
-												onClick={() => handleToggleAttendance(enr.student_id, isAbsent)}
-											>
-												{isAbsent ? <IncludeIcon fontSize='small' /> : <ExcludeIcon fontSize='small' />}
-											</IconButton>
-										</Tooltip>
-									</ListItemSecondaryAction>
-								</ListItem>
-							)
-						})}
-					</List>
+					{/* Add student to this session from enrollment list */}
+					{(() => {
+						const inSession = new Set(attendanceDialog.attendance.map(r => r.student_id))
+						const notInSession = (attendanceDialog.slot?.group_lesson?.enrollments || [])
+							.filter(enr => !inSession.has(enr.student_id))
+						if (!notInSession.length) return null
+						return (
+							<Box mt={2}>
+								<Typography variant='caption' color='text.secondary'>Добавить из списка группы:</Typography>
+								<Box display='flex' flexWrap='wrap' gap={0.5} mt={0.5}>
+									{notInSession.map(enr => (
+										<Chip
+											key={enr.student_id}
+											label={enr.student?.full_name || `#${enr.student_id}`}
+											size='small'
+											onClick={() => handleAddToSession(enr.student_id)}
+											icon={<IncludeIcon />}
+										/>
+									))}
+								</Box>
+							</Box>
+						)
+					})()}
 				</DialogContent>
 				<DialogActions>
-					<Button onClick={() => setAttendanceDialog({ open: false, slot: null })}>Закрыть</Button>
+					<Button onClick={() => setAttendanceDialog({ open: false, slot: null, attendance: [], loading: false })}>Закрыть</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Delete Slot Confirmation Dialog */}
+			<Dialog open={deleteSlotDialog.open} onClose={() => setDeleteSlotDialog({ open: false, slotId: null, slotLabel: '' })} maxWidth='xs' fullWidth>
+				<DialogTitle>Удалить занятие?</DialogTitle>
+				<DialogContent>
+					<Typography>{deleteSlotDialog.slotLabel}</Typography>
+					<Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
+						Занятие будет удалено вместе со всеми записями о посещаемости.
+					</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDeleteSlotDialog({ open: false, slotId: null, slotLabel: '' })}>Отмена</Button>
+					<Button variant='contained' color='error' onClick={deleteSlot}>Удалить</Button>
 				</DialogActions>
 			</Dialog>
 

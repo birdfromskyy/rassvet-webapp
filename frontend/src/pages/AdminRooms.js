@@ -43,7 +43,7 @@ import {
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
 
-const EMPTY_ROOM = { name: '', is_active: true, notes: '' }
+const EMPTY_ROOM = { name: '', is_active: true }
 
 const AdminRooms = () => {
 	const navigate = useNavigate()
@@ -88,7 +88,6 @@ const AdminRooms = () => {
 		setForm({
 			name: item.name,
 			is_active: item.is_active,
-			notes: item.notes || '',
 		})
 		setEditDialog({ open: true, item })
 	}
@@ -116,7 +115,6 @@ const AdminRooms = () => {
 			const data = {
 				name: form.name.trim(),
 				is_active: form.is_active,
-				notes: form.notes || null,
 			}
 			if (editDialog.item) {
 				await scheduleService.updateRoom(editDialog.item.id, data)
@@ -209,7 +207,6 @@ const AdminRooms = () => {
 								<TableRow>
 									<TableCell>ID</TableCell>
 									<TableCell>Название</TableCell>
-									<TableCell>Примечания</TableCell>
 									<TableCell>Статус</TableCell>
 									<TableCell align='center'>Действия</TableCell>
 								</TableRow>
@@ -219,7 +216,6 @@ const AdminRooms = () => {
 									<TableRow key={r.id}>
 										<TableCell>{r.id}</TableCell>
 										<TableCell>{r.name}</TableCell>
-										<TableCell>{r.notes || '—'}</TableCell>
 										<TableCell>
 											<Chip
 												label={r.is_active ? 'Активен' : 'Неактивен'}
@@ -265,7 +261,7 @@ const AdminRooms = () => {
 								))}
 								{!rooms.length && (
 									<TableRow>
-										<TableCell colSpan={5} align='center'>
+										<TableCell colSpan={4} align='center'>
 											<Typography color='text.secondary'>
 												Кабинеты не найдены
 											</Typography>
@@ -296,14 +292,6 @@ const AdminRooms = () => {
 							onChange={e => setForm({ ...form, name: e.target.value })}
 							fullWidth
 							required
-						/>
-						<TextField
-							label='Примечания'
-							value={form.notes}
-							onChange={e => setForm({ ...form, notes: e.target.value })}
-							fullWidth
-							multiline
-							rows={2}
 						/>
 						<FormControlLabel
 							control={

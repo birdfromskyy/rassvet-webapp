@@ -20,19 +20,15 @@ func NewStudentHandler(db *gorm.DB) *StudentHandler {
 }
 
 type CreateStudentRequest struct {
-	FullName    string  `json:"full_name" binding:"required"`
-	ParentPhone *string `json:"parent_phone"`
-	FundingType string  `json:"funding_type"`
-	IsActive    *bool   `json:"is_active"`
-	Notes       *string `json:"notes"`
+	FullName    string `json:"full_name" binding:"required"`
+	FundingType string `json:"funding_type"`
+	IsActive    *bool  `json:"is_active"`
 }
 
 type UpdateStudentRequest struct {
-	FullName    string  `json:"full_name"`
-	ParentPhone *string `json:"parent_phone"`
-	FundingType string  `json:"funding_type"`
-	IsActive    *bool   `json:"is_active"`
-	Notes       *string `json:"notes"`
+	FullName    string `json:"full_name"`
+	FundingType string `json:"funding_type"`
+	IsActive    *bool  `json:"is_active"`
 }
 
 type CreateStudentAvailabilityRequest struct {
@@ -173,13 +169,11 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 
 	student := models.Student{
 		FullName:    req.FullName,
-		ParentPhone: normalizeOptionalString(req.ParentPhone),
 		FundingType: req.FundingType,
 		IsActive:    isActive,
-		Notes:       normalizeOptionalString(req.Notes),
 	}
 
-	if err := h.db.Select("FullName", "ParentPhone", "FundingType", "IsActive", "Notes").Create(&student).Error; err != nil {
+	if err := h.db.Select("FullName", "FundingType", "IsActive").Create(&student).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create student"})
 		return
 	}
@@ -240,14 +234,6 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 
 	if req.IsActive != nil {
 		student.IsActive = *req.IsActive
-	}
-
-	if req.ParentPhone != nil {
-		student.ParentPhone = normalizeOptionalString(req.ParentPhone)
-	}
-
-	if req.Notes != nil {
-		student.Notes = normalizeOptionalString(req.Notes)
 	}
 
 	if err := h.db.Save(&student).Error; err != nil {

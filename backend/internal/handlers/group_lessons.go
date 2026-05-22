@@ -28,7 +28,6 @@ type CreateGroupLessonRequest struct {
 	MaxStudents          int     `json:"max_students"`
 	Status               string  `json:"status"`
 	IgnoreStudentWindows bool    `json:"ignore_student_windows"`
-	Notes                *string `json:"notes"`
 }
 
 type UpdateGroupLessonRequest struct {
@@ -41,7 +40,6 @@ type UpdateGroupLessonRequest struct {
 	MaxStudents          *int    `json:"max_students"`
 	Status               string  `json:"status"`
 	IgnoreStudentWindows *bool   `json:"ignore_student_windows"`
-	Notes                *string `json:"notes"`
 }
 
 type CreateGroupLessonWeekOverrideRequest struct {
@@ -126,7 +124,6 @@ func (h *GroupLessonHandler) CreateGroupLesson(c *gin.Context) {
 		MaxStudents:          maxStudents,
 		Status:               status,
 		IgnoreStudentWindows: req.IgnoreStudentWindows,
-		Notes:                req.Notes,
 	}
 
 	if err := h.db.Create(&lesson).Error; err != nil {
@@ -186,9 +183,6 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 	}
 	if req.IgnoreStudentWindows != nil {
 		lesson.IgnoreStudentWindows = *req.IgnoreStudentWindows
-	}
-	if req.Notes != nil {
-		lesson.Notes = req.Notes
 	}
 
 	if err := h.db.Save(&lesson).Error; err != nil {
