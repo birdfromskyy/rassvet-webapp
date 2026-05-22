@@ -306,6 +306,23 @@ const scheduleService = {
 		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}/exclusions/${studentId}`)
 	},
 
+	// ========== SLOT ATTENDANCE ==========
+	getSlotAttendance: async (scheduleId, slotId) => {
+		const r = await api.get(`/admin/schedules/${scheduleId}/slots/${slotId}/attendance`)
+		return r.data.attendance || []
+	},
+	addSlotStudent: async (scheduleId, slotId, studentId) => {
+		const r = await api.post(`/admin/schedules/${scheduleId}/slots/${slotId}/attendance`, { student_id: studentId })
+		return r.data.attendance
+	},
+	updateAttendance: async (scheduleId, slotId, studentId, attended) => {
+		const r = await api.patch(`/admin/schedules/${scheduleId}/slots/${slotId}/attendance/${studentId}`, { attended })
+		return r.data.attendance
+	},
+	removeSlotStudent: async (scheduleId, slotId, studentId) => {
+		await api.delete(`/admin/schedules/${scheduleId}/slots/${slotId}/attendance/${studentId}`)
+	},
+
 	// ========== REPORTS ==========
 	getMonthlyReport: async (year, month) => {
 		const r = await api.get('/admin/reports/monthly', {

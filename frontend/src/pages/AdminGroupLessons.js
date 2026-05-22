@@ -4,7 +4,6 @@ import {
 	Alert,
 	Box,
 	Button,
-	Checkbox,
 	Chip,
 	CircularProgress,
 	Container,
@@ -14,7 +13,6 @@ import {
 	DialogTitle,
 	Divider,
 	FormControl,
-	FormControlLabel,
 	IconButton,
 	InputLabel,
 	List,
@@ -55,8 +53,6 @@ const EMPTY_FORM = {
 	duration_min: 50,
 	max_students: 10,
 	status: 'active',
-	notes: '',
-	ignore_student_windows: false,
 }
 
 const AdminGroupLessons = () => {
@@ -113,8 +109,6 @@ const AdminGroupLessons = () => {
 			duration_min: group.duration_min || 50,
 			max_students: group.max_students || 10,
 			status: group.status || 'active',
-			notes: group.notes || '',
-			ignore_student_windows: group.ignore_student_windows || false,
 		})
 		setFormOpen(true)
 	}
@@ -134,8 +128,6 @@ const AdminGroupLessons = () => {
 			duration_min: Number(formData.duration_min),
 			max_students: Number(formData.max_students),
 			status: formData.status,
-			notes: formData.notes.trim() || null,
-			ignore_student_windows: formData.ignore_student_windows,
 		}
 
 		try {
@@ -243,14 +235,13 @@ const AdminGroupLessons = () => {
 								<TableCell align='center'>Длительность</TableCell>
 								<TableCell align='center'>Ученики</TableCell>
 								<TableCell>Статус</TableCell>
-								<TableCell>Примечания</TableCell>
 								<TableCell align='right'>Действия</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
 							{groups.length === 0 && (
 								<TableRow>
-									<TableCell colSpan={9} align='center'>
+									<TableCell colSpan={8} align='center'>
 										<Typography color='text.secondary'>Групповых занятий пока нет</Typography>
 									</TableCell>
 								</TableRow>
@@ -276,7 +267,6 @@ const AdminGroupLessons = () => {
 											color={g.status === 'active' ? 'success' : 'default'}
 										/>
 									</TableCell>
-									<TableCell>{g.notes || '-'}</TableCell>
 									<TableCell align='right'>
 										<Tooltip title='Состав группы'>
 											<IconButton size='small' onClick={() => openEnroll(g)}><PersonAddIcon fontSize='small' /></IconButton>
@@ -357,20 +347,6 @@ const AdminGroupLessons = () => {
 							<MenuItem value='paused'>Приостановлена</MenuItem>
 						</Select>
 					</FormControl>
-					<TextField
-						label='Примечания' fullWidth multiline rows={2}
-						value={formData.notes}
-						onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
-					/>
-					<FormControlLabel
-						control={
-							<Checkbox
-								checked={formData.ignore_student_windows}
-								onChange={e => setFormData(p => ({ ...p, ignore_student_windows: e.target.checked }))}
-							/>
-						}
-						label='Игнорировать окна детей при расстановке (не проверять пересечение доступности и максимальный разрыв)'
-					/>
 				</DialogContent>
 				<DialogActions>
 					<Button onClick={() => setFormOpen(false)}>Отмена</Button>

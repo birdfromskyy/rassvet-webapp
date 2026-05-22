@@ -26,10 +26,8 @@ func (h *TeacherHandler) GetPublicTeachers(c *gin.Context) {
 }
 
 type CreateTeacherRequest struct {
-	FullName string  `json:"full_name" binding:"required"`
-	Phone    *string `json:"phone"`
-	IsActive *bool   `json:"is_active"`
-	Notes    *string `json:"notes"`
+	FullName string `json:"full_name" binding:"required"`
+	IsActive *bool  `json:"is_active"`
 	// CMS fields
 	Category       string `json:"category"`
 	PhotoURL       string `json:"photo_url"`
@@ -41,10 +39,8 @@ type CreateTeacherRequest struct {
 }
 
 type UpdateTeacherRequest struct {
-	FullName string  `json:"full_name"`
-	Phone    *string `json:"phone"`
-	IsActive *bool   `json:"is_active"`
-	Notes    *string `json:"notes"`
+	FullName string `json:"full_name"`
+	IsActive *bool  `json:"is_active"`
 	// CMS fields
 	Category       string `json:"category"`
 	PhotoURL       string `json:"photo_url"`
@@ -141,9 +137,7 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 
 	teacher := models.Teacher{
 		FullName:       req.FullName,
-		Phone:          normalizeOptionalString(req.Phone),
 		IsActive:       isActive,
-		Notes:          normalizeOptionalString(req.Notes),
 		Category:       req.Category,
 		PhotoURL:       req.PhotoURL,
 		Qualifications: req.Qualifications,
@@ -206,14 +200,6 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 
 	if req.IsActive != nil {
 		teacher.IsActive = *req.IsActive
-	}
-
-	if req.Phone != nil {
-		teacher.Phone = normalizeOptionalString(req.Phone)
-	}
-
-	if req.Notes != nil {
-		teacher.Notes = normalizeOptionalString(req.Notes)
 	}
 
 	// CMS fields — always update (allow clearing)

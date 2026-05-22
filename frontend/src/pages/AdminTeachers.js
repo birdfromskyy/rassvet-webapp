@@ -61,9 +61,7 @@ const WEEKDAY_FULL = {
 
 const EMPTY_TEACHER = {
   full_name: "",
-  phone: "",
   is_active: true,
-  notes: "",
   category: "",
   photo_url: "",
   qualifications: "",
@@ -134,7 +132,7 @@ const AdminTeachers = () => {
 
   // ── Edit handlers ──────────────────────────────────
   const openCreate = () => {
-    setForm(EMPTY_TEACHER);
+    setForm({ ...EMPTY_TEACHER, sort_order_cms: teachers.length });
     setEditDialog({ open: true, item: null });
   };
 
@@ -145,9 +143,7 @@ const AdminTeachers = () => {
   const openEdit = (item) => {
     setForm({
       full_name: item.full_name,
-      phone: item.phone || "",
       is_active: item.is_active,
-      notes: item.notes || "",
       category: item.category || "",
       photo_url: item.photo_url || "",
       qualifications: parseJsonToLines(item.qualifications),
@@ -172,9 +168,7 @@ const AdminTeachers = () => {
     try {
       const data = {
         full_name: form.full_name.trim(),
-        phone: form.phone || null,
         is_active: form.is_active,
-        notes: form.notes || null,
         category: form.category || "",
         photo_url: form.photo_url || "",
         qualifications: linesToJson(form.qualifications),
@@ -415,7 +409,6 @@ const AdminTeachers = () => {
                   <TableCell>ID</TableCell>
                   <TableCell>ФИО</TableCell>
                   <TableCell>Категория</TableCell>
-                  <TableCell>Телефон</TableCell>
                   <TableCell>Статус</TableCell>
                   <TableCell>На сайте</TableCell>
                   <TableCell align="center">Действия</TableCell>
@@ -431,7 +424,6 @@ const AdminTeachers = () => {
                       <TableCell>{t.id}</TableCell>
                       <TableCell>{t.full_name}</TableCell>
                       <TableCell>{t.category || "—"}</TableCell>
-                      <TableCell>{t.phone || "—"}</TableCell>
                       <TableCell>
                         <Chip
                           label={t.is_active ? "Активен" : "Неактивен"}
@@ -537,20 +529,6 @@ const AdminTeachers = () => {
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
               fullWidth
               required
-            />
-            <TextField
-              label="Телефон"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              fullWidth
-            />
-            <TextField
-              label="Примечания"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              fullWidth
-              multiline
-              rows={2}
             />
             <FormControlLabel
               control={

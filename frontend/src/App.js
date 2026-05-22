@@ -29,6 +29,7 @@ import PendingReviews from './pages/PendingReviews'
 import News from './pages/News/News'
 import NewsDetail from './pages/NewsDetail/NewsDetail'
 import AdminNews from './pages/AdminNews'
+import AdminNewsPreview from './pages/AdminNewsPreview'
 import AdminSchedulePanel from './pages/AdminSchedulePanel'
 import AdminSubjects from './pages/AdminSubjects'
 import AdminTeachers from './pages/AdminTeachers'
@@ -165,6 +166,7 @@ function App() {
 						<Route path='/admin/reviews' element={<AdminReviews />} />
 						<Route path='/admin/pending-reviews' element={<PendingReviews />} />
 						<Route path='/admin/news' element={<AdminNews />} />
+						<Route path='/admin/news/:id/preview' element={<AdminNewsPreview />} />
 						<Route path='/admin/schedule' element={<AdminSchedulePanel />} />
 						<Route path='/admin/schedule/subjects' element={<AdminSubjects />} />
 						<Route path='/admin/schedule/teachers' element={<AdminTeachers />} />

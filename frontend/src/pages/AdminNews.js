@@ -8,7 +8,7 @@ import {
   Divider, Tooltip,
 } from '@mui/material'
 import {
-  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon,
+  Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, Visibility as PreviewIcon,
   ArrowBack as BackIcon, ArrowUpward as UpIcon, ArrowDownward as DownIcon,
   TextFields as TextIcon, Image as ImageIcon, VideoLibrary as VideoIcon,
   InsertDriveFile as FileIcon,
@@ -213,6 +213,9 @@ export default function AdminNews() {
                       {a.published_at ? new Date(a.published_at).toLocaleDateString('ru') : '—'}
                     </TableCell>
                     <TableCell align="right">
+                      <Tooltip title={a.status === 'draft' ? 'Просмотр черновика' : 'Просмотр'}>
+                        <IconButton size="small" color="info" onClick={() => navigate(`/admin/news/${a.id}/preview`)}><PreviewIcon /></IconButton>
+                      </Tooltip>
                       <IconButton size="small" onClick={() => openEdit(a)}><EditIcon /></IconButton>
                       <IconButton size="small" color="error" onClick={() => handleDelete(a.id)}><DeleteIcon /></IconButton>
                     </TableCell>

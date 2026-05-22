@@ -18,7 +18,6 @@ type GroupLesson struct {
 	MaxStudents      int       `json:"max_students" gorm:"not null;default:10"`
 	Status               string `json:"status" gorm:"type:varchar(20);not null;default:'active'"`
 	IgnoreStudentWindows bool   `json:"ignore_student_windows" gorm:"not null;default:false"`
-	Notes                *string `json:"notes,omitempty" gorm:"type:text"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 

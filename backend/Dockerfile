@@ -15,6 +15,5 @@ WORKDIR /app
 
 COPY --from=builder /app/main .
 COPY --from=builder /app/.env .
-COPY --from=builder /app/static ./static
 
 CMD ["./main"]

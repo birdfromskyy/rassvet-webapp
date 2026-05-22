@@ -5,9 +5,7 @@ import "time"
 type Teacher struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	FullName  string    `json:"full_name" gorm:"type:varchar(255);not null"`
-	Phone     *string   `json:"phone,omitempty" gorm:"type:varchar(50)"`
 	IsActive  bool      `json:"is_active" gorm:"not null;default:true"`
-	Notes     *string   `json:"notes,omitempty" gorm:"type:text"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 

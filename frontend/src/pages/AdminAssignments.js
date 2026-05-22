@@ -48,7 +48,6 @@ const EMPTY_ASSIGNMENT = {
 	visits_per_week: 1,
 	duration_min: 50,
 	status: 'active',
-	notes: '',
 }
 
 const AdminAssignments = () => {
@@ -142,7 +141,6 @@ const AdminAssignments = () => {
 			visits_per_week: item.visits_per_week,
 			duration_min: item.duration_min,
 			status: item.status,
-			notes: item.notes || '',
 		})
 		setEditDialog({ open: true, item })
 	}
@@ -155,7 +153,7 @@ const AdminAssignments = () => {
 			return
 		}
 		try {
-			const data = { ...form, notes: form.notes || null }
+			const data = { ...form }
 			if (editDialog.item) {
 				await scheduleService.updateAssignment(editDialog.item.id, data)
 				toast.success('Назначение обновлено')
@@ -521,14 +519,6 @@ const AdminAssignments = () => {
 								<MenuItem value='paused'>Приостановлен</MenuItem>
 							</Select>
 						</FormControl>
-						<TextField
-							label='Примечания'
-							value={form.notes}
-							onChange={e => setForm({ ...form, notes: e.target.value })}
-							fullWidth
-							multiline
-							rows={2}
-						/>
 					</Box>
 				</DialogContent>
 				<DialogActions>
