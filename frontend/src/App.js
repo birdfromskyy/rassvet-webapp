@@ -46,6 +46,7 @@ import AdminFinZones from './pages/AdminFinZones'
 import AdminServices from './pages/AdminServices'
 import AdminSiteSettings from './pages/AdminSiteSettings'
 import AdminCMSPanel from './pages/AdminCMSPanel'
+import AdminDocuments from './pages/AdminDocuments'
 import ChildSchedule from './pages/ChildSchedule'
 import TeacherSchedule from './pages/TeacherSchedule'
 import PrivateRoute from './components/PrivateRoute'
@@ -179,6 +180,9 @@ function App() {
 						<Route path='/admin/schedule/weekly' element={<AdminSchedule />} />
 						<Route path='/admin/schedule/reports' element={<AdminReports />} />
 						<Route path='/admin/users' element={<AdminUsers />} />
+
+						{/* Documents review */}
+						<Route path='/admin/documents' element={<AdminDocuments />} />
 
 						{/* CMS hub */}
 						<Route path='/admin/cms' element={<AdminCMSPanel />} />

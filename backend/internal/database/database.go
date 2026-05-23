@@ -64,6 +64,10 @@ func Migrate(db *gorm.DB) {
 		&models.GroupLessonAttendance{},
 		&models.UserStudent{},
 
+		// Document submissions (parent profiles + child docs)
+		&models.ParentProfile{},
+		&models.ChildDocSubmission{},
+
 		// CMS models (Employee removed — teachers table is used instead)
 		&models.CmsFile{},
 		&models.HistoryEvent{},
