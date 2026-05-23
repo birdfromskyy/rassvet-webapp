@@ -53,7 +53,7 @@ func (h *HistoryHandler) UpdateEvent(c *gin.Context) {
 	id := c.Param("id")
 	var event models.HistoryEvent
 	if err := h.db.First(&event, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "event not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Событие не найдено"})
 		return
 	}
 

@@ -34,6 +34,16 @@ const getUrlBasename = url => {
 	}
 }
 
+const safeUrl = url => {
+	if (!url) return null
+	try {
+		const parsed = new URL(url)
+		return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? url : null
+	} catch {
+		return null
+	}
+}
+
 const renderBlock = (block, index) => {
 	if (!block?.type) return null
 	switch (block.type) {
@@ -65,14 +75,17 @@ const renderBlock = (block, index) => {
 		}
 		case 'video': {
 			const embedUrl = getVkEmbedUrl(block.content)
-			if (!embedUrl)
+			if (!embedUrl) {
+				const videoHref = safeUrl(block.content)
+				if (!videoHref) return null
 				return (
 					<Box key={block.id || index} mb={2}>
-						<a href={block.content} target='_blank' rel='noopener noreferrer'>
+						<a href={videoHref} target='_blank' rel='noopener noreferrer'>
 							Открыть видео
 						</a>
 					</Box>
 				)
+			}
 			return (
 				<Box key={block.id || index} mb={2} sx={{ position: 'relative', paddingTop: '56.25%' }}>
 					<iframe

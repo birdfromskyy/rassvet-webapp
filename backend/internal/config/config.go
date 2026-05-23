@@ -7,6 +7,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const minJWTSecretLen = 32
+
 type Config struct {
 	DBHost        string
 	DBUser        string
@@ -15,6 +17,7 @@ type Config struct {
 	DBPort        string
 	JWTSecret     string
 	Port          string
+	FrontendURL   string
 	EmailFrom     string
 	EmailPassword string
 	SMTPHost      string
@@ -38,8 +41,9 @@ func Load() *Config {
 		DBPassword:    getEnv("DB_PASSWORD", "postgres"),
 		DBName:        getEnv("DB_NAME", "reviews_db"),
 		DBPort:        getEnv("DB_PORT", "5432"),
-		JWTSecret:     getEnv("JWT_SECRET", "secret"),
+		JWTSecret:     requireEnv("JWT_SECRET"),
 		Port:          getEnv("PORT", "8080"),
+		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:3000"),
 		EmailFrom:     getEnv("EMAIL_FROM", ""),
 		EmailPassword: getEnv("EMAIL_PASSWORD", ""),
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
@@ -57,4 +61,12 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func requireEnv(key string) string {
+	value := os.Getenv(key)
+	if len(value) < minJWTSecretLen {
+		log.Fatalf("env %s must be set and at least %d characters long", key, minJWTSecretLen)
+	}
+	return value
 }

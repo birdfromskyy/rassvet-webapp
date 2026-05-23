@@ -67,7 +67,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 	if rawTeacherID := c.Query("teacher_id"); rawTeacherID != "" {
 		parsedTeacherID, err := strconv.Atoi(rawTeacherID)
 		if err != nil || parsedTeacherID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "teacher_id must be positive"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID преподавателя должен быть положительным числом"})
 			return
 		}
 		teacherID = uint(parsedTeacherID)
@@ -75,7 +75,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 	if rawStudentID := c.Query("student_id"); rawStudentID != "" {
 		parsedStudentID, err := strconv.Atoi(rawStudentID)
 		if err != nil || parsedStudentID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "student_id must be positive"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID ученика должен быть положительным числом"})
 			return
 		}
 		studentID = uint(parsedStudentID)
@@ -105,7 +105,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 	if err := query.
 		Order("schedules.week_start_date ASC, schedule_slots.weekday ASC, schedule_slots.start_time ASC").
 		Find(&slots).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to build monthly report"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 

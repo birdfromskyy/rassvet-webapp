@@ -62,7 +62,7 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&review).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create review"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать отзыв"})
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *ReviewHandler) UpdateMyReview(c *gin.Context) {
 
 	var review models.Review
 	if err := h.db.Where("user_id = ?", userID).First(&review).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Отзыв не найден"})
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *ReviewHandler) UpdateMyReview(c *gin.Context) {
 	review.Status = models.StatusPending
 
 	if err := h.db.Save(&review).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update review"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить отзыв"})
 		return
 	}
 
@@ -135,7 +135,7 @@ func (h *ReviewHandler) GetPublishedReviews(c *gin.Context) {
 	var reviews []models.Review
 
 	if err := h.db.Preload("User").Where("status = ?", models.StatusApproved).Find(&reviews).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reviews"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения отзывов"})
 		return
 	}
 
@@ -168,7 +168,7 @@ func (h *ReviewHandler) GetMyReviews(c *gin.Context) {
 
 	var reviews []models.Review
 	if err := h.db.Where("user_id = ?", userID).Find(&reviews).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reviews"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения отзывов"})
 		return
 	}
 

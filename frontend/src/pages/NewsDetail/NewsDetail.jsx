@@ -104,6 +104,16 @@ const NewsDetail = () => {
     }
   }
 
+  const safeUrl = url => {
+    if (!url) return null
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? url : null
+    } catch {
+      return null
+    }
+  }
+
   const renderBlock = (block, index) => {
     if (!block?.type) return null
 
@@ -140,10 +150,12 @@ const NewsDetail = () => {
         const embedUrl = getVkEmbedUrl(block.content)
 
         if (!embedUrl) {
+          const videoHref = safeUrl(block.content)
+          if (!videoHref) return null
           return (
             <div key={block.id || index} className="article-file">
               <a
-                href={block.content}
+                href={videoHref}
                 target="_blank"
                 rel="noopener noreferrer"
               >

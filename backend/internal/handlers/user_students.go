@@ -24,7 +24,7 @@ func NewUserStudentHandler(db *gorm.DB) *UserStudentHandler {
 func (h *UserStudentHandler) GetUsers(c *gin.Context) {
 	var users []models.User
 	if err := h.db.Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения пользователей"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"users": users})
@@ -56,7 +56,7 @@ func (h *UserStudentHandler) CreateUser(c *gin.Context) {
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *UserStudentHandler) CreateUser(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Пользователь с таким email уже существует"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать пользователя"})
 		return
 	}
 
@@ -102,7 +102,7 @@ type UpdateUserRequest struct {
 func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || userID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
 		return
 	}
 
@@ -115,10 +115,10 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 	var user models.User
 	if err := h.db.First(&user, userID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения пользователя"})
 		return
 	}
 
@@ -147,7 +147,7 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 	if req.Password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 			return
 		}
 		user.Password = string(hashedPassword)
@@ -159,7 +159,7 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Пользователь с таким email уже существует"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить пользователя"})
 		return
 	}
 
@@ -171,13 +171,13 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 func (h *UserStudentHandler) GetUserChildren(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || userID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
 		return
 	}
 
 	var links []models.UserStudent
 	if err := h.db.Where("user_id = ?", userID).Preload("Student").Find(&links).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch children"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка детей"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"children": links})
@@ -191,7 +191,7 @@ type AddChildRequest struct {
 func (h *UserStudentHandler) AddUserChild(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || userID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
 		return
 	}
 
@@ -203,13 +203,13 @@ func (h *UserStudentHandler) AddUserChild(c *gin.Context) {
 
 	var user models.User
 	if err := h.db.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		return
 	}
 
 	var student models.Student
 	if err := h.db.First(&student, req.StudentID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Ученик не найден"})
 		return
 	}
 
@@ -223,7 +223,7 @@ func (h *UserStudentHandler) AddUserChild(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Этот ученик уже привязан к данному пользователю"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add child"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось привязать ученика"})
 		return
 	}
 
@@ -235,23 +235,23 @@ func (h *UserStudentHandler) AddUserChild(c *gin.Context) {
 func (h *UserStudentHandler) RemoveUserChild(c *gin.Context) {
 	userID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || userID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
 		return
 	}
 
 	studentID, err := strconv.Atoi(c.Param("studentId"))
 	if err != nil || studentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID ученика"})
 		return
 	}
 
 	result := h.db.Where("user_id = ? AND student_id = ?", userID, studentID).Delete(&models.UserStudent{})
 	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove child"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отвязать ученика"})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Link not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Связь не найдена"})
 		return
 	}
 
@@ -264,7 +264,7 @@ func (h *UserStudentHandler) GetMyChildren(c *gin.Context) {
 
 	var links []models.UserStudent
 	if err := h.db.Where("user_id = ?", userID).Preload("Student").Find(&links).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch children"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка детей"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"children": links})
@@ -276,7 +276,7 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 
 	studentID, err := strconv.Atoi(c.Param("studentId"))
 	if err != nil || studentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID ученика"})
 		return
 	}
 
@@ -289,13 +289,13 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 
 	weekStart := c.Query("week_start")
 	if weekStart == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start query param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр week_start обязателен"})
 		return
 	}
 
 	parsedWeekStart, err := time.Parse("2006-01-02", weekStart)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start must be in YYYY-MM-DD format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр week_start должен быть в формате YYYY-MM-DD"})
 		return
 	}
 
@@ -306,7 +306,7 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Опубликованное расписание на эту неделю не найдено"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения расписания"})
 		return
 	}
 
@@ -323,7 +323,7 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 		Where("schedule_id = ? AND status != ?", schedule.ID, models.ScheduleSlotStatusCancelled).
 		Order("weekday ASC, start_time ASC").
 		Find(&allSlots).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slots"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения слотов"})
 		return
 	}
 
@@ -375,19 +375,19 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	role, _ := c.Get("role")
 	if role != string(models.RoleTeacher) && role != string(models.RoleAdmin) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Teacher access required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для преподавателей"})
 		return
 	}
 
 	weekStart := c.Query("week_start")
 	if weekStart == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start query param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр week_start обязателен"})
 		return
 	}
 
 	parsedWeekStart, err := time.Parse("2006-01-02", weekStart)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start must be in YYYY-MM-DD format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр week_start должен быть в формате YYYY-MM-DD"})
 		return
 	}
 
@@ -395,7 +395,7 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query("teacher_id")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID преподавателя"})
 			return
 		}
 		teacherID = uint(parsed)
@@ -405,7 +405,7 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	if raw := strings.TrimSpace(c.Query("student_id")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil || parsed <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID ученика"})
 			return
 		}
 		studentID = uint(parsed)
@@ -417,7 +417,7 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Опубликованное расписание на эту неделю не найдено"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения расписания"})
 		return
 	}
 
@@ -439,7 +439,7 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	}
 
 	if err := query.Order("weekday ASC, start_time ASC, id ASC").Find(&slots).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slots"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения слотов"})
 		return
 	}
 
@@ -492,19 +492,19 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 func (h *UserStudentHandler) GetTeacherScheduleOptions(c *gin.Context) {
 	role, _ := c.Get("role")
 	if role != string(models.RoleTeacher) && role != string(models.RoleAdmin) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Teacher access required"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для преподавателей"})
 		return
 	}
 
 	var teachers []models.Teacher
 	if err := h.db.Where("is_active = ?", true).Order("full_name ASC").Find(&teachers).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teachers"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка преподавателей"})
 		return
 	}
 
 	var students []models.Student
 	if err := h.db.Where("is_active = ?", true).Order("full_name ASC").Find(&students).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch students"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка учеников"})
 		return
 	}
 

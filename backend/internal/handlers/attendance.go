@@ -13,22 +13,22 @@ import (
 func (h *ScheduleHandler) GetSlotAttendance(c *gin.Context) {
 	slotID, err := strconv.Atoi(c.Param("slotId"))
 	if err != nil || slotID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var slot models.ScheduleSlot
 	if err := h.db.First(&slot, slotID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Slot not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch slot"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if slot.SlotType != models.SlotTypeGroup {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Slot is not a group lesson"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Слот не является групповым занятием"})
 		return
 	}
 
@@ -37,7 +37,7 @@ func (h *ScheduleHandler) GetSlotAttendance(c *gin.Context) {
 		Where("schedule_slot_id = ?", slotID).
 		Order("student_id ASC").
 		Find(&attendance).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch attendance"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -48,7 +48,7 @@ func (h *ScheduleHandler) GetSlotAttendance(c *gin.Context) {
 func (h *ScheduleHandler) AddSlotStudent(c *gin.Context) {
 	slotID, err := strconv.Atoi(c.Param("slotId"))
 	if err != nil || slotID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -62,17 +62,17 @@ func (h *ScheduleHandler) AddSlotStudent(c *gin.Context) {
 
 	var slot models.ScheduleSlot
 	if err := h.db.First(&slot, slotID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Slot not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 		return
 	}
 	if slot.SlotType != models.SlotTypeGroup {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Slot is not a group lesson"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Слот не является групповым занятием"})
 		return
 	}
 
 	var student models.Student
 	if err := h.db.First(&student, req.StudentID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Student not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *ScheduleHandler) AddSlotStudent(c *gin.Context) {
 		StudentID:      req.StudentID,
 	}
 	if err := h.db.Create(&record).Error; err != nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Student already in this session"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Ученик уже добавлен в этот слот"})
 		return
 	}
 
@@ -93,12 +93,12 @@ func (h *ScheduleHandler) AddSlotStudent(c *gin.Context) {
 func (h *ScheduleHandler) UpdateAttendance(c *gin.Context) {
 	slotID, err := strconv.Atoi(c.Param("slotId"))
 	if err != nil || slotID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 	studentID, err := strconv.Atoi(c.Param("studentId"))
 	if err != nil || studentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -114,13 +114,13 @@ func (h *ScheduleHandler) UpdateAttendance(c *gin.Context) {
 	if err := h.db.Preload("Student").
 		Where("schedule_slot_id = ? AND student_id = ?", slotID, studentID).
 		First(&record).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Attendance record not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись посещаемости не найдена"})
 		return
 	}
 
 	record.Attended = req.Attended
 	if err := h.db.Save(&record).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update attendance"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить запись"})
 		return
 	}
 
@@ -131,23 +131,23 @@ func (h *ScheduleHandler) UpdateAttendance(c *gin.Context) {
 func (h *ScheduleHandler) RemoveSlotStudent(c *gin.Context) {
 	slotID, err := strconv.Atoi(c.Param("slotId"))
 	if err != nil || slotID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid slot id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 	studentID, err := strconv.Atoi(c.Param("studentId"))
 	if err != nil || studentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	result := h.db.Where("schedule_slot_id = ? AND student_id = ?", slotID, studentID).
 		Delete(&models.GroupLessonAttendance{})
 	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove student"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 		return
 	}
 

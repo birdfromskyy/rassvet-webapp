@@ -33,7 +33,7 @@ func (h *SiteSettingHandler) GetByKey(c *gin.Context) {
 	key := c.Param("key")
 	var setting models.SiteSetting
 	if err := h.db.Where("key = ?", key).First(&setting).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "setting not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Настройка не найдена"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"key": setting.Key, "value": setting.Value})

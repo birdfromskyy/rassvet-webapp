@@ -70,7 +70,7 @@ func (h *ServiceCmsHandler) UpdateService(c *gin.Context) {
 	id := c.Param("id")
 	var service models.ServiceItem
 	if err := h.db.First(&service, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "service not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Услуга не найдена"})
 		return
 	}
 

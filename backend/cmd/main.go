@@ -7,6 +7,7 @@ import (
 	"backend/internal/middleware"
 	"backend/internal/services"
 	"log"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -30,12 +31,13 @@ func main() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowOrigins:     []string{cfg.FrontendURL},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
+	r.Use(middleware.SecurityHeaders())
 
 	// Serve uploaded files
 	r.Static("/uploads", "./uploads")
@@ -57,6 +59,9 @@ func main() {
 	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
 	userStudentHandler := handlers.NewUserStudentHandler(db)
 
+	// Document submissions handler
+	documentHandler := handlers.NewDocumentHandler(db, cfg.JWTSecret, rdb)
+
 	// CMS handlers
 	cmsFileHandler := handlers.NewCmsFileHandler(db)
 	historyHandler := handlers.NewHistoryHandler(db)
@@ -65,13 +70,16 @@ func main() {
 	finZoneHandler := handlers.NewFinZoneHandler(db)
 	siteSettingHandler := handlers.NewSiteSettingHandler(db)
 
-	// Public auth routes
-	r.POST("/api/register", authHandler.Register)
-	r.POST("/api/login", authHandler.Login)
-	r.POST("/api/verify-email", authHandler.VerifyEmail)
-	r.POST("/api/resend-code", authHandler.ResendCode)
-	r.POST("/api/forgot-password", authHandler.ForgotPassword)
-	r.POST("/api/reset-password", authHandler.ResetPassword)
+	// Public auth routes (rate limited per IP)
+	r.POST("/api/register",       middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.Register)
+	r.POST("/api/login",          middleware.IPRateLimit(rdb, 15, 5*time.Minute), authHandler.Login)
+	r.POST("/api/verify-email",   middleware.IPRateLimit(rdb, 10, 5*time.Minute), authHandler.VerifyEmail)
+	r.POST("/api/resend-code",    middleware.IPRateLimit(rdb, 5, 5*time.Minute),  authHandler.ResendCode)
+	r.POST("/api/forgot-password",middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.ForgotPassword)
+	r.POST("/api/reset-password", middleware.IPRateLimit(rdb, 10, 15*time.Minute), authHandler.ResetPassword)
+
+	// Private file serving — auth validated inside handler (Bearer or ?token=)
+	r.GET("/api/documents/file/:filename", documentHandler.ServePrivateFile)
 
 	// Public CMS routes (no auth required)
 	r.GET("/api/employees", teacherHandler.GetPublicTeachers)
@@ -250,6 +258,14 @@ func main() {
 			// Reports
 			admin.GET("/reports/monthly", reportHandler.GetMonthlyReport)
 
+			// Document submissions (admin review)
+			admin.GET("/documents", documentHandler.AdminListDocuments)
+			admin.PUT("/documents/submissions/:id/status", documentHandler.AdminUpdateSubmissionStatus)
+			admin.DELETE("/documents/submissions/:id", documentHandler.AdminDeleteSubmission)
+			admin.PUT("/documents/parent/:userId/status", documentHandler.AdminUpdateParentStatus)
+			admin.DELETE("/documents/parent/:userId", documentHandler.AdminDeleteParentProfile)
+			admin.DELETE("/documents/user/:userId/personal-data", documentHandler.AdminDeletePersonalData)
+
 			// Users
 			admin.GET("/users", userStudentHandler.GetUsers)
 			admin.POST("/users", userStudentHandler.CreateUser)
@@ -263,6 +279,13 @@ func main() {
 		protected.GET("/my-children/:studentId/schedule", userStudentHandler.GetChildSchedule)
 		protected.GET("/teacher/schedule", userStudentHandler.GetTeacherPublishedSchedule)
 		protected.GET("/teacher/schedule/options", userStudentHandler.GetTeacherScheduleOptions)
+
+		// Document submissions (parent + children docs)
+		protected.GET("/documents", documentHandler.GetMyDocuments)
+		protected.POST("/documents/parent", documentHandler.SaveParentDocs)
+		protected.POST("/documents/children", documentHandler.AddChildDocs)
+		protected.DELETE("/documents/children/:id", documentHandler.DeleteChildSubmission)
+		protected.PUT("/documents/children/:id", documentHandler.UpdateChildDocs)
 	}
 
 	if err := r.Run(":" + cfg.Port); err != nil {

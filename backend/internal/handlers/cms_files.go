@@ -29,7 +29,7 @@ type CmsFileRequest struct {
 func (h *CmsFileHandler) GetBySection(c *gin.Context) {
 	section := c.Query("section")
 	if section == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "section query param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр section обязателен"})
 		return
 	}
 
@@ -87,7 +87,7 @@ func (h *CmsFileHandler) UpdateFile(c *gin.Context) {
 	id := c.Param("id")
 	var file models.CmsFile
 	if err := h.db.First(&file, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Файл не найден"})
 		return
 	}
 

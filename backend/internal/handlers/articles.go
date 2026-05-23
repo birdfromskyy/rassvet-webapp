@@ -101,7 +101,7 @@ func (h *ArticleHandler) GetArticleBySlug(c *gin.Context) {
 	if err := h.db.Preload("Blocks", func(db *gorm.DB) *gorm.DB {
 		return db.Order("sort_order ASC")
 	}).Where("slug = ? AND status = ?", slug, "published").First(&article).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Статья не найдена"})
 		return
 	}
 	c.JSON(http.StatusOK, article)
@@ -131,7 +131,7 @@ func (h *ArticleHandler) GetArticleByID(c *gin.Context) {
 	if err := h.db.Preload("Blocks", func(db *gorm.DB) *gorm.DB {
 		return db.Order("sort_order ASC")
 	}).First(&article, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Статья не найдена"})
 		return
 	}
 	c.JSON(http.StatusOK, article)
@@ -148,7 +148,7 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 	var count int64
 	h.db.Model(&models.Article{}).Where("slug = ?", req.Slug).Count(&count)
 	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "slug already exists"})
+		c.JSON(http.StatusConflict, gin.H{"error": "URL-адрес (slug) уже занят другой статьёй"})
 		return
 	}
 
@@ -187,7 +187,7 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	id := c.Param("id")
 	var article models.Article
 	if err := h.db.First(&article, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Статья не найдена"})
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	var count int64
 	h.db.Model(&models.Article{}).Where("slug = ? AND id != ?", req.Slug, article.ID).Count(&count)
 	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "slug already exists"})
+		c.JSON(http.StatusConflict, gin.H{"error": "URL-адрес (slug) уже занят другой статьёй"})
 		return
 	}
 

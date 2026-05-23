@@ -72,7 +72,7 @@ func (h *FinZoneHandler) UpdateFinZone(c *gin.Context) {
 	id := c.Param("id")
 	var zone models.FinZone
 	if err := h.db.First(&zone, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "zone not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Финансовая зона не найдена"})
 		return
 	}
 
