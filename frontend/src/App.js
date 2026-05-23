@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Home from './pages/Home';
-
+import ScrollToTop from "./components/ScrollToTop/ScrollToTop";
 import ServicesListPage from "./pages/ServicesListPage";
 import Mission from './pages/Mission'
 import History from './pages/History'
@@ -53,6 +53,7 @@ import AdminRoute from './components/AdminRoute'
 import ForgotPassword from './pages/ForgotPassword/ForgotPassword'
 import Profile from './pages/Profile/Profile'
 import FinActivities from './pages/FinActivities';
+import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
 
 function App() {
 	const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -105,6 +106,7 @@ function App() {
 
 	return (
 		<>
+		  <ScrollToTop />
 			<Routes>
 				<Route path='/forgot-password' element={<ForgotPassword />} />
 				<Route
@@ -195,6 +197,7 @@ function App() {
 
 				<Route path='/main' element={<Home />} />
 <Route path='/mission' element={<Mission />} />
+<Route path="/service-algorithm" element={<ServiceAlgorithm />} />
 <Route path='/fin-activities' element={<FinActivities />} />
 <Route path='/services-list' element={<ServicesListPage />} />
 <Route path='/history' element={<History />} />
