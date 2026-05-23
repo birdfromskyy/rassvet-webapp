@@ -79,13 +79,13 @@ func (h *TeacherHandler) GetTeachers(c *gin.Context) {
 		case "false":
 			query = query.Where("is_active = ?", false)
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid is_active value"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректное значение параметра is_active"})
 			return
 		}
 	}
 
 	if err := query.Find(&teachers).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teachers"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -95,17 +95,17 @@ func (h *TeacherHandler) GetTeachers(c *gin.Context) {
 func (h *TeacherHandler) GetTeacherByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 
 	req.FullName = strings.TrimSpace(req.FullName)
 	if req.FullName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "full_name is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Поле «ФИО» обязательно"})
 		return
 	}
 
@@ -148,13 +148,13 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&teacher).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать преподавателя"})
 		return
 	}
 
 	if !isActive {
 		if err := h.db.Model(&teacher).Update("is_active", false).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать преподавателя"})
 			return
 		}
 		teacher.IsActive = false
@@ -169,7 +169,7 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -182,17 +182,17 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if req.FullName != "" {
 		req.FullName = strings.TrimSpace(req.FullName)
 		if req.FullName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "full_name cannot be empty"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ФИО не может быть пустым"})
 			return
 		}
 		teacher.FullName = req.FullName
@@ -214,7 +214,7 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 	}
 
 	if err := h.db.Save(&teacher).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить преподавателя"})
 		return
 	}
 
@@ -227,24 +227,24 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 func (h *TeacherHandler) DeactivateTeacher(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	teacher.IsActive = false
 
 	if err := h.db.Save(&teacher).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deactivate teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -257,17 +257,17 @@ func (h *TeacherHandler) DeactivateTeacher(c *gin.Context) {
 func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -275,7 +275,7 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 	if err := h.db.Model(&models.Assignment{}).
 		Where("teacher_id = ? AND status = ?", teacher.ID, models.AssignmentStatusActive).
 		Count(&activeAssignments).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check teacher assignments"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 	if activeAssignments > 0 {
@@ -319,7 +319,7 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 		return tx.Delete(&teacher).Error
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить преподавателя"})
 		return
 	}
 
@@ -329,17 +329,17 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 func (h *TeacherHandler) GetTeacherSubjects(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -347,7 +347,7 @@ func (h *TeacherHandler) GetTeacherSubjects(c *gin.Context) {
 	if err := h.db.Preload("Subject").
 		Where("teacher_id = ?", teacherID).
 		Find(&teacherSubjects).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher subjects"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -361,7 +361,7 @@ func (h *TeacherHandler) GetTeacherSubjects(c *gin.Context) {
 func (h *TeacherHandler) UpdateTeacherSubjects(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -374,17 +374,17 @@ func (h *TeacherHandler) UpdateTeacherSubjects(c *gin.Context) {
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	uniqueSubjectIDs := make(map[uint]struct{})
 	for _, id := range req.SubjectIDs {
 		if id == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Subject id must be positive"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID предмета должен быть положительным числом"})
 			return
 		}
 		uniqueSubjectIDs[id] = struct{}{}
@@ -400,25 +400,25 @@ func (h *TeacherHandler) UpdateTeacherSubjects(c *gin.Context) {
 		if err := h.db.Model(&models.Subject{}).
 			Where("id IN ?", subjectIDs).
 			Count(&count).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate subjects"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки предметов"})
 			return
 		}
 
 		if count != int64(len(subjectIDs)) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "One or more subject ids are invalid"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Один или несколько ID предметов не существуют"})
 			return
 		}
 	}
 
 	tx := h.db.Begin()
 	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
 	if err := tx.Where("teacher_id = ?", teacherID).Delete(&models.TeacherSubject{}).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear teacher subjects"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -433,13 +433,13 @@ func (h *TeacherHandler) UpdateTeacherSubjects(c *gin.Context) {
 
 		if err := tx.Create(&teacherSubjects).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save teacher subjects"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сохранить данные"})
 			return
 		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -447,7 +447,7 @@ func (h *TeacherHandler) UpdateTeacherSubjects(c *gin.Context) {
 	if err := h.db.Preload("Subject").
 		Where("teacher_id = ?", teacherID).
 		Find(&updatedTeacherSubjects).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated teacher subjects"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -462,17 +462,17 @@ func (h *TeacherHandler) UpdateTeacherSubjects(c *gin.Context) {
 func (h *TeacherHandler) GetTeacherAvailability(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -480,7 +480,7 @@ func (h *TeacherHandler) GetTeacherAvailability(c *gin.Context) {
 	if err := h.db.Where("teacher_id = ?", teacherID).
 		Order("weekday ASC, start_time ASC").
 		Find(&availability).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher availability"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -494,7 +494,7 @@ func (h *TeacherHandler) GetTeacherAvailability(c *gin.Context) {
 func (h *TeacherHandler) CreateTeacherAvailability(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -507,25 +507,25 @@ func (h *TeacherHandler) CreateTeacherAvailability(c *gin.Context) {
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if !isValidWeekday(req.Weekday) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 7"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "День недели должен быть от 1 до 7"})
 		return
 	}
 
 	if !isValidTimeHHMM(req.StartTime) || !isValidTimeHHMM(req.EndTime) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "start_time and end_time must be in HH:MM format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала и окончания должно быть в формате ЧЧ:ММ"})
 		return
 	}
 
 	if !isStartBeforeEnd(req.StartTime, req.EndTime) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "start_time must be earlier than end_time"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала должно быть раньше времени окончания"})
 		return
 	}
 
@@ -537,7 +537,7 @@ func (h *TeacherHandler) CreateTeacherAvailability(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&availability).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create teacher availability"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать запись"})
 		return
 	}
 
@@ -550,13 +550,13 @@ func (h *TeacherHandler) CreateTeacherAvailability(c *gin.Context) {
 func (h *TeacherHandler) UpdateTeacherAvailability(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	availabilityID, err := strconv.Atoi(c.Param("availabilityId"))
 	if err != nil || availabilityID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid availability id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -570,16 +570,16 @@ func (h *TeacherHandler) UpdateTeacherAvailability(c *gin.Context) {
 	if err := h.db.Where("id = ? AND teacher_id = ?", availabilityID, teacherID).
 		First(&availability).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher availability not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Окно доступности преподавателя не найдено"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher availability"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if req.Weekday != nil {
 		if !isValidWeekday(*req.Weekday) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "weekday must be between 1 and 7"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "День недели должен быть от 1 до 7"})
 			return
 		}
 		availability.Weekday = *req.Weekday
@@ -587,7 +587,7 @@ func (h *TeacherHandler) UpdateTeacherAvailability(c *gin.Context) {
 
 	if req.StartTime != "" {
 		if !isValidTimeHHMM(req.StartTime) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "start_time must be in HH:MM format"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала должно быть в формате ЧЧ:ММ"})
 			return
 		}
 		availability.StartTime = req.StartTime
@@ -595,19 +595,19 @@ func (h *TeacherHandler) UpdateTeacherAvailability(c *gin.Context) {
 
 	if req.EndTime != "" {
 		if !isValidTimeHHMM(req.EndTime) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "end_time must be in HH:MM format"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Время окончания должно быть в формате ЧЧ:ММ"})
 			return
 		}
 		availability.EndTime = req.EndTime
 	}
 
 	if !isStartBeforeEnd(availability.StartTime, availability.EndTime) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "start_time must be earlier than end_time"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала должно быть раньше времени окончания"})
 		return
 	}
 
 	if err := h.db.Save(&availability).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update teacher availability"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить запись"})
 		return
 	}
 
@@ -620,13 +620,13 @@ func (h *TeacherHandler) UpdateTeacherAvailability(c *gin.Context) {
 func (h *TeacherHandler) DeleteTeacherAvailability(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	availabilityID, err := strconv.Atoi(c.Param("availabilityId"))
 	if err != nil || availabilityID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid availability id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -634,15 +634,15 @@ func (h *TeacherHandler) DeleteTeacherAvailability(c *gin.Context) {
 	if err := h.db.Where("id = ? AND teacher_id = ?", availabilityID, teacherID).
 		First(&availability).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher availability not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Окно доступности преподавателя не найдено"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher availability"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if err := h.db.Delete(&availability).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete teacher availability"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
 		return
 	}
 
@@ -661,23 +661,23 @@ type UpdateTeacherRoomsRequest struct {
 func (h *TeacherHandler) GetTeacherRooms(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	var teacherRooms []models.TeacherRoom
 	if err := h.db.Preload("Room").Where("teacher_id = ?", teacherID).Find(&teacherRooms).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher rooms"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -691,17 +691,17 @@ func (h *TeacherHandler) GetTeacherRooms(c *gin.Context) {
 func (h *TeacherHandler) UpdateTeacherRooms(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -715,7 +715,7 @@ func (h *TeacherHandler) UpdateTeacherRooms(c *gin.Context) {
 
 	if err := tx.Where("teacher_id = ?", teacherID).Delete(&models.TeacherRoom{}).Error; err != nil {
 		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear teacher rooms"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -730,13 +730,13 @@ func (h *TeacherHandler) UpdateTeacherRooms(c *gin.Context) {
 		}
 		if err := tx.Create(&teacherRooms).Error; err != nil {
 			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save teacher rooms"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сохранить данные"})
 			return
 		}
 	}
 
 	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 

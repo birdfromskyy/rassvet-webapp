@@ -96,11 +96,11 @@ func (h *GroupLessonHandler) CreateGroupLesson(c *gin.Context) {
 	}
 
 	if req.VisitsPerWeek <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week должен быть больше 0"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Количество занятий в неделю должно быть больше 0"})
 		return
 	}
 	if req.DurationMin <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_min должен быть больше 0"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия должна быть больше 0"})
 		return
 	}
 
@@ -348,7 +348,7 @@ func (h *GroupLessonHandler) CreateWeekOverride(c *gin.Context) {
 
 	weekDate, err := parseDate(req.WeekStartDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start_date должен быть в формате YYYY-MM-DD"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Дата начала недели должна быть в формате YYYY-MM-DD"})
 		return
 	}
 

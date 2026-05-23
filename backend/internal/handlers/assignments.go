@@ -89,7 +89,7 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 	if teacherID := c.Query("teacher_id"); teacherID != "" {
 		id, err := strconv.Atoi(teacherID)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 			return
 		}
 		query = query.Where("teacher_id = ?", id)
@@ -98,7 +98,7 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 	if studentID := c.Query("student_id"); studentID != "" {
 		id, err := strconv.Atoi(studentID)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid student_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 			return
 		}
 		query = query.Where("student_id = ?", id)
@@ -107,7 +107,7 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 	if subjectID := c.Query("subject_id"); subjectID != "" {
 		id, err := strconv.Atoi(subjectID)
 		if err != nil || id <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 			return
 		}
 		query = query.Where("subject_id = ?", id)
@@ -115,14 +115,14 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 
 	if status := c.Query("status"); status != "" {
 		if !isValidAssignmentStatus(status) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный статус"})
 			return
 		}
 		query = query.Where("status = ?", status)
 	}
 
 	if err := query.Find(&assignments).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignments"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -132,7 +132,7 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 func (h *AssignmentHandler) GetAssignmentByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -143,10 +143,10 @@ func (h *AssignmentHandler) GetAssignmentByID(c *gin.Context) {
 		Preload("Subject").
 		First(&assignment, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -156,17 +156,17 @@ func (h *AssignmentHandler) GetAssignmentByID(c *gin.Context) {
 func (h *AssignmentHandler) GetTeacherAssignments(c *gin.Context) {
 	teacherID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || teacherID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid teacher id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -178,7 +178,7 @@ func (h *AssignmentHandler) GetTeacherAssignments(c *gin.Context) {
 		Where("teacher_id = ?", teacherID).
 		Order("id ASC").
 		Find(&assignments).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch teacher assignments"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -197,24 +197,24 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	}
 
 	if req.StudentID == 0 || req.TeacherID == 0 || req.SubjectID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "student_id, teacher_id and subject_id must be positive"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID ученика, преподавателя и предмета должны быть положительными числами"})
 		return
 	}
 
 	if !isValidVisitsPerWeek(req.VisitsPerWeek) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week must be between 1 and 5"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Количество занятий в неделю должно быть от 1 до 5"})
 		return
 	}
 
 	if !isValidDurationMin(req.DurationMin) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_min must be 30 or 50"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия должна быть 30 или 50 минут"})
 		return
 	}
 
 	status := models.AssignmentStatusActive
 	if strings.TrimSpace(req.Status) != "" {
 		if !isValidAssignmentStatus(req.Status) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 'active' or 'paused'"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть active или paused"})
 			return
 		}
 		status = req.Status
@@ -223,7 +223,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	fundingType := models.FundingTypeBudget
 	if strings.TrimSpace(req.FundingType) != "" {
 		if !isValidFundingType(req.FundingType) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "funding_type must be 'paid' or 'budget'"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Тип финансирования должен быть paid или budget"})
 			return
 		}
 		fundingType = req.FundingType
@@ -237,30 +237,30 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	var student models.Student
 	if err := h.db.First(&student, req.StudentID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Student not found"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Ученик не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate student"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки ученика"})
 		return
 	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, req.TeacherID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Teacher not found"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Преподаватель не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate teacher"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки преподавателя"})
 		return
 	}
 
 	var subject models.Subject
 	if err := h.db.First(&subject, req.SubjectID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Subject not found"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Предмет не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки предмета"})
 		return
 	}
 
@@ -268,10 +268,10 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	if err := h.db.Where("teacher_id = ? AND subject_id = ?", req.TeacherID, req.SubjectID).
 		First(&teacherSubject).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Teacher does not teach this subject"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Этот преподаватель не ведёт указанный предмет"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate teacher subject relation"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Этот преподаватель не ведёт указанный предмет"})
 		return
 	}
 
@@ -282,10 +282,10 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		req.TeacherID,
 		req.SubjectID,
 	).First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Assignment already exists"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Запись с такими данными уже существует"})
 		return
 	} else if err != nil && err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check assignment uniqueness"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -301,7 +301,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&assignment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать запись"})
 		return
 	}
 
@@ -310,7 +310,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		Preload("Teacher").
 		Preload("Subject").
 		First(&assignment, assignment.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch created assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -323,7 +323,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -336,10 +336,10 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 	var assignment models.Assignment
 	if err := h.db.First(&assignment, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -349,7 +349,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if req.StudentID != nil {
 		if *req.StudentID == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "student_id must be positive"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID ученика должен быть положительным числом"})
 			return
 		}
 		newStudentID = *req.StudentID
@@ -357,7 +357,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if req.TeacherID != nil {
 		if *req.TeacherID == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "teacher_id must be positive"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID преподавателя должен быть положительным числом"})
 			return
 		}
 		newTeacherID = *req.TeacherID
@@ -365,7 +365,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if req.SubjectID != nil {
 		if *req.SubjectID == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "subject_id must be positive"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ID предмета должен быть положительным числом"})
 			return
 		}
 		newSubjectID = *req.SubjectID
@@ -373,7 +373,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if strings.TrimSpace(req.FundingType) != "" {
 		if !isValidFundingType(req.FundingType) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "funding_type must be 'paid' or 'budget'"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Тип финансирования должен быть paid или budget"})
 			return
 		}
 		assignment.FundingType = req.FundingType
@@ -381,7 +381,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if req.VisitsPerWeek != nil {
 		if !isValidVisitsPerWeek(*req.VisitsPerWeek) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "visits_per_week must be between 1 and 5"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Количество занятий в неделю должно быть от 1 до 5"})
 			return
 		}
 		assignment.VisitsPerWeek = *req.VisitsPerWeek
@@ -389,7 +389,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if req.DurationMin != nil {
 		if !isValidDurationMin(*req.DurationMin) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "duration_min must be 30 or 50"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия должна быть 30 или 50 минут"})
 			return
 		}
 		assignment.DurationMin = *req.DurationMin
@@ -397,7 +397,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 
 	if strings.TrimSpace(req.Status) != "" {
 		if !isValidAssignmentStatus(req.Status) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 'active' or 'paused'"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть active или paused"})
 			return
 		}
 		assignment.Status = req.Status
@@ -411,10 +411,10 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		var student models.Student
 		if err := h.db.First(&student, newStudentID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Student not found"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Ученик не найден"})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate student"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки ученика"})
 			return
 		}
 		assignment.StudentID = newStudentID
@@ -424,10 +424,10 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		var teacher models.Teacher
 		if err := h.db.First(&teacher, newTeacherID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Teacher not found"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Преподаватель не найден"})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate teacher"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки преподавателя"})
 			return
 		}
 		assignment.TeacherID = newTeacherID
@@ -437,10 +437,10 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		var subject models.Subject
 		if err := h.db.First(&subject, newSubjectID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Subject not found"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Предмет не найден"})
 				return
 			}
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate subject"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки предмета"})
 			return
 		}
 		assignment.SubjectID = newSubjectID
@@ -450,10 +450,10 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 	if err := h.db.Where("teacher_id = ? AND subject_id = ?", assignment.TeacherID, assignment.SubjectID).
 		First(&teacherSubject).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Teacher does not teach this subject"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Этот преподаватель не ведёт указанный предмет"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate teacher subject relation"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Этот преподаватель не ведёт указанный предмет"})
 		return
 	}
 
@@ -465,15 +465,15 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		assignment.SubjectID,
 		assignment.ID,
 	).First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Assignment already exists"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Запись с такими данными уже существует"})
 		return
 	} else if err != nil && err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check assignment uniqueness"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
 	if err := h.db.Save(&assignment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить запись"})
 		return
 	}
 
@@ -482,7 +482,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		Preload("Teacher").
 		Preload("Subject").
 		First(&assignment, assignment.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -495,17 +495,17 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var assignment models.Assignment
 	if err := h.db.First(&assignment, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -527,7 +527,7 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 			return tx.Delete(&assignment).Error
 		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete paused assignment"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
 			return
 		}
 
@@ -542,7 +542,7 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить назначение: есть связанные слоты расписания. Сначала удалите их или сбросьте расписание."})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
 		return
 	}
 
@@ -554,13 +554,13 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 func (h *AssignmentHandler) GetAssignmentWeekOverrides(c *gin.Context) {
 	weekStart := strings.TrimSpace(c.Query("week_start"))
 	if weekStart == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start query param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр week_start обязателен"})
 		return
 	}
 
 	parsedWeekStart, err := parseWeekStartDate(weekStart)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start must be in YYYY-MM-DD format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Параметр week_start должен быть в формате YYYY-MM-DD"})
 		return
 	}
 
@@ -573,7 +573,7 @@ func (h *AssignmentHandler) GetAssignmentWeekOverrides(c *gin.Context) {
 		Where("week_start_date = ?", parsedWeekStart).
 		Order("id ASC").
 		Find(&overrides).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment week overrides"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -586,7 +586,7 @@ func (h *AssignmentHandler) GetAssignmentWeekOverrides(c *gin.Context) {
 func (h *AssignmentHandler) CreateAssignmentWeekOverride(c *gin.Context) {
 	assignmentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || assignmentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -599,33 +599,33 @@ func (h *AssignmentHandler) CreateAssignmentWeekOverride(c *gin.Context) {
 	var assignment models.Assignment
 	if err := h.db.First(&assignment, assignmentID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	parsedWeekStart, err := parseWeekStartDate(req.WeekStartDate)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "week_start_date must be in YYYY-MM-DD format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Дата начала недели должна быть в формате YYYY-MM-DD"})
 		return
 	}
 
 	if !isValidPlannedVisits(req.PlannedVisits) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "planned_visits must be between 0 and 3"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Количество планируемых занятий должно быть от 0 до 3"})
 		return
 	}
 
 	if req.DurationMin != nil && !isValidDurationMin(*req.DurationMin) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_min must be 30 or 50"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия должна быть 30 или 50 минут"})
 		return
 	}
 
 	status := models.AssignmentStatusActive
 	if strings.TrimSpace(req.Status) != "" {
 		if !isValidAssignmentStatus(req.Status) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 'active' or 'paused'"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть active или paused"})
 			return
 		}
 		status = req.Status
@@ -634,10 +634,10 @@ func (h *AssignmentHandler) CreateAssignmentWeekOverride(c *gin.Context) {
 	var existing models.AssignmentWeekOverride
 	if err := h.db.Where("assignment_id = ? AND week_start_date = ?", assignmentID, parsedWeekStart).
 		First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Week override already exists for this assignment and week"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Недельное исключение для этого назначения уже существует"})
 		return
 	} else if err != nil && err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check week override uniqueness"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -651,14 +651,14 @@ func (h *AssignmentHandler) CreateAssignmentWeekOverride(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&override).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create assignment week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать запись"})
 		return
 	}
 
 	if err := h.db.
 		Preload("Assignment").
 		First(&override, override.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch created week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -671,13 +671,13 @@ func (h *AssignmentHandler) CreateAssignmentWeekOverride(c *gin.Context) {
 func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 	assignmentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || assignmentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	overrideID, err := strconv.Atoi(c.Param("overrideId"))
 	if err != nil || overrideID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid override id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -691,17 +691,17 @@ func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 	if err := h.db.Where("id = ? AND assignment_id = ?", overrideID, assignmentID).
 		First(&override).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Assignment week override not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Недельное исключение для назначения не найдено"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if strings.TrimSpace(req.WeekStartDate) != "" {
 		parsedWeekStart, err := parseWeekStartDate(req.WeekStartDate)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "week_start_date must be in YYYY-MM-DD format"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Дата начала недели должна быть в формате YYYY-MM-DD"})
 			return
 		}
 		override.WeekStartDate = parsedWeekStart
@@ -709,7 +709,7 @@ func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 
 	if req.PlannedVisits != nil {
 		if !isValidPlannedVisits(*req.PlannedVisits) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "planned_visits must be between 0 and 3"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Количество планируемых занятий должно быть от 0 до 3"})
 			return
 		}
 		override.PlannedVisits = *req.PlannedVisits
@@ -717,7 +717,7 @@ func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 
 	if req.DurationMin != nil {
 		if !isValidDurationMin(*req.DurationMin) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "duration_min must be 30 or 50"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия должна быть 30 или 50 минут"})
 			return
 		}
 		override.DurationMin = req.DurationMin
@@ -725,7 +725,7 @@ func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 
 	if strings.TrimSpace(req.Status) != "" {
 		if !isValidAssignmentStatus(req.Status) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "status must be 'active' or 'paused'"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть active или paused"})
 			return
 		}
 		override.Status = req.Status
@@ -742,22 +742,22 @@ func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 		override.WeekStartDate,
 		override.ID,
 	).First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Week override already exists for this assignment and week"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Недельное исключение для этого назначения уже существует"})
 		return
 	} else if err != nil && err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check week override uniqueness"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
 	if err := h.db.Save(&override).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update assignment week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить запись"})
 		return
 	}
 
 	if err := h.db.
 		Preload("Assignment").
 		First(&override, override.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -770,13 +770,13 @@ func (h *AssignmentHandler) UpdateAssignmentWeekOverride(c *gin.Context) {
 func (h *AssignmentHandler) DeleteAssignmentWeekOverride(c *gin.Context) {
 	assignmentID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || assignmentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid assignment id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	overrideID, err := strconv.Atoi(c.Param("overrideId"))
 	if err != nil || overrideID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid override id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -784,15 +784,15 @@ func (h *AssignmentHandler) DeleteAssignmentWeekOverride(c *gin.Context) {
 	if err := h.db.Where("id = ? AND assignment_id = ?", overrideID, assignmentID).
 		First(&override).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Assignment week override not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Недельное исключение для назначения не найдено"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch assignment week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if err := h.db.Delete(&override).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete assignment week override"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
 		return
 	}
 

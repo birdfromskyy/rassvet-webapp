@@ -14,7 +14,7 @@ func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			c.Abort()
 			return
 		}
@@ -23,7 +23,7 @@ func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
 
 		claims, err := utils.ValidateToken(tokenString, jwtSecret)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Недействительный токен"})
 			c.Abort()
 			return
 		}
@@ -31,7 +31,7 @@ func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
 		// Check token blacklist (set on logout)
 		blacklistKey := "blacklist:" + tokenString
 		if exists, _ := rdb.Exists(context.Background(), blacklistKey).Result(); exists > 0 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token has been revoked"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Токен аннулирован"})
 			c.Abort()
 			return
 		}
@@ -46,7 +46,7 @@ func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get("role")
 		if !exists || role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для администраторов"})
 			c.Abort()
 			return
 		}

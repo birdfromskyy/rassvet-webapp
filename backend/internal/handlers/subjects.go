@@ -43,13 +43,13 @@ func (h *SubjectHandler) GetSubjects(c *gin.Context) {
 		case "false":
 			query = query.Where("is_active = ?", false)
 		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid is_active value"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректное значение параметра is_active"})
 			return
 		}
 	}
 
 	if err := query.Find(&subjects).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subjects"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -59,17 +59,17 @@ func (h *SubjectHandler) GetSubjects(c *gin.Context) {
 func (h *SubjectHandler) GetSubjectByID(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var subject models.Subject
 	if err := h.db.First(&subject, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Subject not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Предмет не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -85,21 +85,21 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 
 	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Name is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Поле «название» обязательно"})
 		return
 	}
 
 	if req.DefaultDurationMin != 30 && req.DefaultDurationMin != 50 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "default_duration_min must be 30 or 50"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия по умолчанию должна быть 30 или 50 минут"})
 		return
 	}
 
 	var existing models.Subject
 	if err := h.db.Where("LOWER(name) = LOWER(?)", req.Name).First(&existing).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Subject with this name already exists"})
+		c.JSON(http.StatusConflict, gin.H{"error": "Предмет с таким названием уже существует"})
 		return
 	} else if err != nil && err != gorm.ErrRecordNotFound {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subject uniqueness"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -115,7 +115,7 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 	}
 
 	if err := h.db.Select("Name", "DefaultDurationMin", "IsActive").Create(&subject).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать предмет"})
 		return
 	}
 
@@ -123,7 +123,7 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 	// Explicitly update is_active to false if needed.
 	if !isActive {
 		if err := h.db.Model(&subject).Update("is_active", false).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subject"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать предмет"})
 			return
 		}
 		subject.IsActive = false
@@ -138,7 +138,7 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
@@ -151,26 +151,26 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 	var subject models.Subject
 	if err := h.db.First(&subject, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Subject not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Предмет не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	if req.Name != "" {
 		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Name cannot be empty"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Название не может быть пустым"})
 			return
 		}
 
 		var existing models.Subject
 		if err := h.db.Where("LOWER(name) = LOWER(?) AND id <> ?", req.Name, id).First(&existing).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Subject with this name already exists"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Предмет с таким названием уже существует"})
 			return
 		} else if err != nil && err != gorm.ErrRecordNotFound {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subject uniqueness"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 			return
 		}
 
@@ -179,7 +179,7 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 
 	if req.DefaultDurationMin != nil {
 		if *req.DefaultDurationMin != 30 && *req.DefaultDurationMin != 50 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "default_duration_min must be 30 or 50"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия по умолчанию должна быть 30 или 50 минут"})
 			return
 		}
 		subject.DefaultDurationMin = *req.DefaultDurationMin
@@ -190,7 +190,7 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 	}
 
 	if err := h.db.Save(&subject).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить предмет"})
 		return
 	}
 
@@ -203,24 +203,24 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 func (h *SubjectHandler) DeactivateSubject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var subject models.Subject
 	if err := h.db.First(&subject, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Subject not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Предмет не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
 	subject.IsActive = false
 
 	if err := h.db.Save(&subject).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to deactivate subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -233,17 +233,17 @@ func (h *SubjectHandler) DeactivateSubject(c *gin.Context) {
 func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid subject id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
 
 	var subject models.Subject
 	if err := h.db.First(&subject, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Subject not found"})
+			c.JSON(http.StatusNotFound, gin.H{"error": "Предмет не найден"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -252,7 +252,7 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		if err := h.db.Model(&models.Assignment{}).
 			Where("subject_id = ? AND status = ?", subject.ID, models.AssignmentStatusActive).
 			Count(&activeAssignments).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subject assignments"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 			return
 		}
 		if activeAssignments > 0 {
@@ -264,7 +264,7 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		if err := h.db.Model(&models.GroupLesson{}).
 			Where("subject_id = ? AND status = ?", subject.ID, models.GroupLessonStatusActive).
 			Count(&activeGroups).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check subject groups"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 			return
 		}
 		if activeGroups > 0 {
@@ -309,7 +309,7 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 			return tx.Delete(&subject).Error
 		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete inactive subject"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
 			return
 		}
 
@@ -322,7 +322,7 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть связанные назначения. Сначала деактивируйте."})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete subject"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить предмет"})
 		return
 	}
 
