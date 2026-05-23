@@ -149,24 +149,12 @@ const TodayScheduleWidget = ({ user }) => {
           <span className="section-badge">Сегодня</span>
 
           <h2>{isTeacher ? "Ваше расписание" : "Расписание ребёнка"}</h2>
-
-          {!isTeacher && activeChild && <p>{activeChild.student?.full_name}</p>}
         </div>
 
         <button onClick={() => navigate("/my-schedule")}>
           Посмотреть всё расписание
         </button>
       </div>
-
-      {!isTeacher && children.length > 1 && (
-        <div className="dashboard-schedule__switcher">
-          <button onClick={prevChild}>←</button>
-          <span>
-            {activeChildIndex + 1} из {children.length}
-          </span>
-          <button onClick={nextChild}>→</button>
-        </div>
-      )}
 
       {loading ? (
         <div className="dashboard-schedule__empty">Загружаем расписание...</div>
@@ -188,6 +176,15 @@ const TodayScheduleWidget = ({ user }) => {
               </div>
             </article>
           ))}
+        </div>
+      )}
+            {!isTeacher && children.length > 1 && (
+        <div className="dashboard-schedule__switcher">
+          <button onClick={prevChild}>←</button>
+          <span>
+            {activeChild.student?.full_name}
+          </span>
+          <button onClick={nextChild}>→</button>
         </div>
       )}
     </section>
@@ -407,10 +404,10 @@ const Dashboard = ({ user, onLogout }) => {
 
             <div className="dashboard-profile__grid">
               <div className="dashboard-profile__item">
-                <span>Имя</span>
+                <span>ФИО</span>
 
                 <strong>
-                  {user?.first_name} {user?.middle_name} {user?.last_name}
+                  {user?.last_name} {user?.first_name} {user?.middle_name}
                 </strong>
               </div>
 
