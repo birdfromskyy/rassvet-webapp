@@ -40,9 +40,11 @@ import {
 	Add as AddIcon,
 	PersonAdd as PersonAddIcon,
 	Edit as EditIcon,
+	DeleteForever as DeleteDataIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
+import documentService from '../services/documentService'
 
 const EMPTY_FORM = {
 	email: '',
@@ -119,6 +121,9 @@ const AdminUsers = () => {
 	const [children, setChildren] = useState([])
 	const [selectedStudent, setSelectedStudent] = useState(null)
 
+	const [deleteDataDialog, setDeleteDataDialog] = useState({ open: false, user: null })
+	const [deleteDataLoading, setDeleteDataLoading] = useState(false)
+
 	const [createDialog, setCreateDialog] = useState(false)
 	const [createForm, setCreateForm] = useState(EMPTY_FORM)
 	const [createLoading, setCreateLoading] = useState(false)
@@ -153,6 +158,21 @@ const AdminUsers = () => {
 			toast.error('Ошибка загрузки данных')
 		} finally {
 			setLoading(false)
+		}
+	}
+
+	const handleDeletePersonalData = async () => {
+		const u = deleteDataDialog.user
+		if (!u) return
+		setDeleteDataLoading(true)
+		try {
+			await documentService.adminDeletePersonalData(u.id)
+			toast.success(`Персональные данные пользователя ${u.email} удалены`)
+			setDeleteDataDialog({ open: false, user: null })
+		} catch {
+			toast.error('Ошибка удаления данных')
+		} finally {
+			setDeleteDataLoading(false)
 		}
 	}
 
@@ -369,6 +389,15 @@ const AdminUsers = () => {
 													</Badge>
 												</IconButton>
 											</Tooltip>
+											<Tooltip title='Удалить персональные данные'>
+												<IconButton
+													size='small'
+													color='error'
+													onClick={() => setDeleteDataDialog({ open: true, user: u })}
+												>
+													<DeleteDataIcon fontSize='small' />
+												</IconButton>
+											</Tooltip>
 										</TableCell>
 									</TableRow>
 								))}
@@ -483,6 +512,50 @@ const AdminUsers = () => {
 					<Button onClick={() => setEditDialog({ open: false, user: null })}>Отмена</Button>
 					<Button variant='contained' onClick={handleEdit} disabled={editLoading}>
 						{editLoading ? 'Сохранение...' : 'Сохранить'}
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Delete Personal Data Dialog */}
+			<Dialog
+				open={deleteDataDialog.open}
+				onClose={() => setDeleteDataDialog({ open: false, user: null })}
+				maxWidth='sm'
+				fullWidth
+			>
+				<DialogTitle sx={{ color: 'error.main' }}>
+					Удалить персональные данные
+				</DialogTitle>
+				<DialogContent>
+					<Typography sx={{ mb: 1 }}>
+						Вы собираетесь безвозвратно удалить персональные данные пользователя:
+					</Typography>
+					<Typography fontWeight={700} sx={{ mb: 2 }}>
+						{deleteDataDialog.user?.email}
+					</Typography>
+					<Typography variant='body2' color='text.secondary' sx={{ mb: 0.5 }}>
+						Будут удалены:
+					</Typography>
+					<Box component='ul' sx={{ pl: 3, mb: 2 }}>
+						<Typography component='li' variant='body2'>Все заявки с документами детей и прикреплённые файлы</Typography>
+						<Typography component='li' variant='body2'>Номер телефона родителя</Typography>
+						<Typography component='li' variant='body2'>Файлы паспорта и СНИЛС родителя</Typography>
+					</Box>
+					<Typography variant='body2' color='error.main' fontWeight={600}>
+						Это действие нельзя отменить.
+					</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDeleteDataDialog({ open: false, user: null })}>
+						Отмена
+					</Button>
+					<Button
+						variant='contained'
+						color='error'
+						onClick={handleDeletePersonalData}
+						disabled={deleteDataLoading}
+					>
+						{deleteDataLoading ? 'Удаление...' : 'Удалить данные'}
 					</Button>
 				</DialogActions>
 			</Dialog>

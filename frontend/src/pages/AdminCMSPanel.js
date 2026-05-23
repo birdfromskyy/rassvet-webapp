@@ -23,6 +23,7 @@ import {
   Article as NewsIcon,
   ManageAccounts as UsersIcon,
   ArrowBack as BackIcon,
+  AssignmentInd as DocsIcon,
 } from '@mui/icons-material'
 
 const MODULES = [
@@ -95,6 +96,13 @@ const MODULES = [
     icon: UsersIcon,
     color: 'success',
     path: '/admin/users',
+  },
+  {
+    title: 'Документы родителей',
+    description: 'Проверка и подтверждение документов, поданных родителями',
+    icon: DocsIcon,
+    color: 'warning',
+    path: '/admin/documents',
   },
 ]
 
