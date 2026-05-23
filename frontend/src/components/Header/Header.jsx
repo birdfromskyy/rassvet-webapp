@@ -44,6 +44,7 @@ const dropdowns = [
     id: "clients",
     title: "Для клиентов",
     links: [
+      { title: "Алгоритм получения услуг", path: "/service-algorithm" },
       { title: "Кол-во свободных мест", path: "/available-places" },
       { title: "Отзывы клиентов", path: "/reviews" },
       { title: "Форма социального обслуживания", path: "/social-service-form" },

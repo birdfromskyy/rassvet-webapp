@@ -85,15 +85,17 @@
 }
 
 .news__layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 32px;
+  display: block;
 }
 
 .news__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
   gap: 28px;
+
+  width: 100%;
 }
 
 .news__sidebar-card {
@@ -252,4 +254,91 @@
 
 .news__clear:hover {
   background: rgba(7, 68, 98, 0.18);
+}
+
+.news__select {
+  position: relative;
+
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+
+    min-width: 240px;
+    height: 54px;
+
+    padding: 0 52px 0 20px;
+
+    border: 1px solid rgba(7, 68, 98, 0.12);
+    border-radius: 18px;
+
+    background: #ffffff;
+
+    color: #074462;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+
+    box-shadow: 0 10px 24px rgba(7, 68, 98, 0.06);
+
+    &:hover {
+      border-color: rgba(7, 68, 98, 0.25);
+    }
+
+    &:focus {
+      outline: none;
+
+      border-color: #f4df00;
+
+      box-shadow:
+        0 0 0 4px rgba(244, 223, 0, 0.25),
+        0 10px 24px rgba(7, 68, 98, 0.06);
+    }
+  }
+
+  &::after {
+    content: "";
+
+    position: absolute;
+
+    top: 50%;
+    right: 20px;
+
+    width: 10px;
+    height: 10px;
+
+    border-right: 2px solid #074462;
+    border-bottom: 2px solid #074462;
+
+    transform:
+      translateY(-60%)
+      rotate(45deg);
+
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .news__select {
+    width: 100%;
+
+    select {
+      width: 100%;
+      min-width: unset;
+    }
+  }
+}
+
+.news__select select option {
+  background: #ffffff;
+  color: #074462;
+
+  font-size: 15px;
+  font-weight: 600;
+
+  padding: 12px;
 }

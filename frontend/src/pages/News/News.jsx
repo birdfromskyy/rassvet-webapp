@@ -203,20 +203,6 @@ const News = () => {
                   </>
                 )}
               </div>
-
-              <aside className="news__sidebar">
-                <div className="news__sidebar-card">
-                  <h2>🔥 Популярные статьи</h2>
-
-                  {popularArticles.map((article) => (
-                    <NewsCard
-                      key={article.id}
-                      article={article}
-                      variant="compact"
-                    />
-                  ))}
-                </div>
-              </aside>
             </div>
           </div>
         </section>
