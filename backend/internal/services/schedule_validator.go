@@ -112,10 +112,6 @@ func (v *ScheduleValidator) HasStudentConflict(
 			if slot.GroupLessonID == nil {
 				continue
 			}
-			// Если группа не блокирует окна учеников — не считаем конфликтом
-			if slot.GroupLesson != nil && slot.GroupLesson.IgnoreStudentWindows {
-				continue
-			}
 			if !isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
 				continue
 			}
