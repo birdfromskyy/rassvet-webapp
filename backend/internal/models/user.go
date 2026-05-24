@@ -31,11 +31,3 @@ type User struct {
 	Reviews []Review `json:"reviews,omitempty"`
 }
 
-type VerificationCode struct {
-	ID        uint `gorm:"primarykey"`
-	CreatedAt time.Time
-	Email     string    `gorm:"not null"`
-	Code      string    `gorm:"not null"`
-	ExpiresAt time.Time `gorm:"not null"`
-	Used      bool      `gorm:"default:false"`
-}

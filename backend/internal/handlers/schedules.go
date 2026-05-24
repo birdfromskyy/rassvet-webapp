@@ -692,9 +692,12 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 				return
 			}
 		}
-		if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
+		force := c.Query("force") == "true"
+		if !force {
+			if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
+				c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+				return
+			}
 		}
 	}
 
@@ -868,10 +871,21 @@ func (h *ScheduleHandler) ClearManualSlots(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginManual).
-		Delete(&models.ScheduleSlot{}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
+	var slotIDs []uint
+	if err := h.db.Model(&models.ScheduleSlot{}).
+		Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginManual).
+		Pluck("id", &slotIDs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка слотов"})
 		return
+	}
+
+	if len(slotIDs) > 0 {
+		h.db.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.ScheduleSlotExclusion{})
+		h.db.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.GroupLessonAttendance{})
+		if err := h.db.Where("id IN ?", slotIDs).Delete(&models.ScheduleSlot{}).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
+			return
+		}
 	}
 
 	h.respondWithSchedule(c, &schedule)
@@ -1130,7 +1144,6 @@ func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, exc
 		return nil
 	}
 
-	bufferedStart, bufferedEnd := applyManualBreakBuffer(slot.StartTime, slot.EndTime, services.DefaultBreakMinutes)
 	studentIDs, err := h.getSlotStudentIDs(slot)
 	if err != nil {
 		return err
@@ -1149,7 +1162,7 @@ func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, exc
 			continue
 		}
 
-		if !manualTimesOverlap(bufferedStart, bufferedEnd, existing.StartTime, existing.EndTime) {
+		if !manualTimesOverlap(slot.StartTime, slot.EndTime, existing.StartTime, existing.EndTime) {
 			continue
 		}
 

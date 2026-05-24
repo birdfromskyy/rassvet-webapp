@@ -13,6 +13,7 @@ frontend/.env.production.local
 CLAUDE.md
 PROJECT.md
 WORD.md
+IDEAS.md
 
 # Скрипты с кредами
 directus-init.sh
