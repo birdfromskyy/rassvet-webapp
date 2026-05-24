@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,15 +21,63 @@ const EarlyStopUnplacedLessons = 5
 const MaxScheduleStrategies = 5
 
 type ScheduleGenerator struct {
-	db        *gorm.DB
-	validator *ScheduleValidator
+	db                   *gorm.DB
+	validator            *ScheduleValidator
+	maxStudentGapMinutes int
+	teacherGapMinutes    int
 }
 
 func NewScheduleGenerator(db *gorm.DB) *ScheduleGenerator {
 	return &ScheduleGenerator{
-		db:        db,
-		validator: NewScheduleValidator(),
+		db:                   db,
+		validator:            NewScheduleValidator(),
+		maxStudentGapMinutes: MaxStudentGapMinutes,
+		teacherGapMinutes:    TeacherGapMinutes,
 	}
+}
+
+func (g *ScheduleGenerator) loadSettings() {
+	readInt := func(key string, def int) int {
+		var s struct{ Value string }
+		if err := g.db.Raw("SELECT value FROM site_settings WHERE key = ? LIMIT 1", key).Scan(&s).Error; err == nil && s.Value != "" {
+			if v, err := strconv.Atoi(s.Value); err == nil && v > 0 {
+				return v
+			}
+		}
+		return def
+	}
+	g.maxStudentGapMinutes = readInt("max_student_gap_minutes", MaxStudentGapMinutes)
+	g.teacherGapMinutes = readInt("teacher_gap_minutes", TeacherGapMinutes)
+}
+
+type gapCombo struct {
+	studentGap int
+	teacherGap int
+}
+
+func buildGapValues(max int) []int {
+	if max <= 5 {
+		return []int{max}
+	}
+	var values []int
+	for v := 5; v < max; v += 5 {
+		values = append(values, v)
+	}
+	return append(values, max)
+}
+
+// buildGapCombinations returns all (student_gap, teacher_gap) pairs to try
+// during the multi-run phase. Returns a single entry when both maxima are ≤ 5.
+func (g *ScheduleGenerator) buildGapCombinations() []gapCombo {
+	sg := buildGapValues(g.maxStudentGapMinutes)
+	tg := buildGapValues(g.teacherGapMinutes)
+	combos := make([]gapCombo, 0, len(sg)*len(tg))
+	for _, s := range sg {
+		for _, t := range tg {
+			combos = append(combos, gapCombo{s, t})
+		}
+	}
+	return combos
 }
 
 type GenerationContext struct {
@@ -180,6 +229,7 @@ func (g *ScheduleGenerator) GenerateScheduleWithProgress(
 	generatedByUserID uint,
 	progress ScheduleGenerationProgressFunc,
 ) (*ScheduleResponse, error) {
+	g.loadSettings()
 	reportGenerationProgress(progress, 1, "Подготовка расписания", "")
 	weekStartDate = normalizeDate(weekStartDate)
 	weekEndDate := weekStartDate.AddDate(0, 0, 5)
@@ -358,6 +408,43 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 }
 
 func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, progress ScheduleGenerationProgressFunc) error {
+	// Phase 1: combinatorial scan — try all (student_gap × teacher_gap) pairs
+	// using the default strategy, pick the combination that places the most lessons.
+	combos := g.buildGapCombinations()
+	multiRun := len(combos) > 1
+	bestCombo := combos[len(combos)-1] // default: the user-configured max values
+	if multiRun {
+		bestCount := -1
+		defaultStrategy := g.scheduleStrategies()[0]
+		for i, combo := range combos {
+			g.maxStudentGapMinutes = combo.studentGap
+			g.teacherGapMinutes = combo.teacherGap
+			if err := g.CleanupAutoSlots(schedule.ID); err != nil {
+				return err
+			}
+			ctx, err := g.LoadGenerationContext(*schedule)
+			if err != nil {
+				return err
+			}
+			result, err := g.RunGenerationStrategy(schedule.ID, ctx, defaultStrategy)
+			if err != nil {
+				return err
+			}
+			if result.ScheduledCount > bestCount {
+				bestCount = result.ScheduledCount
+				bestCombo = combo
+			}
+			percent := 5 + (i+1)*40/len(combos)
+			reportGenerationProgress(progress, percent,
+				fmt.Sprintf("Поиск: окно %d/%d мин → %d занятий", combo.studentGap, combo.teacherGap, result.ScheduledCount), "scan")
+		}
+		g.maxStudentGapMinutes = bestCombo.studentGap
+		g.teacherGapMinutes = bestCombo.teacherGap
+		reportGenerationProgress(progress, 45,
+			fmt.Sprintf("Лучшее: окно %d/%d мин (%d занятий)", bestCombo.studentGap, bestCombo.teacherGap, bestCount), "scan")
+	}
+
+	// Phase 2: full multi-strategy run with the chosen gap combination.
 	strategies := g.scheduleStrategies()
 	var best *generationRunResult
 	strategyCount := len(strategies)
@@ -365,12 +452,17 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 		strategyCount = MaxScheduleStrategies
 	}
 
+	phase2Start := 5
+	if multiRun {
+		phase2Start = 48
+	}
+
 	for index, strategy := range strategies {
 		if index >= MaxScheduleStrategies {
 			break
 		}
-		startPercent := 5 + index*80/strategyCount
-		finishPercent := 5 + (index+1)*80/strategyCount
+		startPercent := phase2Start + index*(85-phase2Start)/strategyCount
+		finishPercent := phase2Start + (index+1)*(85-phase2Start)/strategyCount
 		reportGenerationProgress(progress, startPercent, fmt.Sprintf("Проверка стратегии %d из %d", index+1, strategyCount), strategy.Name)
 		if err := g.CleanupAutoSlots(schedule.ID); err != nil {
 			return err
@@ -1050,7 +1142,7 @@ func (g *ScheduleGenerator) ScoreCandidate(candidate CandidateSlot, task WeeklyT
 
 			if gap == IdealStudentGapMinutes || reverseGap == IdealStudentGapMinutes {
 				score += 140
-			} else if (gap >= 0 && gap <= MaxStudentGapMinutes) || (reverseGap >= 0 && reverseGap <= MaxStudentGapMinutes) {
+			} else if (gap >= 0 && gap <= g.maxStudentGapMinutes) || (reverseGap >= 0 && reverseGap <= g.maxStudentGapMinutes) {
 				score += 70
 			} else {
 				score -= 100
@@ -1064,7 +1156,11 @@ func (g *ScheduleGenerator) ScoreCandidate(candidate CandidateSlot, task WeeklyT
 			gap := gapMinutes(slot.EndTime, candidate.StartTime)
 			reverseGap := gapMinutes(candidate.EndTime, slot.StartTime)
 
-			if gap == TeacherGapMinutes || reverseGap == TeacherGapMinutes {
+			tMax := g.teacherGapMinutes
+			if tMax < DefaultBreakMinutes {
+				tMax = DefaultBreakMinutes
+			}
+			if (gap >= DefaultBreakMinutes && gap <= tMax) || (reverseGap >= DefaultBreakMinutes && reverseGap <= tMax) {
 				score += 120
 			} else {
 				score -= 80
@@ -1386,7 +1482,11 @@ func (g *ScheduleGenerator) ScoreGroupCandidate(candidate GroupCandidateSlot, ta
 		if slot.TeacherID == candidate.TeacherID && slot.Weekday == candidate.Weekday {
 			gap := gapMinutes(slot.EndTime, candidate.StartTime)
 			reverseGap := gapMinutes(candidate.EndTime, slot.StartTime)
-			if gap == TeacherGapMinutes || reverseGap == TeacherGapMinutes {
+			tMax := g.teacherGapMinutes
+			if tMax < DefaultBreakMinutes {
+				tMax = DefaultBreakMinutes
+			}
+			if (gap >= DefaultBreakMinutes && gap <= tMax) || (reverseGap >= DefaultBreakMinutes && reverseGap <= tMax) {
 				score += 120
 			} else {
 				score -= 80
@@ -1554,15 +1654,15 @@ func (g *ScheduleGenerator) teacherGapPenalty(teacherID uint, weekday int, ctx *
 		return intervals[i][0] < intervals[j][0]
 	})
 
+	tMax := g.teacherGapMinutes
+	if tMax < DefaultBreakMinutes {
+		tMax = DefaultBreakMinutes
+	}
 	total := 0
 	for i := 1; i < len(intervals); i++ {
 		gap := intervals[i][0] - intervals[i-1][1]
-		if gap != TeacherGapMinutes {
-			if gap > TeacherGapMinutes {
-				total += gap - TeacherGapMinutes
-			} else {
-				total += TeacherGapMinutes - gap
-			}
+		if gap > tMax {
+			total += gap - tMax
 		}
 	}
 	return total
@@ -1575,6 +1675,10 @@ func (g *ScheduleGenerator) hasValidTeacherGap(
 	endTime string,
 	existingSlots []models.ScheduleSlot,
 ) bool {
+	maxGap := g.teacherGapMinutes
+	if maxGap < DefaultBreakMinutes {
+		maxGap = DefaultBreakMinutes
+	}
 	hasTeacherSlotToday := false
 	for _, slot := range existingSlots {
 		if slot.TeacherID != teacherID || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
@@ -1583,7 +1687,7 @@ func (g *ScheduleGenerator) hasValidTeacherGap(
 		hasTeacherSlotToday = true
 		gap := gapMinutes(slot.EndTime, startTime)
 		reverseGap := gapMinutes(endTime, slot.StartTime)
-		if gap == TeacherGapMinutes || reverseGap == TeacherGapMinutes {
+		if (gap >= DefaultBreakMinutes && gap <= maxGap) || (reverseGap >= DefaultBreakMinutes && reverseGap <= maxGap) {
 			return true
 		}
 	}
@@ -1644,7 +1748,7 @@ func (g *ScheduleGenerator) createsLargeStudentGap(
 
 	for i := 1; i < len(intervals); i++ {
 		gap := intervals[i].start - intervals[i-1].end
-		if gap > MaxStudentGapMinutes {
+		if gap > g.maxStudentGapMinutes {
 			return true
 		}
 	}

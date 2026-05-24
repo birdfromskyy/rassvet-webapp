@@ -281,8 +281,11 @@ const scheduleService = {
 		const r = await api.post(url, data)
 		return r.data
 	},
-	updateSlot: async (scheduleId, slotId, data) => {
-		const r = await api.put(`/admin/schedules/${scheduleId}/slots/${slotId}`, data)
+	updateSlot: async (scheduleId, slotId, data, force = false) => {
+		const url = force
+			? `/admin/schedules/${scheduleId}/slots/${slotId}?force=true`
+			: `/admin/schedules/${scheduleId}/slots/${slotId}`
+		const r = await api.put(url, data)
 		return r.data
 	},
 	pinSlot: async (scheduleId, slotId) => {

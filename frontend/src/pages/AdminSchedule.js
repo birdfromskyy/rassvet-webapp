@@ -67,6 +67,8 @@ import {
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
+import api from '../services/api'
+import './AdminSchedule.scss'
 
 const WEEKDAY_NAMES = {
 	1: 'Понедельник',
@@ -217,6 +219,12 @@ const AdminSchedule = () => {
 	const [deleteSlotDialog, setDeleteSlotDialog] = useState({ open: false, slotId: null, slotLabel: '' })
 	const deleteManualTimerRef = useRef(null)
 
+	// Generation settings
+	const [maxGapMinutes, setMaxGapMinutes] = useState(30)
+	const [maxGapSaved, setMaxGapSaved] = useState(false)
+	const [teacherGapMinutes, setTeacherGapMinutes] = useState(10)
+	const [teacherGapSaved, setTeacherGapSaved] = useState(false)
+
 	const weekStartISO = formatDateISO(weekStart)
 
 	const loadSchedule = useCallback(async () => {
@@ -262,6 +270,35 @@ const AdminSchedule = () => {
 			.catch(() => toast.error('Ошибка загрузки справочников'))
 	}, [refLoaded])
 
+	useEffect(() => {
+		api.get('/site-settings/max_student_gap_minutes')
+			.then(r => { if (r.data?.value) setMaxGapMinutes(Number(r.data.value)) })
+			.catch(() => {})
+		api.get('/site-settings/teacher_gap_minutes')
+			.then(r => { if (r.data?.value) setTeacherGapMinutes(Number(r.data.value)) })
+			.catch(() => {})
+	}, [])
+
+	const saveMaxGapMinutes = async val => {
+		try {
+			await api.put('/admin/site-settings', { key: 'max_student_gap_minutes', value: String(val) })
+			setMaxGapSaved(true)
+			setTimeout(() => setMaxGapSaved(false), 2000)
+		} catch {
+			toast.error('Не удалось сохранить настройку')
+		}
+	}
+
+	const saveTeacherGapMinutes = async val => {
+		try {
+			await api.put('/admin/site-settings', { key: 'teacher_gap_minutes', value: String(val) })
+			setTeacherGapSaved(true)
+			setTimeout(() => setTeacherGapSaved(false), 2000)
+		} catch {
+			toast.error('Не удалось сохранить настройку')
+		}
+	}
+
 	const prevWeek = () =>
 		setWeekStart(d => {
 			const n = new Date(d)
@@ -286,8 +323,8 @@ const AdminSchedule = () => {
 			setGenerationProgress(currentJob)
 
 			if (currentJob.status === 'completed') {
-				if (currentJob.result) setScheduleData(currentJob.result)
 				toast.success(successMessage)
+				loadSchedule()
 				return
 			}
 
@@ -368,7 +405,7 @@ const AdminSchedule = () => {
 				const aEnd = timeToMinutes(a.end_time)
 				const bStart = timeToMinutes(b.start_time)
 				const bEnd = timeToMinutes(b.end_time)
-				if (!(aStart < bEnd + 5 && aEnd > bStart - 5)) continue
+				if (!(aStart < bEnd && aEnd > bStart)) continue
 				const sameTeacher = a.teacher_id === b.teacher_id
 				const sameRoom = a.room_id && b.room_id && a.room_id === b.room_id
 				const studentA = getSlotStudentIds(a)
@@ -835,13 +872,13 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const doSaveEditSlot = async () => {
+	const doSaveEditSlot = async (force = false) => {
 		try {
 			const slot = editDialog.slot
 			if (slot.slot_type === 'group' && slot.group_lesson && editForm.ignore_student_windows !== slot.group_lesson.ignore_student_windows) {
 				await scheduleService.updateGroupLesson(slot.group_lesson.id, { ignore_student_windows: editForm.ignore_student_windows })
 			}
-			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, editForm)
+			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, editForm, force)
 			toast.success('Слот обновлён')
 			setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
 			loadSchedule()
@@ -1006,7 +1043,7 @@ const AdminSchedule = () => {
 			if (s.weekday !== weekday) return false
 			const sStart = timeToMinutes(s.start_time)
 			const sEnd = timeToMinutes(s.end_time)
-			if (!(start < sEnd + 5 && end > sStart - 5)) return false
+			if (!(start < sEnd && end > sStart)) return false
 			// Only flag conflicts for matching room, teacher, or student
 			const hasStudentConflict = getSlotStudentIds(s).some(id => checkedStudentIds.has(id))
 			const hasRoomConflict = roomId && s.room_id === roomId
@@ -1080,84 +1117,96 @@ const AdminSchedule = () => {
 	const isApproved = schedule?.status === 'approved'
 	const canAddSlot = isDraft || isApproved
 
+	const issueConfigCount = issues.filter(i => !i.message.startsWith('Все возможные')).length
+	const issueConflictCount = issues.filter(i => i.message.startsWith('Все возможные')).length
+
 	return (
-		<Container maxWidth='xl' sx={{ mt: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
+		<div className='admin-schedule-page'>
+			<div className='container'>
+			<div className='admin-schedule-card'>
 				{/* Header */}
-				<Box
-					display='flex'
-					justifyContent='space-between'
-					alignItems='center'
-					mb={3}
-				>
-					<Typography variant='h4'>Расписание</Typography>
-					<Button
-						startIcon={<BackIcon />}
-						onClick={() => navigate('/admin/schedule')}
-					>
-						Назад
-					</Button>
-				</Box>
+				<div className='admin-schedule-card__header'>
+					<h1 className='admin-schedule-card__title'>Расписание</h1>
+					<button className='admin-schedule-back-btn' onClick={() => navigate('/admin/schedule')}>
+						← Назад
+					</button>
+				</div>
+
+				<div className='admin-schedule-card__body'>
 
 				{/* Week navigation */}
-				<Box
-					display='flex'
-					alignItems='center'
-					justifyContent='center'
-					gap={2}
-					mb={3}
-				>
-					<IconButton onClick={prevWeek} size='large'>
+				<div className='admin-schedule-week-nav'>
+					<button className='admin-schedule-week-nav__btn' onClick={prevWeek}>
 						<ChevronLeft />
-					</IconButton>
-					<Typography
-						variant='h6'
-						sx={{
-							minWidth: 320, textAlign: 'center', fontWeight: 500,
-							...(isCurrentWeek && {
-								color: 'primary.main',
-								fontWeight: 700,
-							}),
-						}}
-					>
+					</button>
+					<span className={`admin-schedule-week-nav__label${isCurrentWeek ? ' admin-schedule-week-nav__label--current' : ''}`}>
 						{formatWeekLabel(weekStart)}
-						{isCurrentWeek && (
-							<Typography component='span' variant='caption' sx={{ ml: 1, color: 'primary.main', fontWeight: 400 }}>
-								(текущая неделя)
-							</Typography>
-						)}
-					</Typography>
-					<IconButton onClick={nextWeek} size='large'>
+						{isCurrentWeek && <span className='admin-schedule-week-nav__badge'>(текущая неделя)</span>}
+					</span>
+					<button className='admin-schedule-week-nav__btn' onClick={nextWeek}>
 						<ChevronRight />
-					</IconButton>
-				</Box>
+					</button>
+				</div>
+
+				{/* Generation settings */}
+				<div className='admin-schedule-settings'>
+					<span className='admin-schedule-settings__label'>Макс. окно у ученика:</span>
+					<input
+						type='number'
+						className='admin-schedule-settings__input'
+						value={maxGapMinutes}
+						min={5}
+						max={120}
+						step={5}
+						onChange={e => setMaxGapMinutes(Number(e.target.value))}
+						onBlur={e => saveMaxGapMinutes(Number(e.target.value))}
+					/>
+					<span className='admin-schedule-settings__label'>мин.</span>
+					{maxGapSaved && <span className='admin-schedule-settings__saved'>✓</span>}
+
+					<span className='admin-schedule-settings__sep' />
+
+					<span className='admin-schedule-settings__label'>Перерыв у преподавателя:</span>
+					<input
+						type='number'
+						className='admin-schedule-settings__input'
+						value={teacherGapMinutes}
+						min={5}
+						max={60}
+						step={5}
+						onChange={e => setTeacherGapMinutes(Number(e.target.value))}
+						onBlur={e => saveTeacherGapMinutes(Number(e.target.value))}
+					/>
+					<span className='admin-schedule-settings__label'>мин.</span>
+					{teacherGapSaved && <span className='admin-schedule-settings__saved'>✓</span>}
+				</div>
 
 				{/* Action bar */}
-				<Box display='flex' alignItems='center' gap={2} mb={3} flexWrap='wrap'>
-					{schedule && (
-						<Chip
-							label={STATUS_LABELS[schedule.status] || schedule.status}
-							color={STATUS_COLORS[schedule.status] || 'default'}
-							size='medium'
-						/>
-					)}
+				<Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
+					{/* Row 1: status + primary actions */}
+					<Box display='flex' alignItems='center' gap={1.5} flexWrap='wrap'>
+						{schedule && (
+							<Chip
+								label={STATUS_LABELS[schedule.status] || schedule.status}
+								color={STATUS_COLORS[schedule.status] || 'default'}
+								size='medium'
+								sx={{ fontWeight: 600 }}
+							/>
+						)}
 
-					{/* Generate — visible when no schedule or draft */}
-					{(isDraft || (!schedule && !loading)) && (
-						<Button
-							variant={!schedule ? 'contained' : 'outlined'}
-							startIcon={<GenerateIcon />}
-							onClick={generate}
-							disabled={generating}
-							color={isPastWeek ? 'warning' : 'primary'}
-						>
-							{generating ? 'Генерация...' : isPastWeek ? '⚠ Сгенерировать расписание' : 'Сгенерировать расписание'}
-						</Button>
-					)}
+						{(isDraft || (!schedule && !loading)) && (
+							<Button
+								variant='contained'
+								startIcon={<GenerateIcon />}
+								onClick={generate}
+								disabled={generating}
+								color={isPastWeek ? 'warning' : 'primary'}
+							>
+								{generating ? 'Генерация...' : isPastWeek ? '⚠ Сгенерировать' : 'Сгенерировать'}
+							</Button>
+						)}
 
-					{/* Draft-mode buttons — visible in draft OR when no schedule (disabled when no schedule) */}
-					{(isDraft || (!schedule && !loading)) && (
-						<>
+						{(isDraft || (!schedule && !loading)) && (
 							<Button
 								variant='contained'
 								color='success'
@@ -1167,123 +1216,109 @@ const AdminSchedule = () => {
 							>
 								Утвердить
 							</Button>
+						)}
+
+						{isApproved && (
 							<Button
+								variant='outlined'
+								color='warning'
+								startIcon={<UnapproveIcon />}
+								onClick={unapprove}
+							>
+								Снять утверждение
+							</Button>
+						)}
+
+						{(canAddSlot || (!schedule && !loading)) && (
+							<Button
+								variant='outlined'
+								startIcon={<AddIcon />}
+								onClick={openCreateSlot}
+							>
+								Добавить занятие
+							</Button>
+						)}
+					</Box>
+
+					{/* Row 2: management + export */}
+					{(isDraft || isApproved) && schedule && (
+						<Box display='flex' alignItems='center' gap={1} flexWrap='wrap'>
+							<Button
+								size='small'
+								variant='outlined'
+								color='inherit'
+								onClick={copyManualFromPrevWeek}
+								disabled={generating}
+							>
+								Скопировать ручные
+							</Button>
+
+							<Divider orientation='vertical' flexItem sx={{ mx: 0.5 }} />
+
+							<Button
+								size='small'
 								variant='outlined'
 								startIcon={<ClearIcon />}
 								onClick={clearAuto}
-								disabled={!schedule || generating}
+								disabled={generating}
 								color={isPastWeek ? 'warning' : 'error'}
 							>
 								{isPastWeek ? '⚠ Очистить авто' : 'Очистить авто'}
 							</Button>
 							<Button
-								variant='outlined'
-								color='inherit'
-								onClick={copyManualFromPrevWeek}
-								disabled={!schedule || generating}
-							>
-								Скопировать ручные слоты
-							</Button>
-							<Button
+								size='small'
 								variant='outlined'
 								color='error'
 								onClick={openDeleteManualDialog}
-								disabled={!schedule}
 							>
-								Удалить ручные слоты
+								Удалить ручные
 							</Button>
-						</>
-					)}
 
-					{isApproved && (
-						<Button
-							variant='outlined'
-							color='warning'
-							startIcon={<UnapproveIcon />}
-							onClick={unapprove}
-						>
-							Снять утверждение
-						</Button>
-					)}
+							<Divider orientation='vertical' flexItem sx={{ mx: 0.5 }} />
 
-					{/* Add Slot — always visible, creates schedule if needed */}
-					{(canAddSlot || (!schedule && !loading)) && (
-						<Button
-							variant='outlined'
-							startIcon={<AddIcon />}
-							onClick={openCreateSlot}
-						>
-							Добавить слот
-						</Button>
-					)}
-
-					{/* Export — visible in draft or no-schedule states, disabled when no schedule */}
-					{(isDraft || (!schedule && !loading)) && (
-						<>
 							<Button
-								variant='outlined'
-								color='success'
-								startIcon={<ExcelIcon />}
-								onClick={exportTeachersToExcel}
-								disabled={!schedule}
-							>
-								Экспорт преподавателей
-							</Button>
-							<Button
-								variant='outlined'
-								color='success'
-								startIcon={<ExcelIcon />}
-								onClick={exportStudentsToExcel}
-								disabled={!schedule}
-							>
-								Экспорт детей
-							</Button>
-						</>
-					)}
-					{isApproved && (
-						<>
-							<Button
+								size='small'
 								variant='outlined'
 								color='success'
 								startIcon={<ExcelIcon />}
 								onClick={exportTeachersToExcel}
 							>
-								Экспорт преподавателей
+								Преподаватели
 							</Button>
 							<Button
+								size='small'
 								variant='outlined'
 								color='success'
 								startIcon={<ExcelIcon />}
 								onClick={exportStudentsToExcel}
 							>
-								Экспорт детей
+								Дети
 							</Button>
-						</>
+						</Box>
 					)}
 				</Box>
 
 				{generationProgress && (
-					<Paper variant='outlined' sx={{ p: 2, mb: 3 }}>
-						<Box display='flex' justifyContent='space-between' alignItems='center' mb={1}>
-							<Box>
-								<Typography variant='subtitle1' fontWeight={600}>
-									Идёт генерация...
-								</Typography>
-								<Typography variant='body2' color='text.secondary'>
+					<div className='admin-schedule-progress'>
+						<div className='admin-schedule-progress__top'>
+							<div>
+								<div className='admin-schedule-progress__title'>Идёт генерация...</div>
+								<div className='admin-schedule-progress__message'>
 									{generationProgress.message || 'Расписание рассчитывается'}
 									{generationProgress.strategy ? ` · ${generationProgress.strategy}` : ''}
-								</Typography>
-							</Box>
-							<Typography variant='h6' sx={{ minWidth: 64, textAlign: 'right' }}>
+								</div>
+							</div>
+							<div className='admin-schedule-progress__percent'>
 								{Math.round(generationProgress.percent || 0)}%
-							</Typography>
-						</Box>
-						<LinearProgress
-							variant='determinate'
-							value={Math.max(0, Math.min(100, generationProgress.percent || 0))}
-							sx={{ height: 10, borderRadius: 1 }}
-						/>
-					</Paper>
+							</div>
+						</div>
+						<div className='admin-schedule-progress__bar'>
+							<div
+								className='admin-schedule-progress__fill'
+								style={{ width: `${Math.max(0, Math.min(100, generationProgress.percent || 0))}%` }}
+							/>
+						</div>
+					</div>
 				)}
 
 				{/* Slot filters */}
@@ -1391,47 +1426,26 @@ const AdminSchedule = () => {
 
 				{/* Stats */}
 				{stats && (
-					<Paper variant='outlined' sx={{ p: 2, mb: 3 }}>
-						<Grid container spacing={2} textAlign='center'>
-							<Grid item xs={4}>
-								<Typography variant='h4' color='primary.main'>
-									{stats.total_requested}
-								</Typography>
-								<Typography variant='body2' color='text.secondary'>
-									Запрошено занятий
-								</Typography>
-							</Grid>
-							<Grid item xs={4}>
-								<Typography variant='h4' color='success.main'>
-									{stats.scheduled}
-								</Typography>
-								<Typography variant='body2' color='text.secondary'>
-									Поставлено
-								</Typography>
-								<Typography variant='caption' color='text.disabled'>
-									{stats.ind_scheduled} инд. + {stats.grp_scheduled} групп.
-								</Typography>
-							</Grid>
-							<Grid item xs={4}>
-								<Typography
-									variant='h4'
-									color={stats.unplaced > 0 ? 'error.main' : 'text.secondary'}
-								>
-									{stats.unplaced}
-								</Typography>
-								<Typography variant='body2' color='text.secondary'>
-									Не поставлено
-								</Typography>
-								{stats.unplaced > 0 && (
-									<Typography variant='caption' color='text.secondary' display='block'>
-										{stats.config_errors > 0 && `${stats.config_errors} конфиг.`}
-										{stats.config_errors > 0 && stats.conflict_errors > 0 && ' + '}
-										{stats.conflict_errors > 0 && `${stats.conflict_errors} конфликт.`}
-									</Typography>
-								)}
-							</Grid>
-						</Grid>
-					</Paper>
+					<div className='admin-schedule-stats'>
+						{[
+							{ value: stats.total_requested, label: 'Запрошено', sub: `${stats.ind_requested} инд. + ${stats.grp_requested} групп.`, border: '#1976d2' },
+							{ value: stats.scheduled, label: 'Поставлено', sub: `${stats.ind_scheduled} инд. + ${stats.grp_scheduled} групп.`, border: '#2e7d32' },
+							{
+								value: stats.unplaced,
+								label: 'Не поставлено',
+								sub: stats.unplaced > 0
+									? [issueConfigCount > 0 && `${issueConfigCount} конфиг.`, issueConflictCount > 0 && `${issueConflictCount} конфл.`].filter(Boolean).join(' + ') || `${stats.unplaced} всего`
+									: '—',
+								border: stats.unplaced > 0 ? '#d32f2f' : '#e0e0e0',
+							},
+						].map(({ value, label, sub, border }) => (
+							<div className='admin-schedule-stat' key={label} style={{ borderTopColor: border }}>
+								<div className='admin-schedule-stat__value'>{value}</div>
+								<div className='admin-schedule-stat__label'>{label}</div>
+								<div className='admin-schedule-stat__sub'>{sub}</div>
+							</div>
+						))}
+					</div>
 				)}
 
 				{/* Loading */}
@@ -1458,16 +1472,16 @@ const AdminSchedule = () => {
 						if (!daySlots.length) return null
 						return (
 							<Box key={day} mb={3}>
-								<Typography
-									variant='h6'
-									sx={{ mb: 1, color: 'primary.main', fontWeight: 600 }}
-								>
-									{WEEKDAY_NAMES[day]}{' '}
-									<Typography component='span' variant='body1' color='text.secondary' fontWeight={400}>
+								<div className='admin-schedule-day__header'>
+									<span className='admin-schedule-day__name'>{WEEKDAY_NAMES[day]}</span>
+									<span className='admin-schedule-day__date'>
 										{getWeekdayDate(weekStart, day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
-									</Typography>
-								</Typography>
-								<TableContainer>
+									</span>
+									<span className='admin-schedule-day__count'>
+										{daySlots.length} {daySlots.length === 1 ? 'занятие' : daySlots.length < 5 ? 'занятия' : 'занятий'}
+									</span>
+								</div>
+								<TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
 									<Table size='small'>
 										<TableHead>
 											<TableRow>
@@ -1703,11 +1717,34 @@ const AdminSchedule = () => {
 					))
 
 					return (
-						<Accordion sx={{ mt: 2 }}>
-							<AccordionSummary expandIcon={<ExpandIcon />}>
-								<Typography color='error.main'>
-									Проблемы при генерации ({issues.length})
-								</Typography>
+						<Accordion
+							sx={{
+								mt: 2,
+								borderRadius: '14px !important',
+								boxShadow: 'none',
+								overflow: 'hidden',
+								border: '1px solid #e0e0e0',
+								'&:before': { display: 'none' },
+							}}
+						>
+							<AccordionSummary
+								expandIcon={<ExpandIcon sx={{ color: 'white' }} />}
+								sx={{
+									bgcolor: '#c62828',
+									color: 'white',
+									minHeight: '48px !important',
+									'& .MuiAccordionSummary-content': { my: '12px' },
+								}}
+							>
+								<Box display='flex' alignItems='center' gap={1.5}>
+									<span style={{ fontWeight: 800, fontSize: 15 }}>⚠ Проблемы при генерации</span>
+									{issueConfigCount > 0 && (
+										<span style={{ fontSize: 13, opacity: 0.85 }}>{issueConfigCount} конфигурации</span>
+									)}
+									{issueConflictCount > 0 && (
+										<span style={{ fontSize: 13, opacity: 0.85 }}>{issueConflictCount} конфликтов</span>
+									)}
+								</Box>
 							</AccordionSummary>
 							<AccordionDetails>
 								{/* Filters */}
@@ -1784,7 +1821,6 @@ const AdminSchedule = () => {
 						</Accordion>
 					)
 				})()}
-			</Paper>
 
 			{/* Create Slot Dialog */}
 			<Dialog
@@ -2337,7 +2373,10 @@ const AdminSchedule = () => {
 					</Button>
 				</DialogActions>
 			</Dialog>
-		</Container>
+			</div>{/* end card body */}
+			</div>{/* end admin-schedule-card */}
+			</div>{/* end container */}
+		</div>
 	)
 }
 
