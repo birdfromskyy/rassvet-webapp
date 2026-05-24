@@ -1081,6 +1081,9 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 					if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
 						continue
 					}
+					if g.createsLargeTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
+						continue
+					}
 					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 						continue
 					}
@@ -1427,6 +1430,9 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 					}
 				}
 
+					if g.createsLargeTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
+						continue
+					}
 					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 						continue
 					}
@@ -1692,6 +1698,50 @@ func (g *ScheduleGenerator) hasValidTeacherGap(
 		}
 	}
 	return !hasTeacherSlotToday
+}
+
+// createsLargeTeacherGap returns true if placing a slot at [startTime, endTime]
+// would create a gap larger than teacherGapMinutes between the candidate and the
+// nearest existing teacher lesson on the same weekday (checked in both directions).
+// Returns false when the teacher has no lessons yet that day.
+func (g *ScheduleGenerator) createsLargeTeacherGap(
+	teacherID uint,
+	weekday int,
+	startTime string,
+	endTime string,
+	existingSlots []models.ScheduleSlot,
+) bool {
+	maxGap := g.teacherGapMinutes
+	if maxGap < DefaultBreakMinutes {
+		maxGap = DefaultBreakMinutes
+	}
+	cs := hhmmToMinutes(startTime)
+	ce := hhmmToMinutes(endTime)
+	if cs < 0 || ce < 0 {
+		return false
+	}
+	prevEnd := -1   // latest teacher-lesson end that finishes at or before cs
+	nextStart := -1 // earliest teacher-lesson start that begins at or after ce
+	for _, slot := range existingSlots {
+		if slot.TeacherID != teacherID || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
+			continue
+		}
+		e := hhmmToMinutes(slot.EndTime)
+		s := hhmmToMinutes(slot.StartTime)
+		if e >= 0 && e <= cs && e > prevEnd {
+			prevEnd = e
+		}
+		if s >= 0 && s >= ce && (nextStart < 0 || s < nextStart) {
+			nextStart = s
+		}
+	}
+	if prevEnd >= 0 && cs-prevEnd > maxGap {
+		return true
+	}
+	if nextStart >= 0 && nextStart-ce > maxGap {
+		return true
+	}
+	return false
 }
 
 func (g *ScheduleGenerator) createsLargeStudentGap(
