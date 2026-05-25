@@ -215,7 +215,6 @@ func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 			continue
 		}
 
-		// Проверяем принадлежность ученика слоту
 		if slot.SlotType == models.SlotTypeGroup {
 			if slot.GroupLessonID == nil {
 				continue
@@ -229,11 +228,9 @@ func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 			}
 		}
 
-		if isImmediatelyAdjacent(slot.EndTime, startTime) ||
-			isImmediatelyAdjacent(endTime, slot.StartTime) ||
-			timesOverlap(startTime, endTime, slot.StartTime, slot.EndTime) {
-			return true
-		}
+		// Any lesson of the same subject on the same day is a violation —
+		// regardless of whether the times are adjacent or far apart.
+		return true
 	}
 	return false
 }
