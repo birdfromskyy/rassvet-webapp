@@ -86,14 +86,18 @@ const NewsDetail = () => {
 
     if (url.includes('video_ext.php')) return url
 
-    const match = url.match(/video-?(\d+)_(\d+)/)
+    const videoMatch = url.match(/video-?(\d+)_(\d+)/)
+    if (videoMatch) {
+      return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2`
+    }
 
-    if (!match) return null
+    // ВК Клипы: vk.com/clip-123456_789012 или vk.com/clips/...?z=clip-123456_789012
+    const clipMatch = url.match(/clip-?(\d+)_(\d+)/)
+    if (clipMatch) {
+      return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2`
+    }
 
-    const ownerId = `-${match[1]}`
-    const videoId = match[2]
-
-    return `https://vk.com/video_ext.php?oid=${ownerId}&id=${videoId}&hd=2`
+    return null
   }
 
   const getUrlBasename = url => {

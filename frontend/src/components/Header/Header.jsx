@@ -10,8 +10,25 @@ import {
   FiX,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
+
+const searchPages = [
+  { title: "Главная", path: "/main" },
+  { title: "Миссия и цели", path: "/mission" },
+  { title: "История и достижения", path: "/history" },
+  { title: "Документы", path: "/docs" },
+  { title: "Сотрудники", path: "/employees" },
+  { title: "Структура организации", path: "/structure" },
+  { title: "Перечень услуг", path: "/services-list" },
+  { title: "Описание услуг", path: "/services-description" },
+  { title: "Алгоритм получения услуг", path: "/service-algorithm" },
+  { title: "Контакты", path: "/contacts" },
+  { title: "Новости", path: "/news" },
+  { title: "Независимая оценка качества", path: "/rating" },
+  { title: "Форма социального обслуживания", path: "/social-service-form" },
+  { title: "Свободные места", path: "/available-places" },
+];
 
 const dropdowns = [
   {
@@ -53,6 +70,13 @@ const dropdowns = [
 ];
 
 function Header() {
+  const [searchValue, setSearchValue] = useState("");
+  const navigate = useNavigate();
+
+  const filteredPages = searchPages.filter((page) =>
+    page.title.toLowerCase().includes(searchValue.toLowerCase().trim()),
+  );
+
   const [isHidden, setIsHidden] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -116,20 +140,44 @@ function Header() {
             <img src={logo} alt="Логотип центра РАСсвет" />
           </Link>
 
-          <form className="header__search">
-            <button
-              type="submit"
-              className="header__search-btn"
-              aria-label="Поиск"
-            >
-              <FiSearch />
-            </button>
-            <input
-              type="text"
-              className="header__search-input"
-              placeholder="Поиск..."
-            />
-          </form>
+<div className="header__search">
+  <button
+    type="button"
+    className="header__search-btn"
+    onClick={() => {
+      if (filteredPages[0]) {
+        navigate(filteredPages[0].path);
+        setSearchValue("");
+      }
+    }}
+  >
+    <FiSearch></FiSearch>
+  </button>
+
+  <input
+    className="header__search-input"
+    placeholder="Поиск"
+    value={searchValue}
+    onChange={(e) => setSearchValue(e.target.value)}
+  />
+
+  {searchValue.trim() && filteredPages.length > 0 && (
+    <div className="header__search-results">
+      {filteredPages.slice(0, 6).map((page) => (
+        <button
+          key={page.path}
+          type="button"
+          onClick={() => {
+            navigate(page.path);
+            setSearchValue("");
+          }}
+        >
+          {page.title}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
 
           <button
             className="header__burger"

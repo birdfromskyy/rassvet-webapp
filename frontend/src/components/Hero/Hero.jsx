@@ -48,10 +48,10 @@ export default function Hero() {
 
           <div className="hero__actions">
             <a href="/service-algorithm" className="hero__btn hero__btn--primary">
-              Как записаться
+              Как попасть в Центр
             </a>
 
-            <a href="/mission" className="hero__btn hero__btn--secondary">
+            <a href="/services-list" className="hero__btn hero__btn--secondary">
               Узнать больше
             </a>
           </div>

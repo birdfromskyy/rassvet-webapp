@@ -21,9 +21,19 @@ import { getUploadUrl } from '../services/cmsService'
 const getVkEmbedUrl = url => {
 	if (!url) return null
 	if (url.includes('video_ext.php')) return url
-	const match = url.match(/video-?(\d+)_(\d+)/)
-	if (!match) return null
-	return `https://vk.com/video_ext.php?oid=-${match[1]}&id=${match[2]}&hd=2`
+
+	const videoMatch = url.match(/video-?(\d+)_(\d+)/)
+	if (videoMatch) {
+		return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2`
+	}
+
+	// ВК Клипы: vk.com/clip-123456_789012 или vk.com/clips/...?z=clip-123456_789012
+	const clipMatch = url.match(/clip-?(\d+)_(\d+)/)
+	if (clipMatch) {
+		return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2`
+	}
+
+	return null
 }
 
 const getUrlBasename = url => {

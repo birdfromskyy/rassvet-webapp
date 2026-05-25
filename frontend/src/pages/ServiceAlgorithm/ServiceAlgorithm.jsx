@@ -7,7 +7,7 @@ const steps = [
   {
     number: "01",
     title: "Свяжитесь с нами",
-    text: "Позвоните или напишите — мы ответим на все вопросы и проведём первичную консультацию удалённо, в удобное для вас время.",
+    text: "Позвоните по номеру +7 (900) 397-34-59 — мы ответим на все вопросы и проведём первичную консультацию удалённо, в удобное для вас время.",
   },
   {
     number: "02",
@@ -71,7 +71,7 @@ function ServiceAlgorithm() {
               ))}
             </div>
 
-            <div className="serviceAlgorithm__actions">
+            {/* <div className="serviceAlgorithm__actions">
               <div>
                 <h2>Готовы подать документы?</h2>
                 <p>
@@ -86,7 +86,7 @@ function ServiceAlgorithm() {
                   Связаться с нами
                 </Link>
               </div>
-            </div>
+            </div> */}
           </div>
         </section>
       </main>

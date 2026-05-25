@@ -35,11 +35,11 @@ const ReviewCard = ({ review }) => {
           </div>
         </div>
 
-        {review.status && (
+        {/* {review.status && (
           <span className={`review-card__status review-card__status--${review.status}`}>
             {getStatusLabel(review.status)}
           </span>
-        )}
+        )} */}
       </div>
 
       <p className="review-card__content">
