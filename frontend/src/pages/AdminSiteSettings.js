@@ -8,7 +8,7 @@ import { ArrowBack as BackIcon, Save as SaveIcon } from '@mui/icons-material'
 import { siteSettingService, uploadFile, getUploadUrl } from '../services/cmsService'
 
 // Keys that hold JSON arrays of strings — edited as newline-separated text
-const JSON_ARRAY_KEYS = ['mission_goals', 'fin_hero_list', 'social_forms_json']
+const JSON_ARRAY_KEYS = ['mission_goals', 'about_our_services']
 
 const SECTIONS = [
   {
@@ -20,8 +20,7 @@ const SECTIONS = [
   {
     title: 'Миссия (/mission)',
     fields: [
-      { key: 'mission_hero_title', label: 'Заголовок hero-блока', multiline: false },
-      { key: 'mission_hero_text', label: 'Текст hero-блока', multiline: true, rows: 3 },
+      { key: 'mission_hero_text', label: 'Миссия центра (текст)', multiline: true, rows: 3 },
       { key: 'mission_goals', label: 'Цели центра (каждая с новой строки)', multiline: true, rows: 6, isJsonArray: true },
     ],
   },
@@ -32,9 +31,9 @@ const SECTIONS = [
     ],
   },
   {
-    title: 'Материальная база (/fin_activities) — текст',
+    title: 'Описание услуг (/about_services)',
     fields: [
-      { key: 'fin_hero_text', label: 'Описание в hero-блоке', multiline: true, rows: 3 },
+      { key: 'about_our_services', label: 'Наши услуги (каждая с новой строки)', multiline: true, rows: 8, isJsonArray: true },
     ],
   },
   {

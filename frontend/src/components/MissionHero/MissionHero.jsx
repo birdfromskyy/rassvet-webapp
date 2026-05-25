@@ -1,19 +1,25 @@
-import "./MissionHero.scss";
+import { useEffect, useState } from "react";
 import "./MissionHero.scss";
 import missionImg from "../../assets/doodle.png";
+import { siteSettingService } from "../../services/cmsService";
 
 function MissionHero() {
+  const [missionText, setMissionText] = useState("");
+
+  useEffect(() => {
+    siteSettingService.getAll().then((settings) => {
+      setMissionText(settings.mission_hero_text || "");
+    }).catch(() => {});
+  }, []);
+
   return (
     <section className="mission-hero">
-        <div className="mission-hero__bg">
-          <span className="circle circle--yellow"></span>
-          <span className="circle circle--blue"></span>
-          <span className="circle circle--light"></span>
-        </div>
+      <div className="mission-hero__bg">
+        <span className="circle circle--yellow"></span>
+        <span className="circle circle--blue"></span>
+        <span className="circle circle--light"></span>
+      </div>
       <div className="container mission-hero__inner">
-        
-
-
         <div className="mission-hero__content">
           <span className="section-badge">Миссия центра</span>
 
@@ -22,9 +28,8 @@ function MissionHero() {
           </h1>
 
           <p className="mission-hero__text">
-            Миссия Центра «РАСсвет» — улучшение качества жизни семей,
-            воспитывающих детей с расстройствами аутистического спектра и
-            другими ментальными нарушениями.
+            Миссия Центра «РАСсвет» —{" "}
+            {missionText || "улучшение качества жизни семей, воспитывающих детей с расстройствами аутистического спектра и другими ментальными нарушениями."}
           </p>
         </div>
       </div>
