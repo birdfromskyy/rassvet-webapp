@@ -548,18 +548,13 @@ const AdminTeachers = () => {
               </Typography>
             </Divider>
 
-            <FormControl fullWidth>
-              <InputLabel>Категория</InputLabel>
-              <Select
-                value={form.category}
-                label="Категория"
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              >
-                <MenuItem value="">— не указано —</MenuItem>
-                <MenuItem value="Руководство">Руководство</MenuItem>
-                <MenuItem value="Специалисты">Специалисты</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField
+              label="Категория"
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              fullWidth
+              placeholder="Руководство"
+            />
 
             <Box>
               <Typography variant="body2" color="text.secondary" gutterBottom>
