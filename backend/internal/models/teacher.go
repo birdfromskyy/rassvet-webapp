@@ -10,7 +10,7 @@ type Teacher struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// CMS fields for public /employees page
-	Category       string `json:"category" gorm:"type:varchar(100)"`            // "Руководство" | "Специалисты"
+	Category       string `json:"category" gorm:"type:text"`
 	PhotoURL       string `json:"photo_url" gorm:"type:text"`
 	Qualifications string `json:"qualifications" gorm:"type:text"`               // JSON array of strings
 	Education      string `json:"education" gorm:"type:text"`                    // JSON array of strings

@@ -54,7 +54,6 @@ function EmployeesList() {
                   <div className="employee-card__main">
                     <span className="employee-card__category">{employee.category}</span>
                     <h3>{name}</h3>
-                    <p>{qualifications[0] || ""}</p>
                   </div>
 
                   <span className="employee-card__toggle">{isOpen ? "−" : "+"}</span>
