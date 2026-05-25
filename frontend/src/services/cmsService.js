@@ -52,11 +52,11 @@ export const historyService = {
   delete: (id) => api.delete(`/admin/history/${id}`).then(r => r.data),
 }
 
-// ── Services (/about_services) ─────────────────────────────────────────────
+// ── Services (/services-list and /about_services) ─────────────────────────
 
 export const serviceCmsService = {
-  getAll: () => api.get('/services').then(r => r.data),
-  getAllAdmin: () => api.get('/admin/services').then(r => r.data),
+  getAll: (type) => api.get('/services', { params: type ? { type } : {} }).then(r => r.data),
+  getAllAdmin: (type) => api.get('/admin/services', { params: type ? { type } : {} }).then(r => r.data),
   create: (data) => api.post('/admin/services', data).then(r => r.data),
   update: (id, data) => api.put(`/admin/services/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/admin/services/${id}`).then(r => r.data),
