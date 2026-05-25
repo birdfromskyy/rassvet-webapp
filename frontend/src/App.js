@@ -216,7 +216,14 @@ function App() {
 <Route path='/donation' element={<Donation />} />
 <Route path='/social-service-form' element={<SocialServiceForm />} />
 
-				<Route path='/' element={<Navigate to='/dashboard' />} />
+				<Route
+					path='/'
+					element={
+						isAuthenticated
+							? <Navigate to='/dashboard' replace />
+							: <Navigate to='/main' replace />
+					}
+				/>
 			</Routes>
 			<ToastContainer position='top-right' />
 		</>
