@@ -61,38 +61,38 @@ body {
 }
 
 .section-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 
-  min-height: 45px;
-  padding: 0 20px;
+  min-height: 45px !important;
+  padding: 0 20px !important;
 
-  margin-bottom: 10px;
-  border-radius: 999px;
+  margin-bottom: 10px !important;
+  border-radius: 999px !important;
 
-  background: #ffe96a;
-  color: #074462;
+  background: #ffe96a !important;
+  color: #074462 !important;
 
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
 
-  white-space: nowrap;
+  white-space: nowrap !important;
 }
 
 @media (max-width: 768px) {
   .section-badge {
-    min-height: 54px;
-    padding: 0 24px;
-    font-size: 17px;
+    min-height: 54px !important;
+    padding: 0 24px !important;
+    font-size: 17px !important;
   }
 }
 
 @media (max-width: 480px) {
   .section-badge {
-    min-height: 48px;
-    padding: 0 20px;
-    font-size: 15px;
+    min-height: 48px !important;
+    padding: 0 20px !important;
+    font-size: 15px !important;
   }
 }

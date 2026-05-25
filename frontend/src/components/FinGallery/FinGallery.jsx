@@ -70,8 +70,8 @@ function FinGallery() {
             </h2>
           </div>
 
-          <a href="/contacts" className="fin-gallery__button">
-            Записаться на консультацию →
+          <a href="/service-algorithm" className="fin-gallery__button">
+            Алгоритм получения услуг →
           </a>
         </div>
       </div>
