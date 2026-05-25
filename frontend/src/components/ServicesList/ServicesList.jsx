@@ -1,74 +1,67 @@
 import { useEffect, useState } from "react";
 import "./ServicesList.scss";
 
+const parseJson = (str) => { try { return JSON.parse(str || "[]"); } catch { return []; } };
+
 function ServicesList() {
-  const [services, setServices] = useState([]);
+  const [sections, setSections] = useState([]);
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/services`)
+    fetch(`${process.env.REACT_APP_API_URL}/services?type=services_list`)
       .then((r) => r.json())
       .then((data) => {
-        const items = (data.services || data || [])
-          .filter((s) => s.is_active)
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map((s) => ({
-            category: s.title,
-            accent: s.text,
-            items: (() => { try { return JSON.parse(s.items || "[]"); } catch { return []; } })(),
-          }));
-        setServices(items);
+        const all = (data || []).filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order);
+        const top = all.filter((s) => !s.parent_id);
+        const built = top.map((section) => ({
+          ...section,
+          children: all
+            .filter((s) => s.parent_id === section.id)
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((child) => ({ ...child, subItems: parseJson(child.items) })),
+        }));
+        setSections(built);
       })
       .catch(() => {});
   }, []);
 
   return (
     <section className="servicesList">
-
       <div className="container">
-
         <div className="servicesList__grid">
-
-          {services.map((service, index) => (
-            <div className="serviceCard" key={index}>
-
+          {sections.map((section) => (
+            <div className="serviceCard" key={section.id}>
               <div className="serviceCard__top">
-                <span>{service.accent}</span>
-
-                <h3>{service.category}</h3>
+                <h3>{section.title}</h3>
               </div>
-
-              <ul>
-                {service.items.map((item, idx) => (
-                  <li key={idx}>{item}</li>
-                ))}
-              </ul>
-
+              {section.children.length > 0 && (
+                <ul>
+                  {section.children.map((child) => (
+                    <li key={child.id}>
+                      <strong>{child.title}</strong>
+                      {child.text && <span> — {child.text}</span>}
+                      {child.subItems.length > 0 && (
+                        <ul style={{ marginTop: 6 }}>
+                          {child.subItems.map((item, i) => (
+                            <li key={i}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ))}
-
         </div>
-
-        {/* CTA */}
 
         <div className="servicesList__cta">
-
           <div>
             <h2>Нужна помощь с выбором услуги?</h2>
-
-            <p>
-              Мы подскажем подходящее направление
-              и ответим на все вопросы.
-            </p>
+            <p>Мы подскажем подходящее направление и ответим на все вопросы.</p>
           </div>
-
-          <a href="/contacts">
-            Связаться с нами
-          </a>
-
+          <a href="/contacts">Связаться с нами</a>
         </div>
-
       </div>
-
     </section>
   );
 }

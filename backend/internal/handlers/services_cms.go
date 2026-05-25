@@ -17,7 +17,8 @@ func NewServiceCmsHandler(db *gorm.DB) *ServiceCmsHandler {
 }
 
 type ServiceItemRequest struct {
-	Icon      string `json:"icon"`
+	ParentID  *uint  `json:"parent_id"`
+	Type      string `json:"type"`
 	Title     string `json:"title" binding:"required"`
 	Text      string `json:"text"`
 	Items     string `json:"items"` // JSON array string
@@ -25,15 +26,25 @@ type ServiceItemRequest struct {
 	IsActive  *bool  `json:"is_active"`
 }
 
+// GetServices returns active services, optionally filtered by ?type=
 func (h *ServiceCmsHandler) GetServices(c *gin.Context) {
 	var services []models.ServiceItem
-	h.db.Where("is_active = ?", true).Order("sort_order ASC, id ASC").Find(&services)
+	q := h.db.Where("is_active = ?", true)
+	if t := c.Query("type"); t != "" {
+		q = q.Where("type = ?", t)
+	}
+	q.Order("sort_order ASC, id ASC").Find(&services)
 	c.JSON(http.StatusOK, services)
 }
 
+// GetAllServices returns all services (admin), optionally filtered by ?type=
 func (h *ServiceCmsHandler) GetAllServices(c *gin.Context) {
 	var services []models.ServiceItem
-	h.db.Order("sort_order ASC, id ASC").Find(&services)
+	q := h.db
+	if t := c.Query("type"); t != "" {
+		q = q.Where("type = ?", t)
+	}
+	q.Order("sort_order ASC, id ASC").Find(&services)
 	c.JSON(http.StatusOK, services)
 }
 
@@ -49,8 +60,14 @@ func (h *ServiceCmsHandler) CreateService(c *gin.Context) {
 		isActive = *req.IsActive
 	}
 
+	serviceType := req.Type
+	if serviceType == "" {
+		serviceType = "services_list"
+	}
+
 	service := models.ServiceItem{
-		Icon:      req.Icon,
+		ParentID:  req.ParentID,
+		Type:      serviceType,
 		Title:     req.Title,
 		Text:      req.Text,
 		Items:     req.Items,
@@ -80,7 +97,10 @@ func (h *ServiceCmsHandler) UpdateService(c *gin.Context) {
 		return
 	}
 
-	service.Icon = req.Icon
+	service.ParentID = req.ParentID
+	if req.Type != "" {
+		service.Type = req.Type
+	}
 	service.Title = req.Title
 	service.Text = req.Text
 	service.Items = req.Items
