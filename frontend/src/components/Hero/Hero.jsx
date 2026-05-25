@@ -35,10 +35,10 @@ export default function Hero() {
               <span>Индивидуальный подход</span>
             </div>
 
-            <div className="hero__feature">
+            <a href="/employees" className="hero__feature">
               <img src={iconChat} alt="" />
               <span>Опытные специалисты</span>
-            </div>
+            </a>
 
             <div className="hero__feature">
               <img src={iconFamily} alt="" />
@@ -47,11 +47,11 @@ export default function Hero() {
           </div>
 
           <div className="hero__actions">
-            <a href="#" className="hero__btn hero__btn--primary">
-              Записаться на консультацию
+            <a href="/service-algorithm" className="hero__btn hero__btn--primary">
+              Как записаться
             </a>
 
-            <a href="/history" className="hero__btn hero__btn--secondary">
+            <a href="/mission" className="hero__btn hero__btn--secondary">
               Узнать больше
             </a>
           </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
@@ -204,6 +204,11 @@ const UploadDocumentsWidget = () => {
         Чтобы получить доступ к расписанию и услугам Центра, загрузите
         необходимые документы. После проверки администрация привяжет ребёнка к
         вашему аккаунту.
+      </p>
+
+      <p>
+        Если вы ещё не проходили консультацию —{" "}
+        <Link to="/service-algorithm">ознакомьтесь с алгоритмом получения услуг</Link>.
       </p>
 
       <ul>

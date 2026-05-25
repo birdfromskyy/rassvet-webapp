@@ -77,6 +77,17 @@
   gap: 10px;
 
   text-align: center;
+  text-decoration: none;
+  cursor: default;
+
+  &[href] {
+    cursor: pointer;
+
+    &:hover span {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
 }
 
 .hero__feature img {
