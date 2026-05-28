@@ -3,6 +3,7 @@ import Footer from "../../components/Footer/Footer";
 import "./Awards.scss";
 import { useState, useEffect } from "react";
 
+
 const awards = [
   {
     title: "Диплом победителя грантового конкурса",
@@ -19,6 +20,10 @@ const awards = [
 ];
 
 function Awards() {
+      useEffect(() => {
+      document.title = 'Наши награды'
+    }, [])
+
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveIndex((prev) => (prev === awards.length - 1 ? 0 : prev + 1));

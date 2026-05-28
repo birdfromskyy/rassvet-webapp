@@ -23,7 +23,7 @@ const CreateReview = () => {
   const [isEditMode, setIsEditMode] = useState(false)
 
   useEffect(() => {
-    document.title = 'РАСсвет | Отзыв'
+    document.title = 'Отзыв'
     checkExistingReview()
   }, [])
 

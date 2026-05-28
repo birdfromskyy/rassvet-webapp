@@ -162,7 +162,7 @@ const FileDropZone = ({ label, files, existingFiles, onAdd, onRemoveExisting, on
 const Profile = ({ user, onUpdateUser, onLogout }) => {
   const navigate = useNavigate()
 
-  useEffect(() => { document.title = 'РАСсвет | Профиль' }, [])
+  useEffect(() => { document.title = 'Профиль' }, [])
 
   // ── Profile form ──────────────────────────────────────────────────────────
   const [formData, setFormData] = useState({

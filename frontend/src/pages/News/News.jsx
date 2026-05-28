@@ -25,7 +25,7 @@ const News = () => {
   const [category, setCategory] = useState("");
 
   useEffect(() => {
-    document.title = "РАСсвет | Новости";
+    document.title = "Новости";
   }, []);
 
   useEffect(() => {

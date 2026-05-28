@@ -1,6 +1,7 @@
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import "./Achievements.scss";
+import { useState, useEffect } from "react";
 
 const stories = [
   {
@@ -25,6 +26,11 @@ const stories = [
 ];
 
 function Achievements() {
+
+        useEffect(() => {
+      document.title = 'Наши успехи'
+    }, [])
+
   return (
     <div className="page page--achievements">
       <Header />

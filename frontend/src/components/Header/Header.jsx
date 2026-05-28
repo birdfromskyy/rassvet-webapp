@@ -59,6 +59,27 @@ const dropdowns = [
     ],
   },
   {
+  id: "clients",
+  title: "Для клиентов",
+  icon: <FiUser />,
+  links: [
+    { title: "Алгоритм получения услуг", path: "/service-algorithm" },
+    { title: "Свободные места", path: "/available-places" },
+    {
+      title: "Форма социального обслуживания",
+      path: "/social-service-form",
+    },
+    {
+      title: "О правилах внутреннего распорядка",
+      path: "/internal-rules",
+    },
+    {
+      title: "Записаться на консультацию",
+      path: "/consultation-request",
+    },
+  ],
+},
+  {
     id: "services",
     title: "Услуги",
     icon: <FiHeart />,
