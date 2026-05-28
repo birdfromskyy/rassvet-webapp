@@ -78,7 +78,7 @@ function Header() {
   const navigate = useNavigate();
 
   const filteredPages = searchPages.filter((page) =>
-    page.title.toLowerCase().includes(searchValue.toLowerCase().trim())
+    page.title.toLowerCase().includes(searchValue.toLowerCase().trim()),
   );
 
   useEffect(() => {
@@ -125,7 +125,14 @@ function Header() {
     <header className={`header ${isHidden ? "header--hidden" : ""}`}>
       <div className="container header__container">
         <div className="header__top">
-          <button className="header__accessibility" type="button">
+          <button
+            className="header__accessibility"
+            type="button"
+            onClick={() => {
+              localStorage.setItem("accessibility", "on");
+              window.location.reload();
+            }}
+          >
             <FiEye />
             <span>Версия для слабовидящих</span>
           </button>
@@ -258,11 +265,7 @@ function Header() {
               Записаться
             </Link>
 
-            <Link
-              to="/login"
-              className="header__account"
-              onClick={closeMenu}
-            >
+            <Link to="/login" className="header__account" onClick={closeMenu}>
               Личный кабинет
             </Link>
 
