@@ -47,7 +47,7 @@ export default function Hero() {
           </div>
 
           <div className="hero__actions">
-            <a href="/service-algorithm" className="hero__btn hero__btn--primary">
+            <a href="/consultation-request" className="hero__btn hero__btn--primary">
               Как попасть в Центр
             </a>
 
