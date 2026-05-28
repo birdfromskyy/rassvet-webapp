@@ -17,7 +17,7 @@ import ServicesDescription from "./pages/ServicesDescription";
 import Contacts from "./pages/Contacts";
 import Donation from "./pages/Donation";
 import SocialServiceForm from "./pages/SocialServiceForm";
-
+import Awards from "./pages/Awards/Awards";
 import Login from "./pages/Login/Login";
 import Register from "./pages/Register/Register";
 import VerifyEmail from "./pages/VerifyEmail/VerifyEmail";
@@ -253,6 +253,7 @@ function App() {
         </Route>
 
         <Route path="/main" element={<Home />} />
+        <Route path="/awards" element={<Awards />} />
         <Route path="/mission" element={<Mission />} />
         <Route path="/service-algorithm" element={<ServiceAlgorithm />} />
         <Route path="/fin-activities" element={<FinActivities />} />
