@@ -28,6 +28,7 @@ const searchPages = [
   { title: "Независимая оценка качества", path: "/rating" },
   { title: "Форма социального обслуживания", path: "/social-service-form" },
   { title: "Свободные места", path: "/available-places" },
+  { title: "Наши успехи", path: "/achievements" },
 ];
 
 const dropdowns = [
@@ -37,6 +38,7 @@ const dropdowns = [
     links: [
       { title: "Миссия и цели", path: "/mission" },
       { title: "История и достижения", path: "/history" },
+      { title: "Наши успехи", path: "/achievements" },
       { title: "Документы", path: "/docs" },
       { title: "Сотрудники", path: "/employees" },
       {

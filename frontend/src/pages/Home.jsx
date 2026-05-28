@@ -4,6 +4,7 @@ import About from "../components/About/About";
 import Services from "../components/Services/Services";
 import HowItWorks from "../components/HowItWorks/HowItWorks";
 import Reviews from "../components/Reviews/Reviews";
+import HomeMap from "../components/HomeMap/HomeMap";
 import Footer from "../components/Footer/Footer";
 import { useEffect } from 'react'
 
@@ -17,8 +18,8 @@ function Home() {
       <Hero />
       <About />
       <Services />
-      {/* <HowItWorks /> */}
       <Reviews />
+      <HomeMap />
       <Footer />
     </div>
   );

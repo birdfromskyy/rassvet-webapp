@@ -13,21 +13,21 @@
 }
 
 .servicesHero__content h1 {
-  font-family: "Merriweather", serif;
+    color: #074462;
 
-  font-size: 64px;
-  line-height: 1.02;
-
-  color: #074462;
-
-  margin-bottom: 24px;
+    margin: 20px auto 18px;
+    max-width: 820px;
+    font-family: "Merriweather", serif;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 1;
 }
 
 .servicesHero__content p {
-  font-size: 28px;
-  line-height: 1.65;
-
-  color: #35586b;
+    max-width: 820px;
+    margin: 0 auto;
+    color: #35586b;
+    font-size: 20px;
+    line-height: 1.6;
 }
 
 /* RIGHT */

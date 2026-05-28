@@ -1,0 +1,139 @@
+.home-map {
+  background: #f7f4ec;
+  padding: 20px 0 50px;
+  color: #074462;
+}
+
+.home-map__head {
+  margin-bottom: 42px;
+  text-align: center;
+
+  h2 {
+    font-family: "Merriweather", serif;
+    font-size: clamp(36px, 4vw, 56px);
+    line-height: 1.05;
+    margin: 0 0 16px;
+  }
+
+  p {
+    font-size: 19px;
+    line-height: 1.5;
+    color: #35586b;
+    margin: 0;
+  }
+}
+
+.home-map__content {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 28px;
+  align-items: stretch;
+}
+
+.home-map__info,
+.home-map__frame {
+  background: #ffffff;
+  border-radius: 32px;
+  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.1);
+}
+
+.home-map__info {
+  padding: 34px;
+
+  h3 {
+    font-family: "Merriweather", serif;
+    font-size: 30px;
+    margin: 0 0 16px;
+  }
+
+  p {
+    color: #55707f;
+    line-height: 1.6;
+    margin: 0 0 26px;
+  }
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    padding: 0 24px;
+    border-radius: 999px;
+    background: #f4df00;
+    color: #074462;
+    font-weight: 800;
+    text-decoration: none;
+  }
+}
+
+.home-map__frame {
+  width: min(100%, 860px);
+  height: 420px;
+  margin: 0 auto;
+
+  overflow: hidden;
+  border-radius: 34px;
+  background: #ffffff;
+  box-shadow: 0 18px 42px rgba(7, 68, 98, 0.14);
+  border: 10px solid #ffffff;
+}
+
+.home-map__frame iframe {
+  display: block;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .home-map__content {
+    grid-template-columns: 1fr;
+  }
+
+  .home-map__frame {
+    height: 360px;
+  }
+}
+
+@media (max-width: 560px) {
+  .home-map {
+    padding: 56px 0 70px;
+  }
+
+  .home-map__info {
+    padding: 24px;
+  }
+
+  .home-map__frame {
+    height: 300px;
+    border-radius: 24px;
+  }
+}
+
+.home-map__wave-top {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.home-map__wave-top svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
+
+.home-map {
+  background: #f7f4ec;
+  padding: 0 0 100px;
+}
+
+.home-map__wave-top {
+  width: 100%;
+  line-height: 0;
+  margin-bottom: 60px;
+}
+
+.home-map__wave-top svg {
+  display: block;
+  width: 100%;
+  height: 120px;
+}
