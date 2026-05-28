@@ -8,6 +8,10 @@ import {
   FiChevronDown,
   FiMenu,
   FiX,
+  FiHome,
+  FiInfo,
+  FiHeart,
+  FiVolume2,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
@@ -37,6 +41,7 @@ const dropdowns = [
   {
     id: "about",
     title: "О центре",
+    icon: <FiInfo />,
     links: [
       { title: "Миссия и цели", path: "/mission" },
       { title: "История и достижения", path: "/history" },
@@ -56,36 +61,25 @@ const dropdowns = [
   {
     id: "services",
     title: "Услуги",
-    small: true,
+    icon: <FiHeart />,
     links: [
       { title: "Перечень соц. услуг", path: "/services-list" },
       { title: "Описание услуг", path: "/services-description" },
-    ],
-  },
-  {
-    id: "clients",
-    title: "Для клиентов",
-    links: [
-      { title: "Алгоритм получения услуг", path: "/service-algorithm" },
-      { title: "Первичная консультация", path: "/consultation-request" },
-      { title: "Кол-во свободных мест", path: "/available-places" },
-      { title: "Отзывы клиентов", path: "/reviews" },
-      { title: "Форма социального обслуживания", path: "/social-service-form" },
     ],
   },
 ];
 
 function Header() {
   const [searchValue, setSearchValue] = useState("");
-  const navigate = useNavigate();
-
-  const filteredPages = searchPages.filter((page) =>
-    page.title.toLowerCase().includes(searchValue.toLowerCase().trim()),
-  );
-
   const [isHidden, setIsHidden] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+
+  const navigate = useNavigate();
+
+  const filteredPages = searchPages.filter((page) =>
+    page.title.toLowerCase().includes(searchValue.toLowerCase().trim())
+  );
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -119,6 +113,14 @@ function Header() {
     setOpenDropdown(null);
   };
 
+  const goToFirstSearchResult = () => {
+    if (filteredPages[0]) {
+      navigate(filteredPages[0].path);
+      setSearchValue("");
+      closeMenu();
+    }
+  };
+
   return (
     <header className={`header ${isHidden ? "header--hidden" : ""}`}>
       <div className="container header__container">
@@ -129,9 +131,9 @@ function Header() {
           </button>
 
           <div className="header__contacts">
-            <a href="#contacts" className="header__top-link">
+            <a href="/contacts" className="header__top-link">
               <FiMapPin />
-              <span>пер. Нагорный, д. 3</span>
+              <span>пер. Нагорный д.3</span>
             </a>
 
             <a href="tel:+79003973459" className="header__top-link">
@@ -141,130 +143,141 @@ function Header() {
           </div>
         </div>
 
-        <div className="header__middle">
+        <div className="header__main">
           <Link to="/main" className="header__logo" onClick={closeMenu}>
             <img src={logo} alt="Логотип центра РАСсвет" />
           </Link>
 
-<div className="header__search">
-  <button
-    type="button"
-    className="header__search-btn"
-    onClick={() => {
-      if (filteredPages[0]) {
-        navigate(filteredPages[0].path);
-        setSearchValue("");
-      }
-    }}
-  >
-    <FiSearch></FiSearch>
-  </button>
-
-  <input
-    className="header__search-input"
-    placeholder="Поиск"
-    value={searchValue}
-    onChange={(e) => setSearchValue(e.target.value)}
-  />
-
-  {searchValue.trim() && filteredPages.length > 0 && (
-    <div className="header__search-results">
-      {filteredPages.slice(0, 6).map((page) => (
-        <button
-          key={page.path}
-          type="button"
-          onClick={() => {
-            navigate(page.path);
-            setSearchValue("");
-          }}
-        >
-          {page.title}
-        </button>
-      ))}
-    </div>
-  )}
-</div>
-
-          <button
-            className="header__burger"
-            type="button"
-            onClick={() => {
-              setIsMenuOpen((prev) => !prev);
-              setOpenDropdown(null);
-            }}
-            aria-label="Открыть меню"
-          >
-            {isMenuOpen ? <FiX /> : <FiMenu />}
-          </button>
-
-          <nav className={`header__nav ${isMenuOpen ? "is-open" : ""}`}>
-            <NavLink
-              to="/main"
-              className="header__nav-link"
-              onClick={closeMenu}
-            >
-              Главная
-            </NavLink>
-
-            {dropdowns.map((dropdown) => (
-              <div
-                className={`header__nav-item header__nav-item--dropdown ${
-                  openDropdown === dropdown.id ? "is-open" : ""
-                }`}
-                key={dropdown.id}
+          <div className="header__center">
+            <nav className={`header__nav ${isMenuOpen ? "is-open" : ""}`}>
+              <NavLink
+                to="/main"
+                className="header__nav-link"
+                onClick={closeMenu}
               >
-                <button
-                  type="button"
-                  className="header__nav-link header__nav-link--trigger"
-                  onClick={() => toggleDropdown(dropdown.id)}
-                >
-                  <span>{dropdown.title}</span>
-                  <FiChevronDown />
-                </button>
+                <FiHome />
+                <span>Главная</span>
+              </NavLink>
 
+              {dropdowns.map((dropdown) => (
                 <div
-                  className={`header__dropdown ${
-                    dropdown.small ? "header__dropdown--small" : ""
+                  className={`header__nav-item header__nav-item--dropdown ${
+                    openDropdown === dropdown.id ? "is-open" : ""
                   }`}
+                  key={dropdown.id}
                 >
-                  {dropdown.links.map((link) => (
-                    <NavLink to={link.path} key={link.path} onClick={closeMenu}>
-                      {link.title}
-                    </NavLink>
+                  <button
+                    type="button"
+                    className="header__nav-link header__nav-link--trigger"
+                    onClick={() => toggleDropdown(dropdown.id)}
+                  >
+                    {dropdown.icon}
+                    <span>{dropdown.title}</span>
+                    <FiChevronDown className="header__chevron" />
+                  </button>
+
+                  <div className="header__dropdown">
+                    {dropdown.links.map((link) => (
+                      <NavLink
+                        to={link.path}
+                        key={link.path}
+                        onClick={closeMenu}
+                      >
+                        {link.title}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <NavLink
+                to="/news"
+                className="header__nav-link"
+                onClick={closeMenu}
+              >
+                <FiVolume2 />
+                <span>Новости</span>
+              </NavLink>
+
+              <NavLink
+                to="/contacts"
+                className="header__nav-link"
+                onClick={closeMenu}
+              >
+                <FiPhone />
+                <span>Контакты</span>
+              </NavLink>
+            </nav>
+
+            <div className="header__search">
+              <button
+                type="button"
+                className="header__search-btn"
+                onClick={goToFirstSearchResult}
+                aria-label="Поиск"
+              >
+                <FiSearch />
+              </button>
+
+              <input
+                className="header__search-input"
+                placeholder="Поиск..."
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") goToFirstSearchResult();
+                }}
+              />
+
+              {searchValue.trim() && filteredPages.length > 0 && (
+                <div className="header__search-results">
+                  {filteredPages.slice(0, 6).map((page) => (
+                    <button
+                      key={page.path}
+                      type="button"
+                      onClick={() => {
+                        navigate(page.path);
+                        setSearchValue("");
+                        closeMenu();
+                      }}
+                    >
+                      {page.title}
+                    </button>
                   ))}
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
+          </div>
 
-            <NavLink
-              to="/news"
-              className="header__nav-link"
+          <div className="header__actions">
+            <Link
+              to="/consultation-request"
+              className="header__consultation"
               onClick={closeMenu}
             >
-              Новости
-            </NavLink>
+              Записаться
+            </Link>
 
-            <NavLink
-              to="/contacts"
-              className="header__nav-link"
+            <Link
+              to="/login"
+              className="header__account"
               onClick={closeMenu}
             >
-              Контакты
-            </NavLink>
+              Личный кабинет
+            </Link>
 
-            <NavLink
-              to="/donation"
-              className="header__nav-link"
-              onClick={closeMenu}
+            <button
+              className="header__burger"
+              type="button"
+              onClick={() => {
+                setIsMenuOpen((prev) => !prev);
+                setOpenDropdown(null);
+              }}
+              aria-label="Открыть меню"
             >
-              Пожертвование
-            </NavLink>
-          </nav>
-
-          <Link to="/login" className="header__login" aria-label="Войти">
-            {" "}
-            <FiUser />
-          </Link>
+              {isMenuOpen ? <FiX /> : <FiMenu />}
+            </button>
+          </div>
         </div>
       </div>
     </header>
