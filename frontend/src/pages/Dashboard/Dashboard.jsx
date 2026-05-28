@@ -400,7 +400,7 @@ const Dashboard = ({ user, onLogout }) => {
             <NewsSection limit={3} />
           </section>
 
-          <section className="dashboard-profile">
+          {/* <section className="dashboard-profile">
             <div className="dashboard-profile__top">
               <span className="section-badge">Профиль</span>
 
@@ -434,7 +434,7 @@ const Dashboard = ({ user, onLogout }) => {
                 </strong>
               </div>
             </div>
-          </section>
+          </section> */}
         </div>
       </main>
 
