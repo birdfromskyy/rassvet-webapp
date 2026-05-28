@@ -57,6 +57,7 @@ import FinActivities from "./pages/FinActivities";
 import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
 import Achievements from "./pages/Achievements/Achievements";
 import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest";
+import AccessibilityPanel from "./components/AccessibilityPanel/AccessibilityPanel";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -109,6 +110,7 @@ function App() {
 
   return (
     <>
+      <AccessibilityPanel />
       <ScrollToTop />
       <Routes>
         <Route path="/forgot-password" element={<ForgotPassword />} />

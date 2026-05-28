@@ -1,0 +1,156 @@
+.accessibility-panel {
+  position: sticky;
+  top: 0;
+  z-index: 5000;
+  background: #ffffff;
+  border-bottom: 3px solid #000;
+  color: #000;
+}
+
+.accessibility-panel__inner {
+  width: min(100% - 32px, 1600px);
+  margin: 0 auto;
+  padding: 12px 0;
+
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.accessibility-panel__group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accessibility-panel button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.accessibility-panel__close {
+  margin-left: auto;
+}
+
+/* BASE */
+
+body.accessibility-mode {
+  font-family: Arial, sans-serif !important;
+}
+
+body.accessibility-mode *,
+body.accessibility-mode *::before,
+body.accessibility-mode *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+  border-radius: 0 !important;
+  font-family: Arial, sans-serif !important;
+}
+
+/* FONT SIZE — перебивает всё */
+
+body.accessibility-mode[data-accessibility-font="small"] *,
+body.accessibility-mode[data-accessibility-font="small"] input,
+body.accessibility-mode[data-accessibility-font="small"] textarea,
+body.accessibility-mode[data-accessibility-font="small"] select,
+body.accessibility-mode[data-accessibility-font="small"] button {
+  font-size: 18px !important;
+}
+
+body.accessibility-mode[data-accessibility-font="medium"] *,
+body.accessibility-mode[data-accessibility-font="medium"] input,
+body.accessibility-mode[data-accessibility-font="medium"] textarea,
+body.accessibility-mode[data-accessibility-font="medium"] select,
+body.accessibility-mode[data-accessibility-font="medium"] button {
+  font-size: 22px !important;
+}
+
+body.accessibility-mode[data-accessibility-font="large"] *,
+body.accessibility-mode[data-accessibility-font="large"] input,
+body.accessibility-mode[data-accessibility-font="large"] textarea,
+body.accessibility-mode[data-accessibility-font="large"] select,
+body.accessibility-mode[data-accessibility-font="large"] button {
+  font-size: 28px !important;
+}
+
+/* FORM FIX */
+
+body.accessibility-mode input,
+body.accessibility-mode textarea,
+body.accessibility-mode select,
+body.accessibility-mode button {
+  min-height: 52px !important;
+  line-height: 1.4 !important;
+}
+
+body.accessibility-mode textarea {
+  min-height: 160px !important;
+}
+
+/* SPACING */
+
+body.accessibility-mode[data-accessibility-spacing="large"] * {
+  letter-spacing: 0.08em !important;
+  line-height: 1.8 !important;
+}
+
+/* THEMES */
+
+body.accessibility-mode[data-accessibility-theme="light"],
+body.accessibility-mode[data-accessibility-theme="light"] * {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+body.accessibility-mode[data-accessibility-theme="dark"],
+body.accessibility-mode[data-accessibility-theme="dark"] * {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #ffffff !important;
+}
+
+body.accessibility-mode[data-accessibility-theme="blue"],
+body.accessibility-mode[data-accessibility-theme="blue"] * {
+  background-color: #9dd1ff !important;
+  color: #063462 !important;
+  border-color: #063462 !important;
+}
+
+/* IMAGES */
+
+body.accessibility-mode[data-accessibility-images="off"] img,
+body.accessibility-mode[data-accessibility-images="off"] svg,
+body.accessibility-mode[data-accessibility-images="off"] iframe,
+body.accessibility-mode[data-accessibility-images="off"] picture {
+  display: none !important;
+}
+
+/* LINKS / FOCUS */
+
+body.accessibility-mode a,
+body.accessibility-mode button {
+  text-decoration: underline !important;
+}
+
+body.accessibility-mode :focus {
+  outline: 4px solid red !important;
+  outline-offset: 4px !important;
+}
+
+@media (max-width: 700px) {
+  .accessibility-panel__inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .accessibility-panel__close {
+    margin-left: 0;
+  }
+}
