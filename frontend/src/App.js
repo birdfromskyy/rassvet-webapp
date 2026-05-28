@@ -56,6 +56,7 @@ import Profile from "./pages/Profile/Profile";
 import FinActivities from "./pages/FinActivities";
 import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
 import Achievements from "./pages/Achievements/Achievements";
+import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -252,6 +253,7 @@ function App() {
           </Route>
         </Route>
 
+<Route path="/consultation-request" element={<ConsultationRequest />} />
         <Route path="/main" element={<Home />} />
         <Route path="/awards" element={<Awards />} />
         <Route path="/mission" element={<Mission />} />

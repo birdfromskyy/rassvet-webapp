@@ -30,6 +30,7 @@ const searchPages = [
   { title: "Свободные места", path: "/available-places" },
   { title: "Наши успехи", path: "/achievements" },
   { title: "Наши награды", path: "/awards" },
+  { title: "Первичная консультация", path: "/consultation-request" },
 ];
 
 const dropdowns = [
@@ -66,6 +67,7 @@ const dropdowns = [
     title: "Для клиентов",
     links: [
       { title: "Алгоритм получения услуг", path: "/service-algorithm" },
+      { title: "Первичная консультация", path: "/consultation-request" },
       { title: "Кол-во свободных мест", path: "/available-places" },
       { title: "Отзывы клиентов", path: "/reviews" },
       { title: "Форма социального обслуживания", path: "/social-service-form" },
