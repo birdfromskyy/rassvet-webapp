@@ -3,7 +3,6 @@ import footerWave from "../../assets/hero-wave.png";
 import footerLogo from "../../assets/logo-footer.png";
 import footerHouse from "../../assets/footer-house.png";
 import vkIcon from "../../assets/vk-icon.png";
-import maxIcon from "../../assets/max-icon.png";
 import { Link, NavLink } from "react-router-dom";
 
 export default function Footer() {
@@ -69,9 +68,6 @@ export default function Footer() {
                   aria-label="VK"
                 >
                   <img src={vkIcon} alt="VK" />
-                </a>
-                <a href="#" className="footer__social-link" aria-label="MAX">
-                  <img src={maxIcon} alt="MAX" />
                 </a>
               </div>
             </div>

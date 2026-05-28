@@ -1,90 +1,151 @@
-.rules {
+.rules-list {
+  padding: 40px 0 90px;
   background: #f7f4ec;
-  padding: 0px 0 100px;
 }
 
-.rules__grid {
+.rules-list__inner {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.rules-list__heading {
+  text-align: center;
+}
+
+.rules-list__title {
+  margin: 0;
+
+  font-family: "Merriweather", serif;
+  font-size: clamp(42px, 5vw, 82px);
+  line-height: 1.05;
+
+  color: #074462;
+}
+
+.rules-list__description {
+  max-width: 980px;
+
+  margin: 26px auto 0;
+
+  color: #2b6283;
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.rules-list__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 26px;
+
+  gap: 28px;
+
+  width: 100%;
 }
 
-.rulesCard {
-  background: #fff;
-  border-radius: 28px;
-  padding: 32px;
-  display: grid;
-  grid-template-columns: 92px 1fr;
-  gap: 24px;
+.rules-card {
+  display: flex;
   align-items: flex-start;
-  box-shadow: 0 14px 34px rgba(7, 68, 98, 0.08);
-}
+  gap: 24px;
 
-.rulesCard__icon {
-  width: 78px;
-  height: 92px;
-  flex-shrink: 0;
-  border-radius: 18px;
-  background: #f4df00;
-  color: #074462;
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  font-weight: 900;
-  position: relative;
-}
+  width: 100%;
+  min-height: 210px;
 
-.rulesCard__icon::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 0;
-  border-top: 18px solid #fff;
-  border-left: 18px solid rgba(7, 68, 98, 0.18);
-}
+  padding: 34px;
 
-.rulesCard h2 {
-  font-family: "Merriweather", serif;
-  font-size: 26px;
-  line-height: 1.15;
-  color: #074462;
-  margin: 0 0 12px;
-}
+  border-radius: 34px;
 
-.rulesCard p {
-  font-size: 16px;
-  line-height: 1.45;
-  color: #35586b;
-  margin: 0 0 20px;
-}
+  background: #ffffff;
 
-.rulesCard a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 800;
-  color: #074462;
   text-decoration: none;
+
+  box-shadow: 0 16px 34px rgba(7, 68, 98, 0.08);
+
+  transition: 0.25s ease;
 }
 
-/* 📱 адаптив */
+.rules-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 22px 42px rgba(7, 68, 98, 0.14);
+}
 
-@media (max-width: 800px) {
-  .rules__grid {
+.rules-card__icon {
+  width: 92px;
+  height: 92px;
+
+  flex-shrink: 0;
+
+  border-radius: 28px;
+
+  background: #f4df00;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #074462;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+.rules-card__content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  min-height: 92px;
+}
+
+.rules-card__content h3 {
+  margin: 0 0 16px;
+
+  color: #074462;
+
+  font-size: 28px;
+  line-height: 1.25;
+}
+
+.rules-card__content p {
+  margin: 0;
+
+  color: #55707f;
+
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .rules-list__grid {
     grid-template-columns: 1fr;
   }
 
-  .rulesHero h1 {
-    font-size: 34px;
-  }
-
-  .rulesCard {
-    flex-direction: column;
+  .rules-card {
+    min-height: auto;
   }
 }
 
 @media (max-width: 560px) {
-  .rulesCard {
-    grid-template-columns: 1fr;
+  .rules-list {
+    padding: 30px 0 60px;
+  }
+
+  .rules-card {
+    padding: 22px;
+    border-radius: 24px;
+    gap: 18px;
+  }
+
+  .rules-card__icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 22px;
+    font-size: 24px;
+  }
+
+  .rules-card__content h3 {
+    font-size: 22px;
+  }
+
+  .rules-list__description {
+    font-size: 17px;
   }
 }

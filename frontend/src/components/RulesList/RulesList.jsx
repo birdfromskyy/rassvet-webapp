@@ -6,30 +6,35 @@ function RulesList() {
   const [rules, setRules] = useState([]);
 
   useEffect(() => {
-    cmsFileService.getBySection("rules").then(setRules).catch(() => {});
+    cmsFileService
+      .getBySection("rules")
+      .then(setRules)
+      .catch(() => {});
   }, []);
 
   return (
-    <section className="rules">
-      <div className="container">
-        <div className="rules__grid">
-          {rules.map((item) => (
-            <article className="rulesCard" key={item.id}>
-              <div className="rulesCard__icon">PDF</div>
+    <section className="rules-list">
+      <div className="container rules-list__inner">
 
-              <div className="rulesCard__content">
-                <h2>{item.title}</h2>
-                {item.description && <p>{item.description}</p>}
+        <div className="rules-list__grid">
+          {rules.map((file) => (
+            <a
+              key={file.id}
+              href={file.file_url ? getUploadUrl(file.file_url) : "#"}
+              className="rules-card"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <div className="rules-card__icon">PDF</div>
 
-                <a
-                  href={item.file_url ? getUploadUrl(item.file_url) : "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Открыть документ →
-                </a>
+              <div className="rules-card__content">
+                <h3>{file.title}</h3>
+
+                <p>
+                  {file.description || "Открыть документ"}
+                </p>
               </div>
-            </article>
+            </a>
           ))}
         </div>
       </div>

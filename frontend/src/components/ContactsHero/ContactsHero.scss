@@ -21,11 +21,17 @@
 }
 
 .contactsHero h1 {
-  font-family: "Merriweather", serif;
-  font-size: 52px;
-  margin-bottom: 18px;
+    margin: 20px auto 18px;
+    max-width: 820px;
+    font-family: "Merriweather", serif;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 1;
 }
 
 .contactsHero p {
-  font-size: 28px;
+    max-width: 820px;
+    margin: 0 auto;
+    color: #35586b;
+    font-size: 20px;
+    line-height: 1.6;
 }
