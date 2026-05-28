@@ -48,7 +48,7 @@
   gap: 24px;
 
   width: 100%;
-  min-height: 210px;
+  min-height: 130px;
 
   padding: 34px;
 
@@ -69,12 +69,12 @@
 }
 
 .rating-card__icon {
-  width: 92px;
-  height: 92px;
+  width: 68px;
+  height: 68px;
 
   flex-shrink: 0;
 
-  border-radius: 28px;
+  border-radius: 50%;
 
   background: #f4df00;
 
@@ -83,8 +83,8 @@
   justify-content: center;
 
   color: #074462;
-  font-size: 32px;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .rating-card__content {
@@ -100,7 +100,7 @@
 
   color: #074462;
 
-  font-size: 28px;
+  font-size: 23px;
   line-height: 1.25;
 }
 
