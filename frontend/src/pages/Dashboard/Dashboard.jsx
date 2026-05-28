@@ -234,7 +234,7 @@ const Dashboard = ({ user, onLogout }) => {
   const [childrenLoading, setChildrenLoading] = useState(isUser);
 
   useEffect(() => {
-    document.title = "РАСсвет | Личный кабинет";
+    document.title = "Личный кабинет";
   }, []);
 
   useEffect(() => {
