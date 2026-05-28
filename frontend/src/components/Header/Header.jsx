@@ -29,6 +29,7 @@ const searchPages = [
   { title: "Форма социального обслуживания", path: "/social-service-form" },
   { title: "Свободные места", path: "/available-places" },
   { title: "Наши успехи", path: "/achievements" },
+  { title: "Наши награды", path: "/awards" },
 ];
 
 const dropdowns = [
@@ -39,6 +40,7 @@ const dropdowns = [
       { title: "Миссия и цели", path: "/mission" },
       { title: "История и достижения", path: "/history" },
       { title: "Наши успехи", path: "/achievements" },
+      { title: "Наши награды", path: "/awards" },
       { title: "Документы", path: "/docs" },
       { title: "Сотрудники", path: "/employees" },
       {
