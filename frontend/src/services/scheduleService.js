@@ -366,6 +366,9 @@ const scheduleService = {
 		const r = await api.put(`/admin/users/${id}`, data)
 		return r.data.user
 	},
+	deleteUser: async (id) => {
+		await api.delete(`/admin/users/${id}`)
+	},
 	getUserChildren: async userId => {
 		const r = await api.get(`/admin/users/${userId}/children`)
 		return r.data.children || []

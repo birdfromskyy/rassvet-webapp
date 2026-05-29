@@ -42,14 +42,34 @@ func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
 	}
 }
 
+// AdminMiddleware allows both "admin" and "superadmin".
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, exists := c.Get("role")
-		if !exists || role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для администраторов"})
+		role, _ := c.Get("role")
+		if role != "admin" && role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ запрещён"})
 			c.Abort()
 			return
 		}
 		c.Next()
 	}
+}
+
+// SuperAdminMiddleware allows only "superadmin".
+func SuperAdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		if role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для суперадминистратора"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// IsSuperAdmin returns true if the current request is made by a superadmin.
+func IsSuperAdmin(c *gin.Context) bool {
+	role, _ := c.Get("role")
+	return role == "superadmin"
 }

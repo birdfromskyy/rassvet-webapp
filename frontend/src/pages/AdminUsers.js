@@ -32,6 +32,7 @@ import {
 	TextField,
 	Badge,
 	Autocomplete,
+	InputAdornment,
 } from '@mui/material'
 import {
 	ArrowBack as BackIcon,
@@ -41,6 +42,9 @@ import {
 	PersonAdd as PersonAddIcon,
 	Edit as EditIcon,
 	DeleteForever as DeleteDataIcon,
+	Visibility,
+	VisibilityOff,
+	Casino as GenerateIcon,
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
@@ -55,7 +59,26 @@ const EMPTY_FORM = {
 	role: 'user',
 }
 
-const UserFormFields = ({ form, setForm, isEdit }) => (
+const getCallerRole = () => {
+	try { return JSON.parse(localStorage.getItem('user') || 'null')?.role || '' }
+	catch { return '' }
+}
+const isSuperAdmin = () => getCallerRole() === 'superadmin'
+
+const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
+const generatePassword = () =>
+	Array.from({ length: 12 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('')
+
+const UserFormFields = ({ form, setForm, isEdit, targetIsSuperAdmin }) => {
+	const [showPwd, setShowPwd] = React.useState(false)
+
+	const handleGenerate = () => {
+		const pwd = generatePassword()
+		setForm(f => ({ ...f, password: pwd }))
+		setShowPwd(true)
+	}
+
+	return (
 	<Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
 		<TextField
 			label='Email *'
@@ -65,14 +88,36 @@ const UserFormFields = ({ form, setForm, isEdit }) => (
 			size='small'
 			type='email'
 		/>
-		<TextField
-			label={isEdit ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль *'}
-			value={form.password}
-			onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-			fullWidth
-			size='small'
-			type='password'
-		/>
+		<Box display='flex' gap={1} alignItems='flex-start'>
+			<TextField
+				label={isEdit ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль *'}
+				value={form.password}
+				onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+				fullWidth
+				size='small'
+				type={showPwd ? 'text' : 'password'}
+				InputProps={{
+					endAdornment: (
+						<InputAdornment position='end'>
+							<IconButton size='small' onClick={() => setShowPwd(v => !v)} tabIndex={-1}>
+								{showPwd ? <VisibilityOff fontSize='small' /> : <Visibility fontSize='small' />}
+							</IconButton>
+						</InputAdornment>
+					),
+				}}
+			/>
+			<Tooltip title='Сгенерировать случайный пароль'>
+				<Button
+					variant='outlined'
+					size='small'
+					startIcon={<GenerateIcon />}
+					onClick={handleGenerate}
+					sx={{ mt: 0, whiteSpace: 'nowrap', flexShrink: 0, height: 40 }}
+				>
+					Сгенерировать
+				</Button>
+			</Tooltip>
+		</Box>
 		<TextField
 			label='Фамилия *'
 			value={form.last_name}
@@ -94,7 +139,7 @@ const UserFormFields = ({ form, setForm, isEdit }) => (
 			fullWidth
 			size='small'
 		/>
-		<FormControl fullWidth size='small'>
+		<FormControl fullWidth size='small' disabled={targetIsSuperAdmin}>
 			<InputLabel>Роль</InputLabel>
 			<Select
 				value={form.role}
@@ -103,11 +148,19 @@ const UserFormFields = ({ form, setForm, isEdit }) => (
 			>
 				<MenuItem value='user'>Пользователь</MenuItem>
 				<MenuItem value='teacher'>Преподаватель</MenuItem>
-				<MenuItem value='admin'>Администратор</MenuItem>
+				{isSuperAdmin() && <MenuItem value='admin'>Администратор</MenuItem>}
+				{targetIsSuperAdmin && <MenuItem value='superadmin'>Суперадминистратор</MenuItem>}
+				{/* superadmin cannot be assigned via UI — database only */}
 			</Select>
+			{targetIsSuperAdmin && (
+				<Typography variant='caption' color='text.secondary' sx={{ mt: 0.5, display: 'block' }}>
+					Роль суперадмина нельзя изменить через интерфейс
+				</Typography>
+			)}
 		</FormControl>
 	</Box>
-)
+	)
+}
 
 const AdminUsers = () => {
 	const navigate = useNavigate()
@@ -123,6 +176,8 @@ const AdminUsers = () => {
 
 	const [deleteDataDialog, setDeleteDataDialog] = useState({ open: false, user: null })
 	const [deleteDataLoading, setDeleteDataLoading] = useState(false)
+	const [deleteUserDialog, setDeleteUserDialog] = useState({ open: false, user: null })
+	const [deleteUserLoading, setDeleteUserLoading] = useState(false)
 
 	const [createDialog, setCreateDialog] = useState(false)
 	const [createForm, setCreateForm] = useState(EMPTY_FORM)
@@ -252,6 +307,22 @@ const AdminUsers = () => {
 		setEditDialog({ open: true, user })
 	}
 
+	const handleDeleteUser = async () => {
+		const u = deleteUserDialog.user
+		if (!u) return
+		setDeleteUserLoading(true)
+		try {
+			await scheduleService.deleteUser(u.id)
+			toast.success('Пользователь удалён')
+			setDeleteUserDialog({ open: false, user: null })
+			loadAll()
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка удаления')
+		} finally {
+			setDeleteUserLoading(false)
+		}
+	}
+
 	const handleEdit = async () => {
 		if (!editForm.email || !editForm.first_name || !editForm.last_name) {
 			toast.error('Заполните обязательные поля')
@@ -351,8 +422,16 @@ const AdminUsers = () => {
 										</TableCell>
 										<TableCell>
 											<Chip
-												label={u.role === 'admin' ? 'Администратор' : u.role === 'teacher' ? 'Преподаватель' : 'Пользователь'}
-												color={u.role === 'admin' ? 'error' : u.role === 'teacher' ? 'primary' : 'default'}
+												label={
+													u.role === 'superadmin' ? 'Суперадмин' :
+													u.role === 'admin' ? 'Администратор' :
+													u.role === 'teacher' ? 'Преподаватель' : 'Пользователь'
+												}
+												color={
+													u.role === 'superadmin' ? 'secondary' :
+													u.role === 'admin' ? 'error' :
+													u.role === 'teacher' ? 'primary' : 'default'
+												}
 												size='small'
 											/>
 										</TableCell>
@@ -369,35 +448,50 @@ const AdminUsers = () => {
 											)}
 										</TableCell>
 										<TableCell align='center'>
-											<Tooltip title='Редактировать пользователя'>
-												<IconButton size='small' onClick={() => openEditDialog(u)}>
-													<EditIcon fontSize='small' />
-												</IconButton>
-											</Tooltip>
-											<Tooltip title='Управление детьми'>
-												<IconButton
-													size='small'
-													color='primary'
-													onClick={() => openChildDialog(u)}
-												>
-													<Badge
-														badgeContent={childrenCounts[u.id] || 0}
-														color='success'
-														invisible={(childrenCounts[u.id] || 0) === 0}
-													>
-														<ChildIcon />
-													</Badge>
-												</IconButton>
-											</Tooltip>
-											<Tooltip title='Удалить персональные данные'>
-												<IconButton
-													size='small'
-													color='error'
-													onClick={() => setDeleteDataDialog({ open: true, user: u })}
-												>
-													<DeleteDataIcon fontSize='small' />
-												</IconButton>
-											</Tooltip>
+											{/* Action visibility rules:
+											  superadmin row → edit allowed, delete blocked (must use DB)
+											  admin row      → superadmin: all; regular admin: no actions
+											  user/teacher   → all actions allowed
+											*/}
+											{u.role === 'superadmin' ? (
+												// Superadmins: only edit (name/email/password), no delete
+												<Tooltip title='Редактировать'>
+													<IconButton size='small' onClick={() => openEditDialog(u)}>
+														<EditIcon fontSize='small' />
+													</IconButton>
+												</Tooltip>
+											) : (isSuperAdmin() || u.role !== 'admin') ? (
+												<>
+													<Tooltip title='Редактировать пользователя'>
+														<IconButton size='small' onClick={() => openEditDialog(u)}>
+															<EditIcon fontSize='small' />
+														</IconButton>
+													</Tooltip>
+													<Tooltip title='Управление детьми'>
+														<IconButton size='small' color='primary' onClick={() => openChildDialog(u)}>
+															<Badge
+																badgeContent={childrenCounts[u.id] || 0}
+																color='success'
+																invisible={(childrenCounts[u.id] || 0) === 0}
+															>
+																<ChildIcon />
+															</Badge>
+														</IconButton>
+													</Tooltip>
+													<Tooltip title='Удалить персональные данные'>
+														<IconButton size='small' color='error' onClick={() => setDeleteDataDialog({ open: true, user: u })}>
+															<DeleteDataIcon fontSize='small' />
+														</IconButton>
+													</Tooltip>
+													<Tooltip title='Удалить пользователя полностью'>
+														<IconButton size='small' color='error' onClick={() => setDeleteUserDialog({ open: true, user: u })}>
+															<DeleteIcon fontSize='small' />
+														</IconButton>
+													</Tooltip>
+												</>
+											) : (
+												<Typography variant='caption' color='text.disabled'>—</Typography>
+											)}
 										</TableCell>
 									</TableRow>
 								))}
@@ -506,7 +600,8 @@ const AdminUsers = () => {
 					Редактировать пользователя #{editDialog.user?.id}
 				</DialogTitle>
 				<DialogContent>
-					<UserFormFields form={editForm} setForm={setEditForm} isEdit={true} />
+					<UserFormFields form={editForm} setForm={setEditForm} isEdit={true}
+						targetIsSuperAdmin={editDialog.user?.role === 'superadmin'} />
 				</DialogContent>
 				<DialogActions>
 					<Button onClick={() => setEditDialog({ open: false, user: null })}>Отмена</Button>
@@ -559,6 +654,44 @@ const AdminUsers = () => {
 					</Button>
 				</DialogActions>
 			</Dialog>
+			{/* Delete User Dialog */}
+			<Dialog
+				open={deleteUserDialog.open}
+				onClose={() => setDeleteUserDialog({ open: false, user: null })}
+				maxWidth='sm'
+				fullWidth
+			>
+				<DialogTitle sx={{ color: 'error.main' }}>Удалить пользователя</DialogTitle>
+				<DialogContent>
+					<Typography sx={{ mb: 1 }}>Вы собираетесь безвозвратно удалить:</Typography>
+					<Typography fontWeight={700} sx={{ mb: 2 }}>
+						{deleteUserDialog.user?.email}
+						{' — '}{[deleteUserDialog.user?.last_name, deleteUserDialog.user?.first_name].filter(Boolean).join(' ') || 'имя не указано'}
+					</Typography>
+					<Typography variant='body2' color='text.secondary' sx={{ mb: 0.5 }}>Вместе с пользователем будут удалены:</Typography>
+					<Box component='ul' sx={{ pl: 3, mb: 2 }}>
+						{[
+							'Анкетирование и файл анкеты',
+							'Документы родителя (паспорт, СНИЛС)',
+							'Документы детей (ИППСУ, свидетельство о рождении, СНИЛС)',
+							'Все уведомления',
+							'Отзывы пользователя',
+							'Заявки на консультацию',
+							'Привязки к ученикам',
+						].map(item => (
+							<Typography key={item} component='li' variant='body2'>{item}</Typography>
+						))}
+					</Box>
+					<Typography variant='body2' color='error.main' fontWeight={600}>Это действие нельзя отменить.</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDeleteUserDialog({ open: false, user: null })}>Отмена</Button>
+					<Button variant='contained' color='error' onClick={handleDeleteUser} disabled={deleteUserLoading}>
+						{deleteUserLoading ? 'Удаление...' : 'Удалить пользователя'}
+					</Button>
+				</DialogActions>
+			</Dialog>
+
 		</Container>
 	)
 }
