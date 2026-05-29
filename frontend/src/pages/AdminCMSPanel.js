@@ -24,6 +24,11 @@ import {
   ManageAccounts as UsersIcon,
   ArrowBack as BackIcon,
   AssignmentInd as DocsIcon,
+  Stars as AchievementsIcon,
+  MilitaryTech as AwardsIcon,
+  ContactPhone as ConsultationsIcon,
+  Description as QuestionnaireIcon,
+  VideoLibrary as ShortsIcon,
 } from '@mui/icons-material'
 
 const MODULES = [
@@ -103,6 +108,41 @@ const MODULES = [
     icon: DocsIcon,
     color: 'warning',
     path: '/admin/documents',
+  },
+  {
+    title: 'Наши успехи',
+    description: 'Истории успеха детей — страница /achievements',
+    icon: AchievementsIcon,
+    color: 'success',
+    path: '/admin/cms/achievements',
+  },
+  {
+    title: 'Награды',
+    description: 'Дипломы и благодарности — страница /awards',
+    icon: AwardsIcon,
+    color: 'info',
+    path: '/admin/cms/awards',
+  },
+  {
+    title: 'Заявки на консультацию',
+    description: 'Входящие заявки от родителей на консультацию',
+    icon: ConsultationsIcon,
+    color: 'error',
+    path: '/admin/consultations',
+  },
+  {
+    title: 'Анкеты родителей',
+    description: 'Проверка заполненных входных анкет',
+    icon: QuestionnaireIcon,
+    color: 'primary',
+    path: '/admin/questionnaires',
+  },
+  {
+    title: 'Шортсы',
+    description: 'Видео-шортсы на главной странице',
+    icon: ShortsIcon,
+    color: 'secondary',
+    path: '/admin/cms/shorts',
   },
 ]
 
