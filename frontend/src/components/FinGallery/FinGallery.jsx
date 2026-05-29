@@ -4,14 +4,21 @@ import placeholder from "../../assets/photo-placeholder.png";
 import { finZoneService, getUploadUrl } from "../../services/cmsService";
 
 const parseJson = (str, fallback = []) => {
-  try { return JSON.parse(str); } catch { return fallback; }
+  try {
+    return JSON.parse(str);
+  } catch {
+    return fallback;
+  }
 };
 
 function FinGallery() {
   const [zones, setZones] = useState([]);
 
   useEffect(() => {
-    finZoneService.getAll().then(setZones).catch(() => {});
+    finZoneService
+      .getAll()
+      .then(setZones)
+      .catch(() => {});
   }, []);
 
   return (
@@ -28,19 +35,18 @@ function FinGallery() {
 
         <div className="fin-gallery__grid">
           {zones.map((zone) => {
-            const imgSrc = zone.image_url ? getUploadUrl(zone.image_url) : placeholder;
+            const imgSrc = zone.image_url
+              ? getUploadUrl(zone.image_url)
+              : placeholder;
             return (
               <article className="fin-card" key={zone.id}>
                 <div className="fin-card__images">
                   <img
                     src={imgSrc}
-                    alt=""
-                    onError={(e) => { e.target.src = placeholder; }}
-                  />
-                  <img
-                    src={imgSrc}
-                    alt=""
-                    onError={(e) => { e.target.src = placeholder; }}
+                    alt={zone.title || ""}
+                    onError={(e) => {
+                      e.target.src = placeholder;
+                    }}
                   />
                 </div>
 
