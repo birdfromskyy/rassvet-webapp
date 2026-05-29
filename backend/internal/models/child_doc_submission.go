@@ -15,11 +15,13 @@ type ChildDocSubmission struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
-	UserID          uint   `gorm:"index;not null" json:"user_id"`
-	ChildName       string `gorm:"size:200;not null" json:"child_name"`
-	IppsuFiles      string `gorm:"type:text;default:'[]'" json:"ippsu_files"`       // JSON []string
-	BirthCertFiles  string `gorm:"type:text;default:'[]'" json:"birth_cert_files"`  // JSON []string
-	ChildSnilsFiles string `gorm:"type:text;default:'[]'" json:"child_snils_files"` // JSON []string
-	Status          string `gorm:"size:20;default:'pending'" json:"status"`         // pending | approved | rejected
-	AdminNote       string `gorm:"type:text" json:"admin_note"`
+	UserID          uint       `gorm:"index;not null" json:"user_id"`
+	ChildName       string     `gorm:"size:200;not null" json:"child_name"`
+	IppsuFiles      string     `gorm:"type:text;default:'[]'" json:"ippsu_files"`       // JSON []string
+	BirthCertFiles  string     `gorm:"type:text;default:'[]'" json:"birth_cert_files"`  // JSON []string
+	ChildSnilsFiles string     `gorm:"type:text;default:'[]'" json:"child_snils_files"` // JSON []string
+	Status          string     `gorm:"size:20;default:'pending'" json:"status"`         // pending | approved | rejected
+	AdminNote       string     `gorm:"type:text" json:"admin_note"`
+	IppsuExpiryDate *time.Time `gorm:"index" json:"ippsu_expiry_date"`
+	ExpiryNotified  bool       `gorm:"default:false" json:"expiry_notified"`
 }

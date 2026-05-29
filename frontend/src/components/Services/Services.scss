@@ -70,7 +70,7 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 22px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .services__card {

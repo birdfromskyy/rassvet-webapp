@@ -2,7 +2,6 @@ import "./Header.scss";
 import {
   FiSearch,
   FiEye,
-  FiUser,
   FiMapPin,
   FiPhone,
   FiChevronDown,
@@ -10,12 +9,16 @@ import {
   FiX,
   FiHome,
   FiInfo,
-  FiHeart,
-  FiVolume2,
+  FiLayers,
+  FiRadio,
+  FiBell,
+  FiUser,
 } from "react-icons/fi";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
+import { siteSettingService } from "../../services/cmsService";
+import notificationService from "../../services/notificationService";
 
 const searchPages = [
   { title: "Главная", path: "/main" },
@@ -79,7 +82,7 @@ const dropdowns = [
   {
     id: "services",
     title: "Услуги",
-    icon: <FiHeart />,
+    icon: <FiLayers />,
     links: [
       { title: "Перечень соц. услуг", path: "/services-list" },
       { title: "Описание услуг", path: "/services-description" },
@@ -92,12 +95,65 @@ function Header() {
   const [isHidden, setIsHidden] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [cmsSettings, setCmsSettings] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef(null);
+  const isLoggedIn = !!localStorage.getItem("token");
 
   const navigate = useNavigate();
 
   const filteredPages = searchPages.filter((page) =>
     page.title.toLowerCase().includes(searchValue.toLowerCase().trim()),
   );
+
+  useEffect(() => {
+    siteSettingService.getAll().then(setCmsSettings).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const load = () => {
+      notificationService.getUnreadCount().then(({ count }) => setUnreadCount(count)).catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 60000); // poll every minute
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!bellOpen) return;
+    notificationService.getAll().then(setNotifications).catch(() => {});
+  }, [bellOpen]);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (bellRef.current && !bellRef.current.contains(e.target)) {
+        setBellOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const handleMarkAllRead = async () => {
+    await notificationService.markAllRead();
+    setUnreadCount(0);
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+  };
+
+  const handleNotifClick = async (n) => {
+    if (!n.is_read) {
+      await notificationService.markOneRead(n.id);
+      setUnreadCount((c) => Math.max(0, c - 1));
+      setNotifications((prev) =>
+        prev.map((item) => item.id === n.id ? { ...item, is_read: true } : item)
+      );
+    }
+    setBellOpen(false);
+    if (n.link) navigate(n.link);
+  };
 
   useEffect(() => {
     let lastScrollY = window.scrollY;
@@ -158,12 +214,15 @@ function Header() {
           <div className="header__contacts">
             <a href="/contacts" className="header__top-link">
               <FiMapPin />
-              <span>пер. Нагорный д.3</span>
+              <span>{cmsSettings.header_address || "пер. Нагорный д.3"}</span>
             </a>
 
-            <a href="tel:+79003973459" className="header__top-link">
+            <a
+              href={`tel:${(cmsSettings.header_phone || "+7 (900) 397-34-59").replace(/\D/g, "").replace(/^8/, "+7")}`}
+              className="header__top-link"
+            >
               <FiPhone />
-              <span>+7 (900) 397-34-59</span>
+              <span>{cmsSettings.header_phone || "+7 (900) 397-34-59"}</span>
             </a>
           </div>
         </div>
@@ -220,7 +279,7 @@ function Header() {
                 className="header__nav-link"
                 onClick={closeMenu}
               >
-                <FiVolume2 />
+                <FiRadio />
                 <span>Новости</span>
               </NavLink>
 
@@ -283,9 +342,61 @@ function Header() {
               Записаться
             </Link>
 
-            <Link to="/login" className="header__account" onClick={closeMenu}>
+            <Link to={isLoggedIn ? "/dashboard" : "/login"} className="header__account" onClick={closeMenu}>
               Личный кабинет
             </Link>
+
+            {isLoggedIn && (
+              <div className="header__bell" ref={bellRef}>
+                <button
+                  type="button"
+                  className="header__bell-btn"
+                  onClick={() => setBellOpen((p) => !p)}
+                  aria-label="Уведомления"
+                >
+                  <FiBell />
+                  {unreadCount > 0 && (
+                    <span className="header__bell-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                  )}
+                </button>
+
+                {bellOpen && (
+                  <div className="header__bell-dropdown">
+                    <div className="header__bell-header">
+                      <span>Уведомления</span>
+                      {unreadCount > 0 && (
+                        <button type="button" onClick={handleMarkAllRead}>
+                          Прочитать все
+                        </button>
+                      )}
+                    </div>
+                    <div className="header__bell-list">
+                      {notifications.length === 0 ? (
+                        <p className="header__bell-empty">Нет уведомлений</p>
+                      ) : (
+                        notifications.map((n) => (
+                          <button
+                            key={n.id}
+                            type="button"
+                            className={`header__bell-item${n.is_read ? "" : " header__bell-item--unread"}`}
+                            onClick={() => handleNotifClick(n)}
+                          >
+                            <span className="header__bell-title">{n.title}</span>
+                            <span className="header__bell-body">{n.body.replace(/^\[uid:\d+\]\s*/, '')}</span>
+                            <span className="header__bell-time">
+                              {new Date(n.created_at).toLocaleDateString("ru-RU", {
+                                day: "2-digit", month: "2-digit", year: "numeric",
+                                hour: "2-digit", minute: "2-digit",
+                              })}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <button
               className="header__burger"
