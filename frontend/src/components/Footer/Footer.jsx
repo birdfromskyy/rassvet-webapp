@@ -3,9 +3,25 @@ import footerWave from "../../assets/hero-wave.png";
 import footerLogo from "../../assets/logo-footer.png";
 import footerHouse from "../../assets/footer-house.png";
 import vkIcon from "../../assets/vk-icon.png";
-import { Link, NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { siteSettingService } from "../../services/cmsService";
 
 export default function Footer() {
+  const [s, setS] = useState({});
+
+  useEffect(() => {
+    siteSettingService.getAll().then(setS).catch(() => {});
+  }, []);
+
+  const phone1 = s.footer_phone1 || "+7 (900) 397-34-59";
+  const phone2 = s.footer_phone2 || "+7 (904) 459-31-02";
+  const address = s.footer_address || "ХМАО - Югра, г. Ханты-Мансийск,\nпер. Нагорный, д. 3";
+  const email = s.footer_email || "vkarpol@yandex.ru";
+  const vkUrl = s.footer_vk_url || "https://vk.com/rassvethm?w=club228149734";
+  const copyright = s.footer_copyright || "© Центр развития детей с задержками развития «РАСсвет» 2026 г. | ИП Евланова О. А.";
+  const toHref = (p) => `tel:${p.replace(/\D/g, "").replace(/^8/, "+7")}`;
+
   return (
     <>
       <img src={footerWave} alt="" className="footer__wave" />
@@ -39,31 +55,22 @@ export default function Footer() {
                 <h4>Контакты</h4>
               </Link>
 
-              <a href="tel:+79003973459" className="footer__contact-link">
-                +7 (900) 397-34-59
-              </a>
-
-              <a href="tel:+79044593102" className="footer__contact-link">
-                +7 (904) 459-31-02
-              </a>
+              <a href={toHref(phone1)} className="footer__contact-link">{phone1}</a>
+              <a href={toHref(phone2)} className="footer__contact-link">{phone2}</a>
 
               <p className="footer__address">
-                ХМАО - Югра, г. Ханты-Мансийск,
-                <br />
-                пер. Нагорный, д. 3
+                {address.split("\n").map((line, i, arr) => (
+                  <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
+                ))}
               </p>
 
-              <a
-                href="mailto:vkarpol@yandex.ru"
-                className="footer__contact-link"
-              >
-                vkarpol@yandex.ru
-              </a>
+              <a href={`mailto:${email}`} className="footer__contact-link">{email}</a>
 
               <div className="footer__socials">
                 <a
                   target="_blank"
-                  href="https://vk.com/rassvethm?w=club228149734"
+                  rel="noreferrer"
+                  href={vkUrl}
                   className="footer__social-link"
                   aria-label="VK"
                 >
@@ -75,10 +82,7 @@ export default function Footer() {
 
           <div className="footer__bottom">
             <div className="container">
-              <p>
-                © Центр развития детей с задержками развития «РАСсвет» 2026 г. |
-                ИП Евланова О. А.
-              </p>
+              <p>{copyright}</p>
               <img src={footerHouse} alt="" className="footer__decor" />
             </div>
           </div>

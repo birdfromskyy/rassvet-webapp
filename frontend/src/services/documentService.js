@@ -71,8 +71,12 @@ const documentService = {
   adminListDocuments: () => api.get('/admin/documents').then(r => r.data),
 
   /** Update status of a child submission */
-  adminUpdateSubmissionStatus: (id, status, adminNote = '') =>
-    api.put(`/admin/documents/submissions/${id}/status`, { status, admin_note: adminNote }).then(r => r.data),
+  adminUpdateSubmissionStatus: (id, status, adminNote = '', ippsuExpiryDate = '') =>
+    api.put(`/admin/documents/submissions/${id}/status`, {
+      status,
+      admin_note: adminNote,
+      ...(ippsuExpiryDate ? { ippsu_expiry_date: ippsuExpiryDate } : {}),
+    }).then(r => r.data),
 
   /** Admin deletes a single child submission + files */
   adminDeleteSubmission: (id) =>

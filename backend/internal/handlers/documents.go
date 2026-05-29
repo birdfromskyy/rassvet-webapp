@@ -210,14 +210,11 @@ func (h *DocumentHandler) GetMyDocuments(c *gin.Context) {
 }
 
 // POST /api/documents/parent  (multipart/form-data)
-// Fields:
-//   phone              — string, +7XXXXXXXXXX
-//   keep_passport      — JSON string of filenames to keep from existing set
-//   keep_snils         — JSON string of filenames to keep from existing set
-//   passport_files[]   — new file uploads (each max 5 MB, max 5 total including kept)
-//   snils_files[]      — new file uploads
 func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 	userID := c.GetUint("userID")
+	if !h.checkQuestionnaireApproved(c, userID) {
+		return
+	}
 
 	phone := strings.TrimSpace(c.PostForm("phone"))
 	if phone != "" && !phoneRe.MatchString(phone) {
@@ -292,7 +289,33 @@ func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 		h.db.Save(&profile)
 	}
 
+	// Notify admins that parent documents were submitted
+	if hasFiles || phone != "" {
+		var user models.User
+		fullName := fmt.Sprintf("пользователь #%d", userID)
+		if h.db.First(&user, userID).Error == nil {
+			fullName = strings.TrimSpace(user.LastName + " " + user.FirstName)
+		}
+		CreateNotification(h.db, 0, "admin",
+			"Документы родителя поданы на проверку",
+			fmt.Sprintf("%s загрузил(а) документы родителя.", fullName),
+			"/admin/documents",
+		)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"parent_profile": profile})
+}
+
+// checkQuestionnaireApproved returns an error response if user has no approved questionnaire.
+func (h *DocumentHandler) checkQuestionnaireApproved(c *gin.Context, userID uint) bool {
+	var q models.Questionnaire
+	if err := h.db.Where("user_id = ? AND status = 'approved'", userID).First(&q).Error; err != nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Подача документов доступна только после проверки анкеты. Пожалуйста, загрузите заполненную анкету и дождитесь подтверждения администратора.",
+		})
+		return false
+	}
+	return true
 }
 
 // POST /api/documents/children  (multipart/form-data)
@@ -303,6 +326,9 @@ func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 //   child_snils_files[]— up to 10 files
 func (h *DocumentHandler) AddChildDocs(c *gin.Context) {
 	userID := c.GetUint("userID")
+	if !h.checkQuestionnaireApproved(c, userID) {
+		return
+	}
 
 	// Count existing children
 	var count int64
@@ -352,6 +378,20 @@ func (h *DocumentHandler) AddChildDocs(c *gin.Context) {
 		Status:          "pending",
 	}
 	h.db.Create(&sub)
+
+	// Notify admins that child documents were submitted
+	{
+		var user models.User
+		fullName := fmt.Sprintf("пользователь #%d", userID)
+		if h.db.First(&user, userID).Error == nil {
+			fullName = strings.TrimSpace(user.LastName + " " + user.FirstName)
+		}
+		CreateNotification(h.db, 0, "admin",
+			"Документы ребёнка поданы на проверку",
+			fmt.Sprintf("%s загрузил(а) документы ребёнка «%s».", fullName, childName),
+			"/admin/documents",
+		)
+	}
 
 	c.JSON(http.StatusCreated, gin.H{"submission": sub})
 }
@@ -677,7 +717,7 @@ func (h *DocumentHandler) AdminListDocuments(c *gin.Context) {
 }
 
 // PUT /api/admin/documents/submissions/:id/status
-// Body: { "status": "approved"|"rejected", "admin_note": "..." }
+// Body: { "status": "approved"|"rejected"|"pending", "admin_note": "...", "ippsu_expiry_date": "2027-01-01" }
 func (h *DocumentHandler) AdminUpdateSubmissionStatus(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -686,8 +726,9 @@ func (h *DocumentHandler) AdminUpdateSubmissionStatus(c *gin.Context) {
 	}
 
 	var body struct {
-		Status    string `json:"status"`
-		AdminNote string `json:"admin_note"`
+		Status          string `json:"status"`
+		AdminNote       string `json:"admin_note"`
+		IppsuExpiryDate string `json:"ippsu_expiry_date"` // "YYYY-MM-DD"
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -704,9 +745,40 @@ func (h *DocumentHandler) AdminUpdateSubmissionStatus(c *gin.Context) {
 		return
 	}
 
+	prevStatus := sub.Status
 	sub.Status = body.Status
 	sub.AdminNote = body.AdminNote
+
+	if body.IppsuExpiryDate != "" {
+		t, parseErr := time.Parse("2006-01-02", body.IppsuExpiryDate)
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат даты (ожидается ГГГГ-ММ-ДД)"})
+			return
+		}
+		sub.IppsuExpiryDate = &t
+		sub.ExpiryNotified = false
+	}
+
 	h.db.Save(&sub)
+
+	// Create in-app notification when status changes to approved or rejected
+	if prevStatus != body.Status && (body.Status == "approved" || body.Status == "rejected") {
+		title, notifBody, link := "", "", "/profile"
+		if body.Status == "approved" {
+			title = fmt.Sprintf("Документы приняты: %s", sub.ChildName)
+			notifBody = "Пакет документов проверен и принят администратором."
+			if body.AdminNote != "" {
+				notifBody += " Примечание: " + body.AdminNote
+			}
+		} else {
+			title = fmt.Sprintf("Документы отклонены: %s", sub.ChildName)
+			notifBody = "Пакет документов был отклонён."
+			if body.AdminNote != "" {
+				notifBody += " Причина: " + body.AdminNote
+			}
+		}
+		CreateNotification(h.db, sub.UserID, "", title, notifBody, link)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"submission": sub})
 }
@@ -738,8 +810,14 @@ func (h *DocumentHandler) AdminUpdateParentStatus(c *gin.Context) {
 		return
 	}
 
+	prevStatus := profile.Status
 	profile.Status = body.Status
 	h.db.Save(&profile)
+
+	if prevStatus != body.Status && body.Status == "verified" {
+		CreateNotification(h.db, profile.UserID, "", "Документы родителя подтверждены",
+			"Ваши личные документы (паспорт, СНИЛС) проверены и подтверждены администратором.", "/profile")
+	}
 
 	c.JSON(http.StatusOK, gin.H{"parent_profile": profile})
 }

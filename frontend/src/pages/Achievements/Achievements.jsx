@@ -2,34 +2,31 @@ import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import "./Achievements.scss";
 import { useState, useEffect } from "react";
-
-const stories = [
-  {
-    name: "Стокач Лёна",
-    image: "https://placehold.co/700x500",
-    text: [
-      "Есть у нас один мальчик — Лёня. Ходит в наш Центр уже почти 3 года.",
-      "У Лёни ауто трудотерапия. Занятия, на которых дети осваивают обычные бытовые навыки.",
-      "Начинал с самого простого: с поддержки взрослого. Сейчас Лёня становится самостоятельнее и увереннее.",
-    ],
-  },
-  {
-    name: "Чормонов Арлен",
-    image: "https://placehold.co/700x500",
-    secondImage: "https://placehold.co/700x500",
-    text: [
-      "Как маленькому Арлену большой мир открылся.",
-      "После занятий сенсорно-моторной интеграцией Арлен начал допускать физический контакт и стал увереннее взаимодействовать с окружающим миром.",
-      "Работа продолжается, и впереди ещё много простых и сложных задач.",
-    ],
-  },
-];
+import achievementService, { getUploadUrl } from "../../services/achievementService";
 
 function Achievements() {
+  useEffect(() => { document.title = "Наши успехи"; }, []);
 
-        useEffect(() => {
-      document.title = 'Наши успехи'
-    }, [])
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    achievementService.getPublic()
+      .then(setStories)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Description is stored as a JSON array of strings, or plain text
+  const parseDescription = (raw) => {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [raw];
+    } catch {
+      return raw.split("\n").filter(Boolean);
+    }
+  };
 
   return (
     <div className="page page--achievements">
@@ -39,9 +36,7 @@ function Achievements() {
         <section className="achievements__hero">
           <div className="container">
             <span className="section-badge">Наши успехи</span>
-
             <h1>Истории маленьких побед</h1>
-
             <p>
               Каждая история — это путь ребёнка, семьи и специалистов Центра.
               Мы радуемся даже небольшим шагам, потому что именно из них
@@ -52,31 +47,37 @@ function Achievements() {
 
         <section className="achievements__stories">
           <div className="container achievements__grid">
-            {stories.map((story, index) => (
-              <article className="achievement-card" key={story.name}>
-                <div className="achievement-card__media">
-                  <img src={story.image} alt={story.name} />
+            {loading ? (
+              <p style={{ textAlign: "center", color: "#94a3b8" }}>Загрузка...</p>
+            ) : stories.length === 0 ? (
+              <p style={{ textAlign: "center", color: "#94a3b8" }}>
+                Истории успеха скоро появятся здесь.
+              </p>
+            ) : (
+              stories.map((story) => (
+                <article className="achievement-card" key={story.id}>
+                  <div className="achievement-card__media">
+                    {story.image_url && (
+                      <img src={getUploadUrl(story.image_url)} alt={story.child_name} />
+                    )}
+                    {story.second_image_url && (
+                      <img src={getUploadUrl(story.second_image_url)} alt="" />
+                    )}
+                  </div>
 
-                  {story.secondImage && (
-                    <img src={story.secondImage} alt="" />
-                  )}
-                </div>
-
-                <div className="achievement-card__content">
-                  <span>История успеха</span>
-
-                  <h2>{story.name}</h2>
-
-                  {story.text.map((paragraph, i) => (
-                    <p key={i}>{paragraph}</p>
-                  ))}
-
-                  <strong>
-                    Маленькими шагами к большим возможностям!
-                  </strong>
-                </div>
-              </article>
-            ))}
+                  <div className="achievement-card__content">
+                    <span>История успеха</span>
+                    <h2>{story.child_name}</h2>
+                    {parseDescription(story.description).map((p, i) => (
+                      <p key={i}>{p}</p>
+                    ))}
+                    {story.conclusion && (
+                      <strong>{story.conclusion}</strong>
+                    )}
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         </section>
       </main>

@@ -669,3 +669,127 @@
 .header__nav-item--dropdown:hover {
   z-index: 10000;
 }
+
+/* ── Notification bell ── */
+.header__bell {
+  position: relative;
+}
+
+.header__bell-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+
+.header__bell-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background: #e53935;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+.header__bell-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header__bell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+
+  button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #074462;
+    font-size: 12px;
+    padding: 0;
+    &:hover { text-decoration: underline; }
+  }
+}
+
+.header__bell-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.header__bell-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.header__bell-item {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #f8fafc;
+  padding: 12px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: background 0.15s;
+
+  &:hover { background: #f8fafc; }
+
+  &--unread {
+    background: #f0f7ff;
+    &:hover { background: #e0f0ff; }
+  }
+}
+
+.header__bell-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.header__bell-body {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header__bell-time {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+}

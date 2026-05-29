@@ -92,39 +92,27 @@ const FileLinks = ({ files }) => {
   )
 }
 
-// ── Unified status dialog ────────────────────────────────────────────────────
-// Works for both parent profile and child submissions.
-// Pass `statusOptions` as [{value, label}] and `showNote` for the note field.
-const StatusDialog = ({ open, title, currentStatus, currentNote, statusOptions, showNote, onClose, onSave }) => {
+// ── Parent status dialog ──────────────────────────────────────────────────────
+const StatusDialog = ({ open, title, currentStatus, statusOptions, onClose, onSave }) => {
   const [status, setStatus] = useState('')
-  const [note, setNote]     = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      setStatus(currentStatus || (statusOptions[0]?.value ?? ''))
-      setNote(currentNote || '')
-    }
-  }, [open, currentStatus, currentNote, statusOptions])
+    if (open) setStatus(currentStatus || (statusOptions[0]?.value ?? ''))
+  }, [open, currentStatus, statusOptions])
 
   const handleSave = async () => {
     setSaving(true)
-    try {
-      await onSave(status, note)
-      toast.success('Статус обновлён')
-      onClose()
-    } catch {
-      toast.error('Ошибка обновления статуса')
-    } finally {
-      setSaving(false)
-    }
+    try { await onSave(status); toast.success('Статус обновлён'); onClose() }
+    catch { toast.error('Ошибка обновления статуса') }
+    finally { setSaving(false) }
   }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Box sx={{ mt: 1 }}>
           <FormControl fullWidth size="small">
             <InputLabel>Статус</InputLabel>
             <Select value={status} label="Статус" onChange={e => setStatus(e.target.value)}>
@@ -133,15 +121,76 @@ const StatusDialog = ({ open, title, currentStatus, currentNote, statusOptions, 
               ))}
             </Select>
           </FormControl>
-          {showNote && (
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Отмена</Button>
+        <Button variant="contained" onClick={handleSave} disabled={saving}>
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+// ── Child submission dialog (with ИППСУ expiry date) ─────────────────────────
+const ChildStatusDialog = ({ open, submission, onClose, onSave }) => {
+  const [status, setStatus]     = useState('')
+  const [note, setNote]         = useState('')
+  const [expiryDate, setExpiry] = useState('')
+  const [saving, setSaving]     = useState(false)
+
+  useEffect(() => {
+    if (open && submission) {
+      setStatus(submission.status || 'pending')
+      setNote(submission.admin_note || '')
+      setExpiry(submission.ippsu_expiry_date ? submission.ippsu_expiry_date.slice(0, 10) : '')
+    }
+  }, [open, submission])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave(status, note, expiryDate)
+      toast.success('Статус обновлён')
+      onClose()
+    } catch { toast.error('Ошибка обновления статуса') }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Статус документов: {submission?.child_name ?? ''}</DialogTitle>
+      <DialogContent>
+        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Статус</InputLabel>
+            <Select value={status} label="Статус" onChange={e => setStatus(e.target.value)}>
+              {CHILD_STATUS_OPTIONS.map(opt => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {status === 'approved' && (
             <TextField
-              label="Примечание для родителя"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              fullWidth size="small" multiline rows={3}
-              helperText="Укажите, что нужно исправить или добавить"
+              label="Срок действия ИППСУ"
+              type="date"
+              value={expiryDate}
+              onChange={e => setExpiry(e.target.value)}
+              fullWidth size="small"
+              InputLabelProps={{ shrink: true }}
+              helperText="Когда срок истечёт — пользователь и администратор получат уведомление на сайте"
             />
           )}
+
+          <TextField
+            label="Примечание для родителя"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            fullWidth size="small" multiline rows={3}
+            helperText="Причина отклонения или комментарий (видит родитель)"
+          />
         </Box>
       </DialogContent>
       <DialogActions>
@@ -356,6 +405,14 @@ const AdminDocuments = () => {
                         <Box display="flex" alignItems="center" gap={2} mb={1} flexWrap="wrap">
                           <Typography fontWeight={600}>{ch.child_name}</Typography>
                           <StatusChip status={ch.status} />
+                          {ch.ippsu_expiry_date && (
+                            <Chip
+                              size="small"
+                              label={`ИППСУ до: ${new Date(ch.ippsu_expiry_date).toLocaleDateString('ru-RU')}`}
+                              color={new Date(ch.ippsu_expiry_date) < new Date() ? 'error' : 'default'}
+                              variant="outlined"
+                            />
+                          )}
                           <Button
                             size="small" variant="outlined"
                             onClick={() => setChildDialog({ open: true, submission: ch })}
@@ -409,16 +466,12 @@ const AdminDocuments = () => {
       </Paper>
 
       {/* ── Child status dialog ── */}
-      <StatusDialog
+      <ChildStatusDialog
         open={childDialog.open}
-        title={`Статус документов: ${childDialog.submission?.child_name ?? ''}`}
-        currentStatus={childDialog.submission?.status}
-        currentNote={childDialog.submission?.admin_note}
-        statusOptions={CHILD_STATUS_OPTIONS}
-        showNote
+        submission={childDialog.submission}
         onClose={() => setChildDialog({ open: false, submission: null })}
-        onSave={(status, note) =>
-          documentService.adminUpdateSubmissionStatus(childDialog.submission.id, status, note)
+        onSave={(status, note, expiryDate) =>
+          documentService.adminUpdateSubmissionStatus(childDialog.submission.id, status, note, expiryDate)
             .then(load)
         }
       />
@@ -428,9 +481,7 @@ const AdminDocuments = () => {
         open={parentDialog.open}
         title="Статус документов родителя"
         currentStatus={parentDialog.status}
-        currentNote=""
         statusOptions={PARENT_STATUS_OPTIONS}
-        showNote={false}
         onClose={() => setParentDialog({ open: false, userId: null, status: '' })}
         onSave={(status) =>
           documentService.adminUpdateParentStatus(parentDialog.userId, status)
