@@ -7,6 +7,8 @@ import NewsSection from "../../components/NewsSection/NewsSection";
 
 import authService from "../../services/authService";
 import scheduleService from "../../services/scheduleService";
+import questionnaireService from "../../services/questionnaireService";
+import { siteSettingService, getUploadUrl } from "../../services/cmsService";
 
 import { toast } from "react-toastify";
 
@@ -191,42 +193,171 @@ const TodayScheduleWidget = ({ user }) => {
   );
 };
 
-const UploadDocumentsWidget = () => {
+// Status banner config — colour + messaging per questionnaire state
+const Q_STATUS = {
+  pending: {
+    bg: "#fefce8", border: "#fde047", color: "#854d0e",
+    icon: "⏳",
+    title: "Анкета отправлена и находится на проверке",
+    body: "Как только администратор примет решение — вы получите уведомление.",
+  },
+  approved: {
+    bg: "#f0fdf4", border: "#86efac", color: "#166534",
+    icon: "✅",
+    title: "Анкета принята!",
+    body: "Администратор одобрил вашу анкету. Теперь можно подать документы.",
+  },
+  rejected: {
+    bg: "#fff1f2", border: "#fca5a5", color: "#991b1b",
+    icon: "⚠️",
+    title: "Требует уточнения",
+    body: null, // replaced by admin_note
+  },
+};
+
+const QuestionnaireSection = () => {
   const navigate = useNavigate();
+  const [q, setQ]                     = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [uploading, setUploading]     = useState(false);
+  const [templateUrl, setTemplateUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [error, setError]             = useState("");
+
+  useEffect(() => {
+    questionnaireService.getMine().then(setQ).catch(() => {}).finally(() => setLoading(false));
+    siteSettingService.getAll().then(s => setTemplateUrl(s.questionnaire_template_url || "")).catch(() => {});
+  }, []);
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) { setSelectedFile(file); setError(""); }
+  };
+
+  const handleSend = async () => {
+    if (!selectedFile) return;
+    setUploading(true); setError("");
+    try {
+      const res = await questionnaireService.upload(selectedFile);
+      setQ(res); setSelectedFile(null);
+    } catch (err) {
+      setError(err?.response?.data?.error || "Ошибка загрузки");
+    } finally { setUploading(false); }
+  };
+
+  if (loading) return null;
+
+  const status = q?.status;
+  const statusCfg = Q_STATUS[status];
+
+  // Styles shared between upload blocks
+  const btnPrimary = { background: "#f7df00", color: "#074462", border: "none", cursor: "pointer", borderRadius: 999, minHeight: 44, padding: "0 20px", fontWeight: 800, fontSize: 14 };
+  const btnOutline = { background: "transparent", border: "2px solid #074462", color: "#074462", cursor: "pointer", borderRadius: 999, minHeight: 44, padding: "0 20px", fontWeight: 700, fontSize: 14 };
+  const btnGhost   = { background: "transparent", border: "1px solid #ccc", color: "#64748b", cursor: "pointer", borderRadius: 999, minHeight: 36, padding: "0 14px", fontSize: 13 };
+
+  // Inline buttons: [Скачать бланк] [Выбрать/Обновить файл] or send-confirm row
+  const UploadBlock = ({ inputId, showDownload }) => (
+    <div style={{ marginTop: 16 }}>
+      {selectedFile ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 14, color: "#374151" }}>📄 {selectedFile.name}</span>
+          <button type="button" style={btnPrimary} onClick={handleSend} disabled={uploading}>
+            {uploading ? "Отправляем..." : "Отправить анкету"}
+          </button>
+          <button type="button" style={btnGhost} disabled={uploading} onClick={() => setSelectedFile(null)}>
+            Отменить
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          {showDownload && templateUrl && (
+            <a href={getUploadUrl(templateUrl)} download style={{ textDecoration: "none" }}>
+              <button type="button" style={btnOutline}>↓ Скачать бланк</button>
+            </a>
+          )}
+          <label style={{ display: "inline-block" }}>
+            <button type="button" style={btnPrimary}
+              onClick={() => document.getElementById(inputId).click()}>
+              {q ? "Обновить файл анкеты" : "Выбрать файл анкеты"}
+            </button>
+            <input id={inputId} type="file" accept=".pdf,.doc,.docx" hidden onChange={handleFileSelect} />
+          </label>
+        </div>
+      )}
+      {error && <p style={{ color: "red", fontSize: 14, marginTop: 8 }}>{error}</p>}
+    </div>
+  );
 
   return (
-    <section className="dashboard-documents">
-      <span className="section-badge">Документы</span>
+    <>
+      {/* ── Анкета ─────────────────────────────────────────────────── */}
+      <section className="dashboard-documents">
+        <span className="section-badge">Анкета</span>
+        <h2>Входная анкета</h2>
 
-      <h2>Загрузите документы</h2>
+        {!q ? (
+          <>
+            <p>
+              После первичной консультации администратор направит вас на заполнение
+              входной анкеты. Скачайте бланк, заполните и загрузите обратно.
+            </p>
+            <UploadBlock inputId="q-upload" showDownload />
+          </>
+        ) : (
+          <>
+            {/* Цветной баннер статуса */}
+            {statusCfg && (
+              <div style={{
+                display: "flex", gap: 12, alignItems: "flex-start",
+                background: statusCfg.bg, border: `1.5px solid ${statusCfg.border}`,
+                borderRadius: 16, padding: "16px 20px", marginBottom: 16,
+                color: statusCfg.color,
+              }}>
+                <span style={{ fontSize: 22, lineHeight: 1.3 }}>{statusCfg.icon}</span>
+                <div>
+                  <strong style={{ display: "block", marginBottom: 4 }}>{statusCfg.title}</strong>
+                  <span style={{ fontSize: 14 }}>
+                    {status === "rejected" && q.admin_note ? q.admin_note : statusCfg.body}
+                  </span>
+                </div>
+              </div>
+            )}
 
-      <p>
-        Чтобы получить доступ к расписанию и услугам Центра, загрузите
-        необходимые документы. После проверки администрация привяжет ребёнка к
-        вашему аккаунту.
-      </p>
+            {/* Бланк + обновление файла — только если не approved */}
+            {(status === "pending" || status === "rejected") && (
+              <UploadBlock inputId="q-reupload" showDownload />
+            )}
+          </>
+        )}
+      </section>
 
-      <p>
-        Если вы ещё не проходили консультацию —{" "}
-        <Link to="/service-algorithm">ознакомьтесь с алгоритмом получения услуг</Link>.
-      </p>
-
-      <ul>
-        <li>ИППСУ</li>
-        <li>Свидетельство о рождении ребёнка</li>
-        <li>СНИЛС ребёнка</li>
-        <li>Паспорт и СНИЛС родителя</li>
-      </ul>
-
-      <button onClick={() => navigate("/profile")}>Загрузить документы</button>
-    </section>
+      {/* ── Документы — только если анкета принята ─────────────────── */}
+      {status === "approved" && (
+        <section className="dashboard-documents">
+          <span className="section-badge">Документы</span>
+          <h2>Подайте документы</h2>
+          <p>
+            Анкета одобрена — теперь загрузите пакет документов. После проверки
+            администрация привяжет ребёнка к вашему аккаунту.
+          </p>
+          <ul>
+            <li>ИППСУ</li>
+            <li>Свидетельство о рождении ребёнка</li>
+            <li>СНИЛС ребёнка</li>
+            <li>Паспорт и СНИЛС родителя</li>
+          </ul>
+          <button onClick={() => navigate("/profile")}>Загрузить документы</button>
+        </section>
+      )}
+    </>
   );
 };
 
 const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
   const isTeacher = user?.role === "teacher";
   const isUser = !isAdmin && !isTeacher;
 
@@ -342,14 +473,14 @@ const Dashboard = ({ user, onLogout }) => {
                 <TodayScheduleWidget user={user} />
               ) : childrenLoading ? (
                 <section className="dashboard-documents">
-                  <div className="dashboard-schedule__empty">
-                    Проверяем данные...
-                  </div>
+                  <div className="dashboard-schedule__empty">Проверяем данные...</div>
                 </section>
               ) : hasChildren ? (
                 <TodayScheduleWidget user={user} />
               ) : (
-                <UploadDocumentsWidget />
+                <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+                  <QuestionnaireSection />
+                </div>
               )}
 
               <section className="dashboard__cards">

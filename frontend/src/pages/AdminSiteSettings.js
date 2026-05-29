@@ -12,6 +12,42 @@ const JSON_ARRAY_KEYS = ['mission_goals', 'about_our_services']
 
 const SECTIONS = [
   {
+    title: 'Шапка сайта (Header)',
+    fields: [
+      { key: 'header_address', label: 'Адрес в шапке', multiline: false },
+      { key: 'header_phone',   label: 'Телефон в шапке', multiline: false },
+    ],
+  },
+  {
+    title: 'Подвал сайта (Footer)',
+    fields: [
+      { key: 'footer_phone1',    label: 'Телефон 1', multiline: false },
+      { key: 'footer_phone2',    label: 'Телефон 2', multiline: false },
+      { key: 'footer_address',   label: 'Адрес (каждая строка — новая строка)', multiline: true, rows: 2 },
+      { key: 'footer_email',     label: 'Email', multiline: false },
+      { key: 'footer_vk_url',    label: 'Ссылка ВКонтакте', multiline: false },
+      { key: 'footer_copyright', label: 'Копирайт (нижняя строка)', multiline: false },
+    ],
+  },
+  {
+    title: 'Страница Контакты (/contacts)',
+    hint: 'Каждая строка в поле = отдельная строка в блоке на сайте.',
+    fields: [
+      { key: 'contacts_management', label: 'Блок «Руководство»', multiline: true, rows: 3 },
+      { key: 'contacts_phones',     label: 'Блок «Телефоны»', multiline: true, rows: 3 },
+      { key: 'contacts_email',      label: 'Блок «Email» (первая строка — ссылка)', multiline: false },
+      { key: 'contacts_addresses',  label: 'Блок «Адреса»', multiline: true, rows: 4 },
+      { key: 'contacts_hours',      label: 'Блок «Режим работы»', multiline: true, rows: 3 },
+    ],
+  },
+  {
+    title: 'Анкетирование',
+    hint: 'Загрузите Word-бланк анкеты. Пользователи скачают его и загрузят заполненный обратно.',
+    fields: [
+      { key: 'questionnaire_template_url', label: 'Бланк входной анкеты (URL после загрузки)', multiline: false, isFile: true },
+    ],
+  },
+  {
     title: 'Главная страница (/)',
     fields: [
       { key: 'home_video_url', label: 'Ссылка на видео-визитку', multiline: false },
@@ -124,12 +160,36 @@ export default function AdminSiteSettings() {
 
       {SECTIONS.map((section, si) => (
         <Paper key={si} sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6" mb={2}>{section.title}</Typography>
+          <Typography variant="h6" mb={section.hint ? 0.5 : 2}>{section.title}</Typography>
+          {section.hint && (
+            <Typography variant="body2" color="text.secondary" mb={2}>{section.hint}</Typography>
+          )}
           <Divider sx={{ mb: 2 }} />
 
           {section.fields.map(field => (
             <Box key={field.key} mb={3}>
-              {field.isPhoto ? (
+              {field.isFile ? (
+                <>
+                  <Typography variant="body2" color="text.secondary" mb={1}>{field.label}</Typography>
+                  {settings[field.key] && (
+                    <Box mb={1}>
+                      <a
+                        href={getUploadUrl(settings[field.key])}
+                        download
+                        style={{ fontSize: 13 }}
+                      >
+                        Скачать текущий файл ↓
+                      </a>
+                    </Box>
+                  )}
+                  <Button variant="outlined" component="label" disabled={uploading} size="small">
+                    {uploading ? 'Загружается...' : 'Загрузить файл (.doc, .docx, .pdf)'}
+                    <input type="file" accept=".doc,.docx,.pdf" hidden
+                      onChange={e => handlePhotoUpload(field.key, e)} />
+                  </Button>
+                  {saved === field.key && <Alert severity="success" sx={{ mt: 1 }}>Сохранено!</Alert>}
+                </>
+              ) : field.isPhoto ? (
                 <>
                   <Typography variant="body2" color="text.secondary" mb={1}>{field.label}</Typography>
                   {settings[field.key] && (
