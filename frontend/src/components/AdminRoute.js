@@ -1,8 +1,10 @@
 import React from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 
+const isAdminOrSuper = (role) => role === 'admin' || role === 'superadmin'
+
 const AdminRoute = ({ user }) => {
-	return user?.role === 'admin' ? <Outlet /> : <Navigate to='/dashboard' />
+	return isAdminOrSuper(user?.role) ? <Outlet /> : <Navigate to='/dashboard' />
 }
 
 export default AdminRoute

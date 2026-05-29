@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"backend/internal/middleware"
 	"backend/internal/models"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -11,6 +14,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+// privileged roles that only a superadmin may assign or affect
+var privilegedRoles = map[string]bool{"admin": true, "superadmin": true}
 
 type UserStudentHandler struct {
 	db *gorm.DB
@@ -61,8 +67,19 @@ func (h *UserStudentHandler) CreateUser(c *gin.Context) {
 	}
 
 	role := req.Role
-	if role != "admin" && role != "user" && role != "teacher" {
+	validRoles := map[string]bool{"user": true, "teacher": true, "admin": true, "superadmin": true}
+	if !validRoles[role] {
 		role = "user"
+	}
+	// Superadmin role cannot be assigned via UI — use the database directly
+	if role == "superadmin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Роль суперадминистратора назначается только через базу данных"})
+		return
+	}
+	// Only superadmin can create admin accounts
+	if role == "admin" && !middleware.IsSuperAdmin(c) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Только суперадминистратор может назначать роль администратора"})
+		return
 	}
 
 	isVerified := true
@@ -131,9 +148,32 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 		}
 	}
 
+	// Superadmin role is immutable via the UI — change it directly in the database.
+	if string(user.Role) == "superadmin" && req.Role != "" && req.Role != "superadmin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Роль суперадминистратора нельзя изменить через интерфейс"})
+		return
+	}
+
 	role := req.Role
-	if role != "admin" && role != "user" && role != "teacher" {
+	validRolesUpd := map[string]bool{"user": true, "teacher": true, "admin": true, "superadmin": true}
+	if !validRolesUpd[role] {
 		role = string(user.Role)
+	}
+	// Regular admin cannot touch privileged accounts or assign privileged roles
+	if !middleware.IsSuperAdmin(c) {
+		if privilegedRoles[string(user.Role)] {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Нельзя редактировать администратора"})
+			return
+		}
+		if privilegedRoles[role] {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Только суперадминистратор может назначать роль администратора"})
+			return
+		}
+	}
+	// Even a superadmin cannot assign the superadmin role via UI
+	if role == "superadmin" && string(user.Role) != "superadmin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Роль суперадминистратора назначается только через базу данных"})
+		return
 	}
 
 	user.Email = req.Email
@@ -165,6 +205,59 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 
 	user.Password = ""
 	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// Admin: DELETE /api/admin/users/:id — cascade delete user and all related data
+func (h *UserStudentHandler) DeleteUser(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || targetID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
+		return
+	}
+
+	// Prevent self-deletion
+	callerID := extractUserID(c)
+	if callerID == uint(targetID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нельзя удалить собственный аккаунт"})
+		return
+	}
+
+	var user models.User
+	if err := h.db.First(&user, targetID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		return
+	}
+
+	// Superadmin accounts cannot be deleted via UI — manage them directly in the database
+	if string(user.Role) == "superadmin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Суперадминистраторов нельзя удалить через интерфейс"})
+		return
+	}
+	// Regular admin cannot delete other admins
+	if !middleware.IsSuperAdmin(c) && string(user.Role) == "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Нельзя удалить администратора"})
+		return
+	}
+
+	// Delete questionnaire file from disk before removing DB record
+	var q models.Questionnaire
+	if h.db.Where("user_id = ?", targetID).First(&q).Error == nil && q.FileName != "" {
+		_ = os.Remove(filepath.Join("./private_uploads/questionnaires", q.FileName))
+	}
+
+	// Cascade: remove all related records (hard delete via Unscoped)
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Questionnaire{})
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Notification{})
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Review{})
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.ConsultationRequest{})
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.UserStudent{})
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.ChildDocSubmission{})
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.ParentProfile{})
+
+	// Hard-delete the user so the email can be reused
+	h.db.Unscoped().Delete(&user)
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // Admin: GET /api/admin/users/:id/children
