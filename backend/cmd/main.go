@@ -5,8 +5,10 @@ import (
 	"backend/internal/database"
 	"backend/internal/handlers"
 	"backend/internal/middleware"
+	"backend/internal/models"
 	"backend/internal/services"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -62,6 +64,18 @@ func main() {
 	// Document submissions handler
 	documentHandler := handlers.NewDocumentHandler(db, cfg.JWTSecret, rdb)
 
+	// Notification handler
+	notificationHandler := handlers.NewNotificationHandler(db)
+
+	// New feature handlers
+	consultationHandler  := handlers.NewConsultationHandler(db)
+	achievementHandler   := handlers.NewAchievementHandler(db)
+	awardHandler         := handlers.NewAwardHandler(db)
+	questionnaireHandler := handlers.NewQuestionnaireHandler(db, rdb)
+
+	// Shorts (video) handler
+	shortHandler := handlers.NewShortHandler(db)
+
 	// CMS handlers
 	cmsFileHandler := handlers.NewCmsFileHandler(db)
 	historyHandler := handlers.NewHistoryHandler(db)
@@ -80,6 +94,14 @@ func main() {
 
 	// Private file serving — auth validated inside handler (Bearer or ?token=)
 	r.GET("/api/documents/file/:filename", documentHandler.ServePrivateFile)
+
+	// Consultation request — public (rate limited: 3 per hour per IP for guests)
+	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), consultationHandler.Create)
+
+	// Public CMS: achievements, awards
+	r.GET("/api/achievements", achievementHandler.GetPublic)
+	r.GET("/api/awards", awardHandler.GetPublic)
+	r.GET("/api/shorts", shortHandler.GetPublic)
 
 	// Public CMS routes (no auth required)
 	r.GET("/api/employees", teacherHandler.GetPublicTeachers)
@@ -270,9 +292,39 @@ func main() {
 			admin.GET("/users", userStudentHandler.GetUsers)
 			admin.POST("/users", userStudentHandler.CreateUser)
 			admin.PUT("/users/:id", userStudentHandler.UpdateUser)
+			admin.DELETE("/users/:id", userStudentHandler.DeleteUser)
 			admin.GET("/users/:id/children", userStudentHandler.GetUserChildren)
 			admin.POST("/users/:id/children", userStudentHandler.AddUserChild)
 			admin.DELETE("/users/:id/children/:studentId", userStudentHandler.RemoveUserChild)
+
+			// Consultations
+			admin.GET("/consultations", consultationHandler.AdminList)
+			admin.PUT("/consultations/:id", consultationHandler.AdminUpdate)
+			admin.DELETE("/consultations/:id", consultationHandler.AdminDelete)
+
+			// Achievements CMS
+			admin.GET("/achievements", achievementHandler.GetAll)
+			admin.POST("/achievements", achievementHandler.Create)
+			admin.PUT("/achievements/:id", achievementHandler.Update)
+			admin.DELETE("/achievements/:id", achievementHandler.Delete)
+
+			// Awards CMS
+			admin.GET("/awards", awardHandler.GetAll)
+			admin.POST("/awards", awardHandler.Create)
+			admin.PUT("/awards/:id", awardHandler.Update)
+			admin.DELETE("/awards/:id", awardHandler.Delete)
+
+			// Shorts CMS (video stories on main page)
+			admin.GET("/shorts", shortHandler.GetAll)
+			admin.POST("/shorts", shortHandler.Create)
+			admin.PUT("/shorts/:id", shortHandler.Update)
+			admin.DELETE("/shorts/:id", shortHandler.Delete)
+
+			// Questionnaires review
+			admin.GET("/questionnaires", questionnaireHandler.AdminList)
+			admin.GET("/questionnaires/:id/file", questionnaireHandler.AdminServeFile)
+			admin.PUT("/questionnaires/:id/status", questionnaireHandler.AdminUpdateStatus)
+			admin.DELETE("/questionnaires/:id", questionnaireHandler.AdminDelete)
 		}
 
 		protected.GET("/my-children", userStudentHandler.GetMyChildren)
@@ -286,7 +338,75 @@ func main() {
 		protected.POST("/documents/children", documentHandler.AddChildDocs)
 		protected.DELETE("/documents/children/:id", documentHandler.DeleteChildSubmission)
 		protected.PUT("/documents/children/:id", documentHandler.UpdateChildDocs)
+
+		// Notifications
+		protected.GET("/notifications", notificationHandler.GetMyNotifications)
+		protected.GET("/notifications/unread-count", notificationHandler.GetUnreadCount)
+		protected.PUT("/notifications/read-all", notificationHandler.MarkAllRead)
+		protected.PUT("/notifications/:id/read", notificationHandler.MarkOneRead)
+
+		// Consultation (auth user — attaches user_id)
+		protected.POST("/consultations/auth", consultationHandler.Create)
+
+		// Questionnaire (anketa)
+		protected.GET("/questionnaire", questionnaireHandler.GetMine)
+		protected.POST("/questionnaire", questionnaireHandler.Upload)
+		protected.GET("/questionnaire/file", questionnaireHandler.ServeFile)
 	}
+
+	// Background goroutine: daily check for expired ИППСУ → create in-app notifications
+	go func() {
+		for {
+			type row struct {
+				ID              uint
+				ChildName       string
+				IppsuExpiryDate *time.Time
+				UserID          uint
+				UserFirstName   string
+				UserLastName    string
+			}
+			var rows []row
+			db.Raw(`
+				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
+				       u.first_name AS user_first_name, u.last_name AS user_last_name
+				FROM child_doc_submissions c
+				JOIN users u ON u.id = c.user_id
+				WHERE c.deleted_at IS NULL
+				  AND c.status = 'approved'
+				  AND c.ippsu_expiry_date IS NOT NULL
+				  AND c.ippsu_expiry_date < NOW()
+				  AND c.expiry_notified = false
+			`).Scan(&rows)
+
+			for _, r := range rows {
+				expiryStr := ""
+				if r.IppsuExpiryDate != nil {
+					expiryStr = r.IppsuExpiryDate.Format("02.01.2006")
+				}
+				fullName := strings.TrimSpace(r.UserLastName + " " + r.UserFirstName)
+
+				// Notify the user
+				handlers.CreateNotification(db, r.UserID, "",
+					"Срок действия ИППСУ истёк",
+					"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истёк "+expiryStr+
+						". Пожалуйста, загрузите обновлённый документ в личном кабинете.",
+					"/profile",
+				)
+				// Notify all admins
+				handlers.CreateNotification(db, 0, "admin",
+					"Истёк срок ИППСУ",
+					"У клиента "+fullName+" истёк срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
+					"/admin/documents",
+				)
+				// Mark as notified so we don't repeat
+				db.Model(&models.ChildDocSubmission{}).
+					Where("id = ?", r.ID).
+					Update("expiry_notified", true)
+			}
+
+			time.Sleep(24 * time.Hour)
+		}
+	}()
 
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatal("Failed to start server:", err)

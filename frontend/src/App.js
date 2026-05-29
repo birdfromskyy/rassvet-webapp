@@ -47,6 +47,11 @@ import AdminServices from "./pages/AdminServices";
 import AdminSiteSettings from "./pages/AdminSiteSettings";
 import AdminCMSPanel from "./pages/AdminCMSPanel";
 import AdminDocuments from "./pages/AdminDocuments";
+import AdminConsultations from "./pages/AdminConsultations";
+import AdminAchievements from "./pages/AdminAchievements";
+import AdminAwards from "./pages/AdminAwards";
+import AdminShorts from "./pages/AdminShorts";
+import AdminQuestionnaires from "./pages/AdminQuestionnaires";
 import ChildSchedule from "./pages/ChildSchedule";
 import TeacherSchedule from "./pages/TeacherSchedule";
 import PrivateRoute from "./components/PrivateRoute";
@@ -132,20 +137,20 @@ function App() {
             !isAuthenticated ? (
               <Login onLogin={handleLogin} />
             ) : (
-              <Navigate to="/dashboard" />
+              <Navigate to="/main" />
             )
           }
         />
         <Route
           path="/register"
           element={
-            !isAuthenticated ? <Register /> : <Navigate to="/dashboard" />
+            !isAuthenticated ? <Register /> : <Navigate to="/main" />
           }
         />
         <Route
           path="/verify-email"
           element={
-            !isAuthenticated ? <VerifyEmail /> : <Navigate to="/dashboard" />
+            !isAuthenticated ? <VerifyEmail /> : <Navigate to="/main" />
           }
         />
 
@@ -221,6 +226,10 @@ function App() {
             {/* Documents review */}
             <Route path="/admin/documents" element={<AdminDocuments />} />
 
+            {/* Consultations & Questionnaires */}
+            <Route path="/admin/consultations" element={<AdminConsultations />} />
+            <Route path="/admin/questionnaires" element={<AdminQuestionnaires />} />
+
             {/* CMS hub */}
             <Route path="/admin/cms" element={<AdminCMSPanel />} />
 
@@ -252,6 +261,9 @@ function App() {
             <Route path="/admin/cms/fin-zones" element={<AdminFinZones />} />
             <Route path="/admin/cms/services" element={<AdminServices />} />
             <Route path="/admin/cms/settings" element={<AdminSiteSettings />} />
+            <Route path="/admin/cms/achievements" element={<AdminAchievements />} />
+            <Route path="/admin/cms/awards" element={<AdminAwards />} />
+            <Route path="/admin/cms/shorts" element={<AdminShorts />} />
           </Route>
         </Route>
 
@@ -277,11 +289,7 @@ function App() {
         <Route
           path="/"
           element={
-            isAuthenticated ? (
-              <Navigate to="/dashboard" replace />
-            ) : (
-              <Navigate to="/main" replace />
-            )
+            <Navigate to="/main" replace />
           }
         />
       </Routes>

@@ -76,6 +76,22 @@ func Migrate(db *gorm.DB) {
 		&models.ServiceItem{},
 		&models.FinZone{},
 		&models.SiteSetting{},
+
+		// In-app notifications
+		&models.Notification{},
+
+		// Consultation requests (from public form)
+		&models.ConsultationRequest{},
+
+		// CMS: achievements and awards
+		&models.Achievement{},
+		&models.Award{},
+
+		// Questionnaire (parent uploads filled anketa)
+		&models.Questionnaire{},
+
+		// CMS: video shorts for the main page stories section
+		&models.VideoShort{},
 	)
 
 	if err != nil {
