@@ -1,143 +1,145 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
-import NewsCard from '../../components/NewsCard/NewsCard'
+import NewsCard from "../../components/NewsCard/NewsCard";
 
-import newsService from '../../services/newsService'
-import { getUploadUrl } from '../../services/cmsService'
+import newsService from "../../services/newsService";
+import { getUploadUrl } from "../../services/cmsService";
 
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 
-import './NewsDetail.scss'
+import "./NewsDetail.scss";
 
 const NewsDetail = () => {
-  const { slug } = useParams()
+  const { slug } = useParams();
 
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
-  const [article, setArticle] = useState(null)
-  const [relatedArticles, setRelatedArticles] = useState([])
+  const [article, setArticle] = useState(null);
+  const [relatedArticles, setRelatedArticles] = useState([]);
 
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const hasLoadedRef = useRef(false)
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    document.title = 'РАСсвет | Новость'
-  }, [])
+    document.title = "РАСсвет | Новость";
+  }, []);
 
   useEffect(() => {
     if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true
-      fetchArticle()
+      hasLoadedRef.current = true;
+      fetchArticle();
     }
-  }, [slug])
+  }, [slug]);
 
   useEffect(() => {
     return () => {
-      hasLoadedRef.current = false
-    }
-  }, [slug])
+      hasLoadedRef.current = false;
+    };
+  }, [slug]);
 
   const fetchArticle = async () => {
-    setLoading(true)
+    setLoading(true);
 
     try {
-      const data = await newsService.getArticleBySlug(slug)
+      const data = await newsService.getArticleBySlug(slug);
 
-      setArticle(data)
+      setArticle(data);
 
-      const related = await newsService.getRelatedArticles(slug, 3)
+      const related = await newsService.getRelatedArticles(slug, 3);
 
-      setRelatedArticles(related || [])
+      setRelatedArticles(related || []);
     } catch (error) {
-      console.error(error)
-      setError('Не удалось загрузить статью')
+      console.error(error);
+      setError("Не удалось загрузить статью");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const formatDate = dateString => {
-    return new Date(dateString).toLocaleDateString('ru-RU', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("ru-RU", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
-  const getCategoryLabel = category => {
+  const getCategoryLabel = (category) => {
     const labels = {
-      news: 'Новости',
-      articles: 'Статьи',
-      updates: 'Обновления',
-      events: 'События',
-    }
+      news: "Новости",
+      articles: "Статьи",
+      updates: "Обновления",
+      events: "События",
+    };
 
-    return labels[category] || category
-  }
+    return labels[category] || category;
+  };
 
-  const getVkEmbedUrl = url => {
-    if (!url) return null
+  const getVkEmbedUrl = (url) => {
+    if (!url) return null;
 
-    if (url.includes('video_ext.php')) return url
+    if (url.includes("video_ext.php")) return url;
 
-    const videoMatch = url.match(/video-?(\d+)_(\d+)/)
+    const videoMatch = url.match(/video-?(\d+)_(\d+)/);
     if (videoMatch) {
-      return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2`
+      return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2`;
     }
 
     // ВК Клипы: vk.com/clip-123456_789012 или vk.com/clips/...?z=clip-123456_789012
-    const clipMatch = url.match(/clip-?(\d+)_(\d+)/)
+    const clipMatch = url.match(/clip-?(\d+)_(\d+)/);
     if (clipMatch) {
-      return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2`
+      return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2`;
     }
 
-    return null
-  }
+    return null;
+  };
 
-  const getUrlBasename = url => {
+  const getUrlBasename = (url) => {
     try {
-      return decodeURIComponent(url.split('/').pop().split('?')[0]) || null
+      return decodeURIComponent(url.split("/").pop().split("?")[0]) || null;
     } catch {
-      return null
+      return null;
     }
-  }
+  };
 
-  const safeUrl = url => {
-    if (!url) return null
+  const safeUrl = (url) => {
+    if (!url) return null;
     try {
-      const parsed = new URL(url)
-      return parsed.protocol === 'https:' || parsed.protocol === 'http:' ? url : null
+      const parsed = new URL(url);
+      return parsed.protocol === "https:" || parsed.protocol === "http:"
+        ? url
+        : null;
     } catch {
-      return null
+      return null;
     }
-  }
+  };
 
   const renderBlock = (block, index) => {
-    if (!block?.type) return null
+    if (!block?.type) return null;
 
     switch (block.type) {
-      case 'text':
+      case "text":
         return (
           <div key={block.id || index} className="article-block">
             {block.content
-              .split('\n')
-              .filter(p => p.trim())
+              .split("\n")
+              .filter((p) => p.trim())
               .map((para, i) => (
                 <p key={i}>{para}</p>
               ))}
           </div>
-        )
+        );
 
-      case 'image': {
-        const imageUrl = getUploadUrl(block.content)
+      case "image": {
+        const imageUrl = getUploadUrl(block.content);
 
-        if (!imageUrl) return null
+        if (!imageUrl) return null;
 
         return (
           <div key={block.id || index} className="article-block">
@@ -147,26 +149,22 @@ const NewsDetail = () => {
               className="article-block__image"
             />
           </div>
-        )
+        );
       }
 
-      case 'video': {
-        const embedUrl = getVkEmbedUrl(block.content)
+      case "video": {
+        const embedUrl = getVkEmbedUrl(block.content);
 
         if (!embedUrl) {
-          const videoHref = safeUrl(block.content)
-          if (!videoHref) return null
+          const videoHref = safeUrl(block.content);
+          if (!videoHref) return null;
           return (
             <div key={block.id || index} className="article-file">
-              <a
-                href={videoHref}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={videoHref} target="_blank" rel="noopener noreferrer">
                 Открыть видео
               </a>
             </div>
-          )
+          );
         }
 
         return (
@@ -178,31 +176,27 @@ const NewsDetail = () => {
               allowFullScreen
             />
           </div>
-        )
+        );
       }
 
-      case 'file': {
-        const fileUrl = getUploadUrl(block.content)
+      case "file": {
+        const fileUrl = getUploadUrl(block.content);
 
-        if (!fileUrl) return null
+        if (!fileUrl) return null;
 
         return (
           <div key={block.id || index} className="article-file">
-            <a
-              href={fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ⬇ {block.title || getUrlBasename(block.content) || 'Скачать файл'}
+            <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+              ⬇ {block.title || getUrlBasename(block.content) || "Скачать файл"}
             </a>
           </div>
-        )
+        );
       }
 
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -213,7 +207,7 @@ const NewsDetail = () => {
           </div>
         </div>
       </main>
-    )
+    );
   }
 
   if (error || !article) {
@@ -221,91 +215,87 @@ const NewsDetail = () => {
       <main className="news-detail-page">
         <div className="news-detail__container">
           <div className="news-detail__state news-detail__state--error">
-            <h2>{error || 'Статья не найдена'}</h2>
+            <h2>{error || "Статья не найдена"}</h2>
 
-            <button onClick={() => navigate('/news')}>
+            <button onClick={() => navigate("/news")}>
               Вернуться к новостям
             </button>
           </div>
         </div>
       </main>
-    )
+    );
   }
 
   return (
-	<>
-	<Header />
-    <main className="news-detail-page">
-      <div className="news-detail__container container">
-        <div className="news-detail__layout">
-          <article className="news-detail">
-            <button
-              className="news-detail__back"
-              onClick={() => navigate('/news')}
-			  >
-              ← Все новости
-            </button>
+    <>
+      <Header />
+      <main className="news-detail-page">
+        <div className="news-detail__container container">
+          <div className="news-detail__layout">
+            <article className="news-detail">
+              <button
+                className="news-detail__back"
+                onClick={() => navigate("/news")}
+              >
+                ← Все новости
+              </button>
 
-            <h1 className="news-detail__title">
-              {article.title}
-            </h1>
+              <h1 className="news-detail__title">{article.title}</h1>
 
-            {article.summary && (
-				<p className="news-detail__summary">
-                {article.summary}
-              </p>
-            )}
+              {article.summary && (
+                <p className="news-detail__summary">{article.summary}</p>
+              )}
 
-            <div className="news-detail__meta">
-              <span>
-                {formatDate(article.published_at || article.date_created)}
-              </span>
-            </div>
-
-            {getUploadUrl(article.featured_image) && (
-				<img
-                src={getUploadUrl(article.featured_image)}
-                alt={article.title}
-                className="news-detail__cover"
-				/>
-            )}
-
-            <div className="news-detail__content">
-              {article.blocks?.map((block, index) =>
-                renderBlock(block, index)
-			)}
-            </div>
-
-            {article.tags && article.tags.length > 0 && (
-				<div className="news-detail__tags">
-                {article.tags.map((tag, index) => (
-					<span key={index}>{tag}</span>
-                ))}
+              <div className="news-detail__meta">
+                <span>
+                  {formatDate(article.published_at || article.date_created)}
+                </span>
               </div>
-            )}
-          </article>
 
-          {relatedArticles.length > 0 && (
-			  <aside className="news-detail-sidebar">
-              <div className="news-detail-sidebar__card">
-                <h2>📖 Похожие статьи</h2>
+              {getUploadUrl(article.featured_image) && (
+                <img
+                  src={getUploadUrl(article.featured_image)}
+                  alt={article.title}
+                  className="news-detail__cover"
+                />
+              )}
 
-                {relatedArticles.map(article => (
-					<NewsCard
-                    key={article.id}
-                    article={article}
-                    variant="compact"
-					/>
-                ))}
+              <div className="news-detail__content">
+                {article.blocks?.map((block, index) =>
+                  renderBlock(block, index),
+                )}
               </div>
-            </aside>
-          )}
+
+              {article.tags && article.tags.length > 0 && (
+                <div className="news-detail__tags">
+                  {article.tags.map((tag, index) => (
+                    <span key={index}>{tag}</span>
+                  ))}
+                </div>
+              )}
+            </article>
+
+            {/* {relatedArticles.length > 0 && (
+              <aside className="news-detail-sidebar">
+                <div className="news-detail-sidebar__card">
+                  <h2>📖 Похожие статьи</h2>
+
+                  {relatedArticles.map((article) => (
+                    <NewsCard
+                      key={article.id}
+                      article={article}
+                      variant="compact"
+                    />
+                  ))}
+                </div>
+              </aside>
+            )} */}
+          </div>
         </div>
-      </div>
-    </main>
-	<Footer />
-	</>
-  )
-}
+      </main>
+      <Footer />
+    </>
+  );
+};
 
-export default NewsDetail
+export default NewsDetail;

@@ -6,6 +6,7 @@ import HowItWorks from "../components/HowItWorks/HowItWorks";
 import Reviews from "../components/Reviews/Reviews";
 import HomeMap from "../components/HomeMap/HomeMap";
 import Footer from "../components/Footer/Footer";
+import Stories from "../components/Stories/Stories";
 import { useEffect } from 'react'
 
 function Home() {
@@ -15,6 +16,7 @@ function Home() {
   return (
     <div className="page page--home">
       <Header />
+      <Stories />
       <Hero />
       <About />
       <Services />
