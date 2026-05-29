@@ -93,6 +93,75 @@
   }
 }
 
+/* ── Action area inside each card ─────────────────────────────────────────── */
+.algorithmCard__action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.algorithmCard--done {
+  border: 2px solid #86efac;
+  background: linear-gradient(135deg, #f0fdf4, #fff);
+}
+.algorithmCard--active {
+  border: 2px solid #f7df00;
+}
+.algorithmCard--locked {
+  opacity: 0.75;
+}
+
+.algo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #074462;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.2s;
+  &:hover:not(:disabled) { opacity: 0.85; }
+}
+.algo-btn--outline {
+  background: transparent;
+  border: 2px solid #074462;
+  color: #074462;
+}
+.algo-btn--sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.algo-btn--locked {
+  background: #e5e7eb;
+  color: #9ca3af;
+  cursor: not-allowed;
+  &:hover { opacity: 1; }
+}
+
+.algo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.algo-badge--done { background: #dcfce7; color: #166534; }
+.algo-badge--wait { background: #fef9c3; color: #854d0e; }
+.algo-badge--warn { background: #fee2e2; color: #991b1b; }
+
+/* ── Original actions block (commented out in JSX, kept for reference) ─────── */
 .serviceAlgorithm__actions {
   margin-top: 48px;
   background: linear-gradient(

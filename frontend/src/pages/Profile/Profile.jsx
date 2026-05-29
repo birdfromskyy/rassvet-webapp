@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import authService from '../../services/authService'
 import documentService from '../../services/documentService'
+import questionnaireService from '../../services/questionnaireService'
 import './Profile.scss'
 
 import Header from '../../components/Header/Header'
@@ -227,6 +228,9 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
     }
   }
 
+  // ── Questionnaire status (gates document upload) ─────────────────────────
+  const [qStatus, setQStatus] = useState(null)
+
   // ── Document state ────────────────────────────────────────────────────────
   const [docsLoading, setDocsLoading]         = useState(true)
   const [parentProfile, setParentProfile]     = useState(null)
@@ -261,7 +265,10 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
 
   const loadDocs = useCallback(async () => {
     try {
-      const data = await documentService.getMyDocuments()
+      const [data, q] = await Promise.all([
+        documentService.getMyDocuments(),
+        questionnaireService.getMine().catch(() => null),
+      ])
       const profile = data.parent_profile || {}
       setParentProfile(profile)
       setChildren(data.children || [])
@@ -270,6 +277,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
       setKeepSnils(safeParseJSON(profile.snils_files))
       setNewPassport([])
       setNewSnils([])
+      setQStatus(q?.status || null)
     } catch {
       toast.error('Ошибка загрузки документов')
     } finally {
@@ -523,6 +531,9 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
               </div>
             ) : (
               <>
+                {/* Show documents only if questionnaire approved OR user already has a profile (existing users) */}
+                {(qStatus === 'approved' || parentProfile?.status) ? (
+                <>
                 {/* Parent documents */}
                 <form className="profile__card docs-card" onSubmit={handleSaveParent} style={{ marginTop: 32 }}>
                   <div className="profile__section">
@@ -827,6 +838,30 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                     </form>
                   )}
                 </div>
+                </>
+                ) : (
+                  <div className="profile__card" style={{ marginTop: 32, borderLeft: '4px solid #f7df00' }}>
+                    <h2 style={{ color: '#074462', marginBottom: 12 }}>Подача документов</h2>
+                    {qStatus === 'pending' ? (
+                      <p style={{ color: '#55707f' }}>
+                        ⏳ Ваша анкета находится на проверке у администратора. После одобрения здесь
+                        появится форма для загрузки документов.
+                      </p>
+                    ) : qStatus === 'rejected' ? (
+                      <p style={{ color: '#55707f' }}>
+                        ⚠️ Анкета требует уточнения. После повторной отправки и одобрения администратором
+                        вы сможете загрузить документы. Перейдите в{' '}
+                        <a href="/dashboard" style={{ color: '#074462' }}>личный кабинет</a>.
+                      </p>
+                    ) : (
+                      <p style={{ color: '#55707f' }}>
+                        Подача документов будет доступна после того, как вы отправите и получите одобрение
+                        входной анкеты. Перейдите в{' '}
+                        <a href="/dashboard" style={{ color: '#074462' }}>личный кабинет</a>.
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
