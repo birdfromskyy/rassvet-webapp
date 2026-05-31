@@ -1,8 +1,7 @@
+import './AdminModule.scss'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-	Container,
-	Paper,
 	Typography,
 	Box,
 	Button,
@@ -199,34 +198,35 @@ const AdminAssignments = () => {
 		arr.find(x => x.id === id)?.[field] || '—'
 
 	return (
-		<Container maxWidth='xl' sx={{ mt: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
-				<Box
-					display='flex'
-					justifyContent='space-between'
-					alignItems='center'
-					mb={3}
-				>
-					<Typography variant='h4'>Назначения</Typography>
-					<Box display='flex' gap={2}>
-						<Button
-							variant='contained'
-							startIcon={<AddIcon />}
-							onClick={openCreate}
-						>
-							Добавить
-						</Button>
+		<main className='admin-module'>
+			<div className='admin-module__container'>
+				<section className='admin-module__hero'>
+					<div>
+						<span className='admin-module__badge'>Расписание</span>
+						<h1>Назначения</h1>
+						<p>Связки ученик — преподаватель — предмет для формирования расписания занятий.</p>
+					</div>
+					<div className='admin-module__actions'>
 						<Button
 							startIcon={<BackIcon />}
 							onClick={() => navigate('/admin/schedule')}
+							className='admin-module__button admin-module__button--ghost'
 						>
 							Назад
 						</Button>
-					</Box>
-				</Box>
+						<Button
+							startIcon={<AddIcon />}
+							onClick={openCreate}
+							className='admin-module__button admin-module__button--primary'
+						>
+							Добавить
+						</Button>
+					</div>
+				</section>
 
+				<section className='admin-module__panel'>
 				{/* Filters */}
-				<Paper variant='outlined' sx={{ p: 2, mb: 3 }}>
+				<Box sx={{ p: 2, mb: 3, border: '1px solid rgba(7,68,98,0.14)', borderRadius: '16px', background: 'rgba(244,223,0,0.08)' }}>
 					<Box display='flex' alignItems='center' gap={1} mb={1.5}>
 						<FilterIcon fontSize='small' color='action' />
 						<Typography variant='subtitle2'>Фильтры</Typography>
@@ -314,7 +314,7 @@ const AdminAssignments = () => {
 							Сбросить
 						</Button>
 					</Box>
-				</Paper>
+				</Box>
 
 				{loading ? (
 					<Box display='flex' justifyContent='center' p={4}>
@@ -416,7 +416,7 @@ const AdminAssignments = () => {
 						</Table>
 					</TableContainer>
 				)}
-			</Paper>
+			</section>
 
 			{/* Edit Dialog */}
 			<Dialog
@@ -424,11 +424,12 @@ const AdminAssignments = () => {
 				onClose={closeEdit}
 				maxWidth='sm'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>
+				<DialogTitle className='admin-module-dialog__title'>
 					{editDialog.item ? 'Редактировать назначение' : 'Новое назначение'}
 				</DialogTitle>
-				<DialogContent>
+				<DialogContent className='admin-module-dialog__content'>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
 						<Autocomplete
 							options={students}
@@ -521,14 +522,15 @@ const AdminAssignments = () => {
 						</FormControl>
 					</Box>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={closeEdit}>Отмена</Button>
 					<Button onClick={saveAssignment} variant='contained'>
 						Сохранить
 					</Button>
 				</DialogActions>
 			</Dialog>
-		</Container>
+		</div>
+		</main>
 	)
 }
 

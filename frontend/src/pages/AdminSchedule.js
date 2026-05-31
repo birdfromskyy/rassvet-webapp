@@ -1,9 +1,8 @@
+import './AdminModule.scss'
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ExcelJS from 'exceljs'
 import { useNavigate } from 'react-router-dom'
 import {
-	Container,
-	Paper,
 	Typography,
 	Box,
 	Button,
@@ -1164,18 +1163,26 @@ const AdminSchedule = () => {
 	const issueConflictCount = issues.filter(i => i.message.startsWith('Все возможные')).length
 
 	return (
-		<div className='admin-schedule-page'>
-			<div className='container'>
-			<div className='admin-schedule-card'>
-				{/* Header */}
-				<div className='admin-schedule-card__header'>
-					<h1 className='admin-schedule-card__title'>Расписание</h1>
-					<button className='admin-schedule-back-btn' onClick={() => navigate('/admin/schedule')}>
-						← Назад
-					</button>
-				</div>
+		<main className='admin-module admin-schedule-page'>
+			<div className='admin-module__container'>
+				<section className='admin-module__hero'>
+					<div>
+						<span className='admin-module__badge'>Расписание</span>
+						<h1>Расписание на неделю</h1>
+						<p>Генерация, управление и утверждение еженедельного расписания занятий центра.</p>
+					</div>
+					<div className='admin-module__actions'>
+						<Button
+							startIcon={<BackIcon />}
+							onClick={() => navigate('/admin/schedule')}
+							className='admin-module__button admin-module__button--ghost'
+						>
+							Назад
+						</Button>
+					</div>
+				</section>
 
-				<div className='admin-schedule-card__body'>
+				<section className='admin-module__panel'>
 
 				{/* Week navigation */}
 				<div className='admin-schedule-week-nav'>
@@ -1387,7 +1394,7 @@ const AdminSchedule = () => {
 
 				{/* Slot filters */}
 				{schedule && (
-					<Paper variant='outlined' sx={{ p: 2, mb: 2 }}>
+					<Box sx={{ p: 2, mb: 2, border: '1px solid rgba(7,68,98,0.14)', borderRadius: '16px', background: 'rgba(244,223,0,0.05)' }}>
 						<Grid container spacing={2} alignItems='center'>
 							<Grid item xs={12} sm={3}>
 								<FormControl fullWidth size='small'>
@@ -1485,25 +1492,24 @@ const AdminSchedule = () => {
 								<Typography variant='caption'>Групповое занятие</Typography>
 							</Box>
 						</Box>
-					</Paper>
+					</Box>
 				)}
 
 				{/* Stats */}
 				{stats && (
 					<div className='admin-schedule-stats'>
 						{[
-							{ value: stats.total_requested, label: 'Запрошено', sub: `${stats.ind_requested} инд. + ${stats.grp_requested} групп.`, border: '#1976d2' },
-							{ value: stats.scheduled, label: 'Поставлено', sub: `${stats.ind_scheduled} инд. + ${stats.grp_scheduled} групп.`, border: '#2e7d32' },
+							{ value: stats.total_requested, label: 'Запрошено', sub: `${stats.ind_requested} инд. + ${stats.grp_requested} групп.` },
+							{ value: stats.scheduled, label: 'Поставлено', sub: `${stats.ind_scheduled} инд. + ${stats.grp_scheduled} групп.` },
 							{
 								value: stats.unplaced,
 								label: 'Не поставлено',
 								sub: stats.unplaced > 0
 									? [issueConfigCount > 0 && `${issueConfigCount} конфиг.`, issueConflictCount > 0 && `${issueConflictCount} конфл.`].filter(Boolean).join(' + ') || `${stats.unplaced} всего`
 									: '—',
-								border: stats.unplaced > 0 ? '#d32f2f' : '#e0e0e0',
 							},
-						].map(({ value, label, sub, border }) => (
-							<div className='admin-schedule-stat' key={label} style={{ borderTopColor: border }}>
+						].map(({ value, label, sub }) => (
+							<div className='admin-schedule-stat' key={label}>
 								<div className='admin-schedule-stat__value'>{value}</div>
 								<div className='admin-schedule-stat__label'>{label}</div>
 								<div className='admin-schedule-stat__sub'>{sub}</div>
@@ -1535,7 +1541,7 @@ const AdminSchedule = () => {
 						const daySlots = slotsByDay[day] || []
 						if (!daySlots.length) return null
 						return (
-							<Box key={day} mb={3}>
+							<Box key={day} mb={3} sx={{ borderRadius: '14px', overflow: 'hidden', border: '1px solid', borderColor: 'divider' }}>
 								<div className='admin-schedule-day__header'>
 									<span className='admin-schedule-day__name'>{WEEKDAY_NAMES[day]}</span>
 									<span className='admin-schedule-day__date'>
@@ -1545,7 +1551,7 @@ const AdminSchedule = () => {
 										{daySlots.length} {daySlots.length === 1 ? 'занятие' : daySlots.length < 5 ? 'занятия' : 'занятий'}
 									</span>
 								</div>
-								<TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 14px 14px' }}>
+								<TableContainer>
 									<Table size='small'>
 										<TableHead>
 											<TableRow>
@@ -1892,9 +1898,10 @@ const AdminSchedule = () => {
 				onClose={() => setCreateDialog(false)}
 				maxWidth='sm'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>Добавить слот вручную</DialogTitle>
-				<DialogContent>
+				<DialogTitle className='admin-module-dialog__title'>Добавить занятие вручную</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
 						<FormControl fullWidth>
 							<InputLabel>Тип занятия</InputLabel>
@@ -2035,7 +2042,7 @@ const AdminSchedule = () => {
 						</Box>
 					</Box>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setCreateDialog(false)}>Отмена</Button>
 					<Button onClick={createSlot} variant='contained'>
 						Добавить
@@ -2049,13 +2056,14 @@ const AdminSchedule = () => {
 				onClose={() => setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })}
 				maxWidth='sm'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>
+				<DialogTitle className='admin-module-dialog__title'>
 					{editDialog.slot?.slot_type === 'group'
 						? `Групповое занятие: ${editDialog.slot?.group_lesson?.name || ''}`
 						: 'Редактировать слот'}
 				</DialogTitle>
-				<DialogContent>
+				<DialogContent className='admin-module-dialog__content'>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
 						<FormControl fullWidth>
 							<InputLabel>День недели</InputLabel>
@@ -2203,7 +2211,7 @@ const AdminSchedule = () => {
 						)}
 					</Box>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })}>
 						Отмена
 					</Button>
@@ -2219,12 +2227,13 @@ const AdminSchedule = () => {
 				onClose={() => setPastWeekConfirm({ open: false, message: '' })}
 				maxWidth='xs'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle sx={{ color: 'warning.main' }}>⚠ Прошедшая неделя</DialogTitle>
-				<DialogContent>
+				<DialogTitle className='admin-module-dialog__title' sx={{ color: 'warning.main' }}>⚠ Прошедшая неделя</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography>{pastWeekConfirm.message}</Typography>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setPastWeekConfirm({ open: false, message: '' })}>Отмена</Button>
 					<Button
 						variant='contained'
@@ -2243,14 +2252,15 @@ const AdminSchedule = () => {
 				onClose={() => setAttendanceDialog({ open: false, slot: null, attendance: [], loading: false })}
 				maxWidth='xs'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>
+				<DialogTitle className='admin-module-dialog__title'>
 					Посещаемость
 					<Typography variant='caption' display='block' color='text.secondary'>
 						{attendanceDialog.slot?.group_lesson?.name} · {WEEKDAY_NAMES[attendanceDialog.slot?.weekday]} {attendanceDialog.slot?.start_time}–{attendanceDialog.slot?.end_time}
 					</Typography>
 				</DialogTitle>
-				<DialogContent>
+				<DialogContent className='admin-module-dialog__content'>
 					{attendanceDialog.loading ? (
 						<Box display='flex' justifyContent='center' p={2}><CircularProgress size={24} /></Box>
 					) : attendanceDialog.attendance.length === 0 ? (
@@ -2309,21 +2319,21 @@ const AdminSchedule = () => {
 						)
 					})()}
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setAttendanceDialog({ open: false, slot: null, attendance: [], loading: false })}>Закрыть</Button>
 				</DialogActions>
 			</Dialog>
 
 			{/* Delete Slot Confirmation Dialog */}
-			<Dialog open={deleteSlotDialog.open} onClose={() => setDeleteSlotDialog({ open: false, slotId: null, slotLabel: '' })} maxWidth='xs' fullWidth>
-				<DialogTitle>Удалить занятие?</DialogTitle>
-				<DialogContent>
+			<Dialog open={deleteSlotDialog.open} onClose={() => setDeleteSlotDialog({ open: false, slotId: null, slotLabel: '' })} maxWidth='xs' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
+				<DialogTitle className='admin-module-dialog__title'>Удалить занятие?</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography>{deleteSlotDialog.slotLabel}</Typography>
 					<Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
 						Занятие будет удалено вместе со всеми записями о посещаемости.
 					</Typography>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setDeleteSlotDialog({ open: false, slotId: null, slotLabel: '' })}>Отмена</Button>
 					<Button variant='contained' color='error' onClick={deleteSlot}>Удалить</Button>
 				</DialogActions>
@@ -2335,9 +2345,10 @@ const AdminSchedule = () => {
 				onClose={() => setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })}
 				maxWidth='sm'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>Конфликт занятий</DialogTitle>
-				<DialogContent>
+				<DialogTitle className='admin-module-dialog__title'>Конфликт занятий</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='body2' gutterBottom>
 						Новое занятие пересекается со следующими занятиями:
 					</Typography>
@@ -2360,7 +2371,7 @@ const AdminSchedule = () => {
 						label='Удалить конфликтующее занятие'
 					/>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button
 						onClick={() =>
 							setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })
@@ -2380,9 +2391,10 @@ const AdminSchedule = () => {
 				onClose={() => setApproveConflictDialog({ open: false, pairs: [] })}
 				maxWidth='sm'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>Нельзя утвердить: есть конфликты</DialogTitle>
-				<DialogContent>
+				<DialogTitle className='admin-module-dialog__title'>Нельзя утвердить: есть конфликты</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Alert severity='error' sx={{ mb: 2 }}>
 						Найдено {approveConflictDialog.pairs.length} конфликтующих пар занятий. Исправьте их перед утверждением.
 					</Alert>
@@ -2403,7 +2415,7 @@ const AdminSchedule = () => {
 						))}
 					</List>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setApproveConflictDialog({ open: false, pairs: [] })}>
 						Закрыть
 					</Button>
@@ -2416,14 +2428,15 @@ const AdminSchedule = () => {
 				onClose={closeDeleteManualDialog}
 				maxWidth='xs'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>Удалить ручные слоты?</DialogTitle>
-				<DialogContent>
+				<DialogTitle className='admin-module-dialog__title'>Удалить ручные слоты?</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='body2'>
 						Вы уверены, что хотите удалить все ручные слоты? Авто-слоты останутся без изменений.
 					</Typography>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={closeDeleteManualDialog}>Отмена</Button>
 					<Button
 						variant='contained'
@@ -2444,18 +2457,19 @@ const AdminSchedule = () => {
 				onClose={closeBulkOriginDialog}
 				maxWidth='xs'
 				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle>
+				<DialogTitle className='admin-module-dialog__title'>
 					{bulkOriginDialog.origin === 'manual' ? 'Перевести всё в ручной режим?' : 'Перевести всё в авто режим?'}
 				</DialogTitle>
-				<DialogContent>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='body2'>
 						{bulkOriginDialog.origin === 'manual'
 							? 'Все занятия расписания будут помечены как ручные. Они не будут удалены при следующей генерации.'
 							: 'Все занятия расписания будут помечены как авто. При следующей генерации авто-занятия будут заменены.'}
 					</Typography>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={closeBulkOriginDialog}>Отмена</Button>
 					<Button
 						variant='contained'
@@ -2469,10 +2483,9 @@ const AdminSchedule = () => {
 					</Button>
 				</DialogActions>
 			</Dialog>
-			</div>{/* end card body */}
-			</div>{/* end admin-schedule-card */}
+			</section>{/* end panel */}
 			</div>{/* end container */}
-		</div>
+		</main>
 	)
 }
 

@@ -1,3 +1,4 @@
+import './AdminModule.scss'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -6,7 +7,6 @@ import {
 	Button,
 	Chip,
 	CircularProgress,
-	Container,
 	Dialog,
 	DialogActions,
 	DialogContent,
@@ -20,7 +20,6 @@ import {
 	ListItemSecondaryAction,
 	ListItemText,
 	MenuItem,
-	Paper,
 	Select,
 	Table,
 	TableBody,
@@ -207,20 +206,21 @@ const AdminGroupLessons = () => {
 	if (loading) return <Box display='flex' justifyContent='center' mt={6}><CircularProgress /></Box>
 
 	return (
-		<Container maxWidth='lg' sx={{ mt: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
-				<Box display='flex' justifyContent='space-between' alignItems='center' mb={3}>
-					<Box>
-						<Typography variant='h5'>Групповые занятия</Typography>
-						<Typography variant='body2' color='text.secondary'>
-							Занятия с произвольным названием, преподавателем, текстовым кабинетом и составом учеников
-						</Typography>
-					</Box>
-					<Box display='flex' gap={1}>
-						<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')}>Назад</Button>
-						<Button variant='contained' startIcon={<AddIcon />} onClick={openCreate}>Создать группу</Button>
-					</Box>
-				</Box>
+		<main className='admin-module'>
+			<div className='admin-module__container'>
+				<section className='admin-module__hero'>
+					<div>
+						<span className='admin-module__badge'>Расписание</span>
+						<h1>Групповые занятия</h1>
+						<p>Занятия с произвольным названием, преподавателем, кабинетом и составом учеников.</p>
+					</div>
+					<div className='admin-module__actions'>
+						<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')} className='admin-module__button admin-module__button--ghost'>Назад</Button>
+						<Button startIcon={<AddIcon />} onClick={openCreate} className='admin-module__button admin-module__button--primary'>Создать группу</Button>
+					</div>
+				</section>
+
+				<section className='admin-module__panel'>
 
 				{error && <Alert severity='error' sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -288,11 +288,11 @@ const AdminGroupLessons = () => {
 						</TableBody>
 					</Table>
 				</TableContainer>
-			</Paper>
+			</section>
 
-			<Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth='sm' fullWidth>
-				<DialogTitle>{editingGroup ? 'Редактировать группу' : 'Создать группу'}</DialogTitle>
-				<DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+			<Dialog open={formOpen} onClose={() => setFormOpen(false)} maxWidth='sm' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
+				<DialogTitle className='admin-module-dialog__title'>{editingGroup ? 'Редактировать группу' : 'Создать группу'}</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<TextField
 						label='Название группового занятия' fullWidth required
 						value={formData.name}
@@ -348,20 +348,20 @@ const AdminGroupLessons = () => {
 						</Select>
 					</FormControl>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setFormOpen(false)}>Отмена</Button>
 					<Button variant='contained' onClick={handleSave}>{editingGroup ? 'Сохранить' : 'Создать'}</Button>
 				</DialogActions>
 			</Dialog>
 
-			<Dialog open={enrollOpen} onClose={() => setEnrollOpen(false)} maxWidth='sm' fullWidth>
-				<DialogTitle>
+			<Dialog open={enrollOpen} onClose={() => setEnrollOpen(false)} maxWidth='sm' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
+				<DialogTitle className='admin-module-dialog__title'>
 					Состав группы: {enrollGroup?.name}
 					<Typography variant='caption' display='block' color='text.secondary'>
 						{enrollGroup?.room_name || '-'} · {enrollGroup?.visits_per_week} раз/нед · {enrollGroup?.duration_min} мин
 					</Typography>
 				</DialogTitle>
-				<DialogContent>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='subtitle2' gutterBottom>Добавить ученика</Typography>
 					<Box display='flex' gap={1} mb={2}>
 						<FormControl fullWidth size='small'>
@@ -396,22 +396,23 @@ const AdminGroupLessons = () => {
 						))}
 					</List>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setEnrollOpen(false)}>Закрыть</Button>
 				</DialogActions>
 			</Dialog>
 
-			<Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)}>
-				<DialogTitle>Удалить группу?</DialogTitle>
-				<DialogContent>
+			<Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} PaperProps={{ className: 'admin-module-dialog' }}>
+				<DialogTitle className='admin-module-dialog__title'>Удалить группу?</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
 					<Typography>Удалить группу «{deleteConfirm?.name}»? Это действие нельзя отменить.</Typography>
 				</DialogContent>
-				<DialogActions>
+				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setDeleteConfirm(null)}>Отмена</Button>
 					<Button variant='contained' color='error' onClick={handleDelete}>Удалить</Button>
 				</DialogActions>
 			</Dialog>
-		</Container>
+		</div>
+		</main>
 	)
 }
 
