@@ -440,21 +440,24 @@ export default function AdminNews() {
           )}
         </section>
 
-        <Dialog
-          open={open}
-          onClose={() => setOpen(false)}
-          maxWidth="md"
-          fullWidth
-          PaperProps={{ sx: { maxHeight: "90vh" } }}
-        >
-          <DialogTitle>
+<Dialog
+  open={open}
+  onClose={() => setOpen(false)}
+  maxWidth="md"
+  fullWidth
+  PaperProps={{
+    className: "admin-module-dialog",
+    sx: { maxHeight: "90vh" },
+  }}
+>
+          <DialogTitle className="admin-module-dialog__title">
             {editing ? "Редактировать новость" : "Новая новость"}
           </DialogTitle>
 
-          <DialogContent
-            dividers
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-          >
+<DialogContent
+  dividers
+  className="admin-module-dialog__content"
+>
             <TextField
               label="Заголовок"
               value={meta.title}
@@ -606,7 +609,7 @@ export default function AdminNews() {
             </Box>
           </DialogContent>
 
-          <DialogActions>
+          <DialogActions className="admin-module-dialog__actions">
             <Button onClick={() => setOpen(false)}>Отмена</Button>
 
             <Button
