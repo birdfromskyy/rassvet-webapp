@@ -45,7 +45,7 @@ import AdminHistory from "./pages/AdminHistory";
 import AdminFinZones from "./pages/AdminFinZones";
 import AdminServices from "./pages/AdminServices";
 import AdminSiteSettings from "./pages/AdminSiteSettings";
-import AdminCMSPanel from "./pages/AdminCMSPanel";
+import AdminCMSPanel from "./pages/AdminCMSPanel/AdminCMSPanel";
 import AdminDocuments from "./pages/AdminDocuments";
 import AdminConsultations from "./pages/AdminConsultations";
 import AdminAchievements from "./pages/AdminAchievements";
