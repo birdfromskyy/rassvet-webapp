@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -30,6 +31,20 @@ var allowedUploadExts = map[string]bool{
 	".mp4":  true,
 }
 
+var allowedUploadMIMEs = map[string]bool{
+	"application/pdf":   true,
+	"image/jpeg":        true,
+	"image/png":         true,
+	"image/gif":         true,
+	"image/webp":        true,
+	"application/msword": true,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+	"application/vnd.ms-excel":                                                true,
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":       true,
+	"text/plain": true,
+	"video/mp4":  true,
+}
+
 func UploadFile(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -46,6 +61,17 @@ func UploadFile(c *gin.Context) {
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if !allowedUploadExts[ext] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("формат «%s» не разрешён", ext)})
+		return
+	}
+
+	mtype, err := mimetype.DetectReader(file)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Не удалось определить тип файла"})
+		return
+	}
+	mimeBase := strings.ToLower(strings.SplitN(mtype.String(), ";", 2)[0])
+	if !allowedUploadMIMEs[strings.TrimSpace(mimeBase)] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("содержимое файла не соответствует расширению «%s»", ext)})
 		return
 	}
 

@@ -62,7 +62,7 @@ func main() {
 	userStudentHandler := handlers.NewUserStudentHandler(db)
 
 	// Document submissions handler
-	documentHandler := handlers.NewDocumentHandler(db, cfg.JWTSecret, rdb)
+	documentHandler := handlers.NewDocumentHandler(db)
 
 	// Notification handler
 	notificationHandler := handlers.NewNotificationHandler(db)
@@ -84,6 +84,20 @@ func main() {
 	finZoneHandler := handlers.NewFinZoneHandler(db)
 	siteSettingHandler := handlers.NewSiteSettingHandler(db)
 
+	// Health check
+	r.GET("/api/health", func(c *gin.Context) {
+		sqlDB, err := db.DB()
+		if err != nil || sqlDB.Ping() != nil {
+			c.JSON(503, gin.H{"status": "unhealthy", "db": "down"})
+			return
+		}
+		if err := rdb.Ping(c.Request.Context()).Err(); err != nil {
+			c.JSON(503, gin.H{"status": "unhealthy", "redis": "down"})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	// Public auth routes (rate limited per IP)
 	r.POST("/api/register",       middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.Register)
 	r.POST("/api/login",          middleware.IPRateLimit(rdb, 15, 5*time.Minute), authHandler.Login)
@@ -91,9 +105,6 @@ func main() {
 	r.POST("/api/resend-code",    middleware.IPRateLimit(rdb, 5, 5*time.Minute),  authHandler.ResendCode)
 	r.POST("/api/forgot-password",middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.ForgotPassword)
 	r.POST("/api/reset-password", middleware.IPRateLimit(rdb, 10, 15*time.Minute), authHandler.ResetPassword)
-
-	// Private file serving — auth validated inside handler (Bearer or ?token=)
-	r.GET("/api/documents/file/:filename", documentHandler.ServePrivateFile)
 
 	// Consultation request — public (rate limited: 3 per hour per IP for guests)
 	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), consultationHandler.Create)
@@ -117,7 +128,7 @@ func main() {
 
 	// Protected API routes
 	protected := r.Group("/api")
-	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret, rdb))
+	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
 		protected.PUT("/profile", authHandler.UpdateProfile)
 		protected.POST("/logout", authHandler.Logout)
@@ -263,6 +274,7 @@ func main() {
 			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
 			admin.POST("/schedules/:id/clear-manual", scheduleHandler.ClearManualSlots)
 			admin.POST("/schedules/:id/copy-manual-from-prev-week", scheduleHandler.CopyManualSlotsFromPrevWeek)
+			admin.PATCH("/schedules/:id/slots/bulk-origin", scheduleHandler.BulkUpdateSlotsOrigin)
 
 			// Group lessons
 			admin.GET("/group-lessons", groupLessonHandler.GetGroupLessons)
@@ -286,6 +298,7 @@ func main() {
 			admin.POST("/documents/submissions/:id/anonymize", documentHandler.AdminAnonymizeSubmission)
 			admin.DELETE("/documents/submissions/:id", documentHandler.AdminDeleteSubmission)
 			admin.PUT("/documents/parent/:userId/status", documentHandler.AdminUpdateParentStatus)
+			admin.POST("/documents/parent/:userId/anonymize", documentHandler.AdminAnonymizeParentProfile)
 			admin.DELETE("/documents/parent/:userId", documentHandler.AdminDeleteParentProfile)
 			admin.DELETE("/documents/user/:userId/personal-data", documentHandler.AdminDeletePersonalData)
 
@@ -335,6 +348,9 @@ func main() {
 		protected.GET("/teacher/schedule", userStudentHandler.GetTeacherPublishedSchedule)
 		protected.GET("/teacher/schedule/options", userStudentHandler.GetTeacherScheduleOptions)
 
+		// Private file serving — cookie auth via AuthMiddleware
+		protected.GET("/documents/file/:filename", documentHandler.ServePrivateFile)
+
 		// Document submissions (parent + children docs)
 		protected.GET("/documents", documentHandler.GetMyDocuments)
 		protected.POST("/documents/parent", documentHandler.SaveParentDocs)
@@ -350,6 +366,7 @@ func main() {
 
 		// Consultation (auth user — attaches user_id)
 		protected.POST("/consultations/auth", consultationHandler.Create)
+		protected.GET("/consultations/mine", consultationHandler.GetMine)
 
 		// Questionnaire (anketa)
 		protected.GET("/questionnaire", questionnaireHandler.GetMine)

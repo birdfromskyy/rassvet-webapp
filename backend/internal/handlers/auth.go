@@ -282,8 +282,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   3600,
+		HttpOnly: true,
+		Secure:   h.cfg.IsProduction,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
 		"user": gin.H{
 			"id":          user.ID,
 			"email":       user.Email,
@@ -559,16 +568,15 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader != "" {
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if claims, err := utils.ValidateToken(tokenString, h.cfg.JWTSecret); err == nil {
-			ttl := time.Until(claims.ExpiresAt.Time)
-			if ttl > 0 {
-				_ = h.rdb.Set(context.Background(), "blacklist:"+tokenString, "1", ttl).Err()
-			}
-		}
-	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.cfg.IsProduction,
+		SameSite: http.SameSiteLaxMode,
+	})
 	c.JSON(http.StatusOK, gin.H{"message": "Выход выполнен успешно"})
 }
 
