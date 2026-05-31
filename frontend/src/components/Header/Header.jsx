@@ -39,6 +39,7 @@ const searchPages = [
   { title: "Наши успехи", path: "/achievements" },
   { title: "Наши награды", path: "/awards" },
   { title: "Первичная консультация", path: "/consultation-request" },
+  { title: "Поддержать центр", path: "/donation" },
 ];
 
 const dropdowns = [
@@ -78,6 +79,7 @@ const dropdowns = [
         title: "Форма социального обслуживания",
         path: "/social-service-form",
       },
+      { title: "Поддержать центр", path: "/donation" },
     ],
   },
   {

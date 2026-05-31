@@ -124,15 +124,6 @@ export default function AdminPrivacyPolicy() {
             >
               Перейти на страницу
             </Button>
-
-            <Button
-              startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
-              onClick={handleSave}
-              disabled={saving || loading}
-              className="admin-module__button admin-module__button--primary"
-            >
-              {saving ? "Сохранение..." : "Сохранить"}
-            </Button>
           </div>
         </section>
 
@@ -170,6 +161,17 @@ export default function AdminPrivacyPolicy() {
                   </Box>
                 </Box>
               ))}
+
+              <Box sx={{ pt: 2, borderTop: "1px solid #edf2f7" }}>
+                <Button
+                  startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                  onClick={handleSave}
+                  disabled={saving || loading}
+                  className="admin-module__button admin-module__button--primary"
+                >
+                  {saving ? "Сохранение..." : "Сохранить"}
+                </Button>
+              </Box>
             </Box>
           )}
         </section>

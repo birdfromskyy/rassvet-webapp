@@ -387,7 +387,7 @@ const AdminTeachers = () => {
           <div className="admin-module__actions">
             <Button
               startIcon={<BackIcon />}
-              onClick={() => navigate("/admin/cms")}
+              onClick={() => navigate(-1)}
               className="admin-module__button admin-module__button--ghost"
             >
               Назад

@@ -23,135 +23,72 @@ import {
 
 import "./AdminCMSPanel.scss";
 
-const MODULES = [
+const GROUPS = [
   {
-    title: "Сотрудники",
-    description: "Преподаватели, фото, квалификация и карточки специалистов.",
-    icon: EmployeesIcon,
-    path: "/admin/schedule/teachers",
+    title: "Публикации и медиа",
+    modules: [
+      { title: "Новости", description: "Публикации, статьи и события Центра.", icon: NewsIcon, path: "/admin/cms/news" },
+      { title: "История и достижения", description: "Хронология событий и достижений организации.", icon: HistoryIcon, path: "/admin/cms/history" },
+      { title: "Наши успехи", description: "Истории успеха детей и семей.", icon: AchievementsIcon, path: "/admin/cms/achievements" },
+      { title: "Наши награды", description: "Дипломы, сертификаты и благодарности.", icon: AwardsIcon, path: "/admin/cms/awards" },
+      { title: "Шортсы", description: "Видео-истории на главной странице.", icon: ShortsIcon, path: "/admin/cms/shorts" },
+    ],
   },
   {
-    title: "Новости",
-    description: "Публикации, статьи и события Центра.",
-    icon: NewsIcon,
-    path: "/admin/cms/news",
+    title: "О центре",
+    modules: [
+      { title: "Сотрудники", description: "Преподаватели, фото, квалификация и карточки специалистов.", icon: EmployeesIcon, path: "/admin/schedule/teachers" },
+      { title: "Услуги", description: "Карточки и описание направлений помощи.", icon: ServicesIcon, path: "/admin/cms/services" },
+      { title: "Материально-техническое обеспечение", description: "Помещения, зоны, оборудование и фотографии.", icon: FinIcon, path: "/admin/cms/fin-zones" },
+    ],
   },
   {
-    title: "История и достижения",
-    description: "Хронология событий и достижений организации.",
-    icon: HistoryIcon,
-    path: "/admin/cms/history",
+    title: "Официальные документы",
+    modules: [
+      { title: "Документы", description: "Файлы раздела официальных документов.", icon: FilesIcon, path: "/admin/cms/docs" },
+      { title: "Правила внутреннего распорядка", description: "Документы с правилами внутреннего распорядка.", icon: RulesIcon, path: "/admin/cms/rules" },
+      { title: "Независимая оценка качества", description: "Материалы раздела оценки качества услуг.", icon: RatingIcon, path: "/admin/cms/rating" },
+    ],
   },
   {
-    title: "Документы",
-    description: "Файлы раздела официальных документов.",
-    icon: FilesIcon,
-    path: "/admin/cms/docs",
+    title: "Клиенты и заявки",
+    modules: [
+      { title: "Заявки на консультацию", description: "Входящие заявки от родителей.", icon: ConsultationsIcon, path: "/admin/consultations" },
+      { title: "Анкеты родителей", description: "Входные анкеты и данные по детям.", icon: QuestionnaireIcon, path: "/admin/questionnaires" },
+      { title: "Документы родителей", description: "Проверка документов, поданных родителями.", icon: DocsIcon, path: "/admin/documents" },
+      { title: "Пользователи", description: "Родители, сотрудники и привязка учеников.", icon: UsersIcon, path: "/admin/users" },
+    ],
   },
   {
-    title: "Правила внутреннего распорядка",
-    description: "Документы с правилами внутреннего распорядка.",
-    icon: RulesIcon,
-    path: "/admin/cms/rules",
-  },
-  {
-    title: "Независимая оценка качества",
-    description: "Материалы раздела оценки качества услуг.",
-    icon: RatingIcon,
-    path: "/admin/cms/rating",
-  },
-  {
-    title: "Материально-техническое обеспечение",
-    description: "Помещения, зоны, оборудование и фотографии.",
-    icon: FinIcon,
-    path: "/admin/cms/fin-zones",
-  },
-  {
-    title: "Услуги",
-    description: "Карточки и описание направлений помощи.",
-    icon: ServicesIcon,
-    path: "/admin/cms/services",
-  },
-  {
-    title: "Настройки сайта",
-    description: "Глобальные данные, миссия, структура и видео.",
-    icon: SettingsIcon,
-    path: "/admin/cms/settings",
-  },
-  {
-    title: "Пользователи",
-    description: "Родители, сотрудники и привязка учеников.",
-    icon: UsersIcon,
-    path: "/admin/users",
-  },
-  {
-    title: "Документы родителей",
-    description: "Проверка документов, поданных родителями.",
-    icon: DocsIcon,
-    path: "/admin/documents",
-  },
-  {
-    title: "Наши успехи",
-    description: "Истории успеха детей и семей.",
-    icon: AchievementsIcon,
-    path: "/admin/cms/achievements",
-  },
-  {
-    title: "Наши награды",
-    description: "Дипломы, сертификаты и благодарности.",
-    icon: AwardsIcon,
-    path: "/admin/cms/awards",
-  },
-  {
-    title: "Заявки на консультацию",
-    description: "Входящие заявки от родителей.",
-    icon: ConsultationsIcon,
-    path: "/admin/consultations",
-  },
-  {
-    title: "Анкеты родителей",
-    description: "Входные анкеты и данные по детям.",
-    icon: QuestionnaireIcon,
-    path: "/admin/questionnaires",
-  },
-  {
-    title: "Шортсы",
-    description: "Видео-истории на главной странице.",
-    icon: ShortsIcon,
-    path: "/admin/cms/shorts",
-  },
-  {
-    title: "Политика ПДн",
-    description: "Политика обработки персональных данных (152-ФЗ). Редактируется без деплоя.",
-    icon: PrivacyIcon,
-    path: "/admin/cms/privacy",
+    title: "Настройки системы",
+    modules: [
+      { title: "Настройки сайта", description: "Глобальные данные, миссия, контакты, структура и видео.", icon: SettingsIcon, path: "/admin/cms/settings" },
+      { title: "Политика ПДн", description: "Политика обработки персональных данных (152-ФЗ). Без деплоя.", icon: PrivacyIcon, path: "/admin/cms/privacy" },
+    ],
   },
 ];
 
+const ALL_MODULES = GROUPS.flatMap(g => g.modules);
+
 function AdminCMSPanel() {
   const navigate = useNavigate();
-
   const [search, setSearch] = useState("");
 
-  const filteredModules = MODULES.filter((module) => {
-    const value = `${module.title} ${module.description}`.toLowerCase();
-    return value.includes(search.toLowerCase().trim());
-  });
+  const query = search.toLowerCase().trim();
+
   return (
     <main className="admin-cms">
       <div className="admin-cms__container">
+
         <section className="admin-cms__hero">
           <div>
             <span className="admin-cms__badge">Панель администратора</span>
-
             <h1>Управление сайтом</h1>
-
             <p>
               Редактирование публичных страниц, материалов, документов, новостей
               и пользовательского контента Центра «РАСсвет».
             </p>
           </div>
-
           <div className="admin-cms__actions">
             <button
               type="button"
@@ -169,34 +106,49 @@ function AdminCMSPanel() {
             type="text"
             placeholder="Найти раздел..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={e => setSearch(e.target.value)}
           />
         </div>
 
-        <section className="admin-cms__grid">
-          {filteredModules.map((module) => {
-            const Icon = module.icon;
+        {query ? (
+          /* Flat search results */
+          <section className="admin-cms__grid">
+            {ALL_MODULES.filter(m =>
+              `${m.title} ${m.description}`.toLowerCase().includes(query)
+            ).map(m => <ModuleCard key={m.path} module={m} navigate={navigate} />)}
+          </section>
+        ) : (
+          /* Grouped view */
+          GROUPS.map(group => (
+            <div key={group.title} className="admin-cms__group">
+              <h2 className="admin-cms__group-title">{group.title}</h2>
+              <section className="admin-cms__grid">
+                {group.modules.map(m => <ModuleCard key={m.path} module={m} navigate={navigate} />)}
+              </section>
+            </div>
+          ))
+        )}
 
-            return (
-              <article className="admin-cms-card" key={module.path}>
-                <div className="admin-cms-card__icon">
-                  <Icon />
-                </div>
-
-                <div className="admin-cms-card__content">
-                  <h2>{module.title}</h2>
-                  <p>{module.description}</p>
-                </div>
-
-                <button type="button" onClick={() => navigate(module.path)}>
-                  Открыть
-                </button>
-              </article>
-            );
-          })}
-        </section>
       </div>
     </main>
+  );
+}
+
+function ModuleCard({ module, navigate }) {
+  const Icon = module.icon;
+  return (
+    <article className="admin-cms-card" onClick={() => navigate(module.path)} style={{ cursor: "pointer" }}>
+      <div className="admin-cms-card__icon">
+        <Icon />
+      </div>
+      <div className="admin-cms-card__content">
+        <h2>{module.title}</h2>
+        <p>{module.description}</p>
+      </div>
+      <button type="button" onClick={e => { e.stopPropagation(); navigate(module.path); }}>
+        Открыть
+      </button>
+    </article>
   );
 }
 

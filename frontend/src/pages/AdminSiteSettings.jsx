@@ -153,6 +153,20 @@ const SECTIONS = [
     ],
   },
   {
+    title: "Пожертвования",
+    hint: "Реквизиты и QR-код для страницы /donation. QR-код загрузите через кнопку загрузки файла.",
+    fields: [
+      { key: "donation_qr_url",         label: "QR-код СберПэй (изображение)", isPhoto: true },
+      { key: "donation_sberpay_number", label: "Номер СберПэй (10003-XXXXX)" },
+      { key: "donation_recipient",      label: "Получатель" },
+      { key: "donation_inn",            label: "ИНН" },
+      { key: "donation_bank",           label: "Банк" },
+      { key: "donation_bik",            label: "БИК" },
+      { key: "donation_ks",             label: "Корреспондентский счёт" },
+      { key: "donation_rs",             label: "Расчётный счёт" },
+    ],
+  },
+  {
     title: "Свободные места",
     fields: [
       {

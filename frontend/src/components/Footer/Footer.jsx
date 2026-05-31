@@ -42,6 +42,7 @@ export default function Footer() {
               <a href="/docs">Документы</a>
               <a href="/employees">Сотрудники</a>
               <a href="/structure">Структура организации</a>
+              <a href="/donation" className="footer__donate-link">❤ Поддержать центр</a>
             </div>
 
             <div className="footer__col">
@@ -83,6 +84,9 @@ export default function Footer() {
           <div className="footer__bottom">
             <div className="container">
               <p>{copyright}</p>
+              <Link to="/privacy" className="footer__privacy-link">
+                Политика обработки персональных данных
+              </Link>
               <img src={footerHouse} alt="" className="footer__decor" />
             </div>
           </div>
