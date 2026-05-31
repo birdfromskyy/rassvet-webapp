@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { isRegularUser } from "../../utils/roles";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import questionnaireService from "../../services/questionnaireService";
@@ -14,19 +15,19 @@ const getStoredUser = () => {
 function ServiceAlgorithm() {
   const navigate = useNavigate();
   const user = getStoredUser();
-  const isRegularUser = user?.role === "user";
+  const showQuestionnaire = isRegularUser(user?.role);
 
   const [qStatus, setQStatus]   = useState(null);   // null | "pending" | "approved" | "rejected"
-  const [qLoading, setQLoading] = useState(isRegularUser);
+  const [qLoading, setQLoading] = useState(showQuestionnaire);
 
   useEffect(() => {
     document.title = "Алгоритм получения услуг";
-    if (!isRegularUser) { setQLoading(false); return; }
+    if (!showQuestionnaire) { setQLoading(false); return; }
     questionnaireService.getMine()
       .then(q => setQStatus(q?.status || null))
       .catch(() => {})
       .finally(() => setQLoading(false));
-  }, [isRegularUser]);
+  }, [showQuestionnaire]);
 
   // ── Step 02 — Анкета ────────────────────────────────────────────────────────
   const Step02Action = () => {

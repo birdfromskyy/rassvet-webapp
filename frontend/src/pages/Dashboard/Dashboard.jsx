@@ -7,6 +7,7 @@ import NewsSection from "../../components/NewsSection/NewsSection";
 
 import authService from "../../services/authService";
 import scheduleService from "../../services/scheduleService";
+import { isAdmin as isAdminRole, isTeacher as isTeacherRole } from "../../utils/roles";
 import questionnaireService from "../../services/questionnaireService";
 import { siteSettingService, getUploadUrl } from "../../services/cmsService";
 
@@ -357,9 +358,9 @@ const QuestionnaireSection = () => {
 const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
 
-  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
-  const isTeacher = user?.role === "teacher";
-  const isUser = !isAdmin && !isTeacher;
+  const isAdmin   = isAdminRole(user?.role);
+  const isTeacher = isTeacherRole(user?.role);
+  const isUser    = !isAdmin && !isTeacher;
 
   const [hasChildren, setHasChildren] = useState(false);
   const [childrenLoading, setChildrenLoading] = useState(isUser);

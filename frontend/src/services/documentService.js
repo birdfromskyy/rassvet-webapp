@@ -78,7 +78,11 @@ const documentService = {
       ...(ippsuExpiryDate ? { ippsu_expiry_date: ippsuExpiryDate } : {}),
     }).then(r => r.data),
 
-  /** Admin deletes a single child submission + files */
+  /** Admin anonymizes a child submission: deletes files, clears PII, keeps record + status */
+  adminAnonymizeSubmission: (id) =>
+    api.post(`/admin/documents/submissions/${id}/anonymize`).then(r => r.data),
+
+  /** Admin hard-deletes a child submission + files completely from DB */
   adminDeleteSubmission: (id) =>
     api.delete(`/admin/documents/submissions/${id}`).then(r => r.data),
 

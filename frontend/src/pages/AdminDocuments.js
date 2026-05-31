@@ -32,7 +32,10 @@ import {
   ExpandMore as ExpandIcon,
   OpenInNew as OpenIcon,
   HourglassTop as PendingIcon,
+  DeleteSweep as AnonymizeIcon,
+  DeleteForever as HardDeleteIcon,
 } from '@mui/icons-material'
+import { Tooltip } from '@mui/material'
 import { toast } from 'react-toastify'
 import documentService from '../services/documentService'
 
@@ -251,6 +254,7 @@ const AdminDocuments = () => {
   const [childDialog, setChildDialog]         = useState({ open: false, submission: null })
   const [parentDialog, setParentDialog]       = useState({ open: false, userId: null, status: '' })
   const [deleteDialog, setDeleteDialog]       = useState({ open: false, submission: null })
+  const [anonymizeDialog, setAnonymizeDialog] = useState({ open: false, submission: null })
   const [deleteParentDialog, setDeleteParentDialog] = useState({ open: false, userId: null, email: '' })
 
   const load = useCallback(async () => {
@@ -419,12 +423,24 @@ const AdminDocuments = () => {
                           >
                             Изменить статус
                           </Button>
-                          <Button
-                            size="small" variant="outlined" color="error"
-                            onClick={() => setDeleteDialog({ open: true, submission: ch })}
-                          >
-                            Удалить заявку
-                          </Button>
+                          <Tooltip title="Удалить файлы и ПД, запись сохраняется">
+                            <Button
+                              size="small" variant="outlined" color="warning"
+                              startIcon={<AnonymizeIcon />}
+                              onClick={() => setAnonymizeDialog({ open: true, submission: ch })}
+                            >
+                              Очистить
+                            </Button>
+                          </Tooltip>
+                          <Tooltip title="Полностью удалить из БД">
+                            <Button
+                              size="small" variant="outlined" color="error"
+                              startIcon={<HardDeleteIcon />}
+                              onClick={() => setDeleteDialog({ open: true, submission: ch })}
+                            >
+                              Удалить
+                            </Button>
+                          </Tooltip>
                         </Box>
 
                         {ch.admin_note && (
@@ -489,11 +505,23 @@ const AdminDocuments = () => {
         }
       />
 
-      {/* ── Delete submission dialog ── */}
+      {/* ── Anonymize submission dialog ── */}
+      <DeleteDialog
+        open={anonymizeDialog.open}
+        title="Очистить персональные данные"
+        description={`Файлы и ПД заявки «${anonymizeDialog.submission?.child_name ?? ''}» будут удалены. Запись о заявке и её статус сохранятся в БД.`}
+        onClose={() => setAnonymizeDialog({ open: false, submission: null })}
+        onConfirm={() =>
+          documentService.adminAnonymizeSubmission(anonymizeDialog.submission.id)
+            .then(() => { toast.success('Данные очищены, запись сохранена'); load() })
+        }
+      />
+
+      {/* ── Hard delete submission dialog ── */}
       <DeleteDialog
         open={deleteDialog.open}
-        title="Удалить заявку"
-        description={`Удалить заявку «${deleteDialog.submission?.child_name ?? ''}»? Все прикреплённые файлы будут удалены безвозвратно.`}
+        title="Полностью удалить заявку"
+        description={`Заявка «${deleteDialog.submission?.child_name ?? ''}» и все её файлы будут полностью удалены из БД без возможности восстановления.`}
         onClose={() => setDeleteDialog({ open: false, submission: null })}
         onConfirm={() =>
           documentService.adminDeleteSubmission(deleteDialog.submission.id)

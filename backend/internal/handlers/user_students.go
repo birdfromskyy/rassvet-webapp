@@ -148,6 +148,12 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 		}
 	}
 
+	// A superadmin can only edit their own account, not another superadmin's.
+	callerID := extractUserID(c)
+	if string(user.Role) == "superadmin" && callerID != uint(userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Нельзя редактировать аккаунт другого суперадминистратора"})
+		return
+	}
 	// Superadmin role is immutable via the UI — change it directly in the database.
 	if string(user.Role) == "superadmin" && req.Role != "" && req.Role != "superadmin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Роль суперадминистратора нельзя изменить через интерфейс"})
@@ -467,7 +473,7 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 // Protected teacher: GET /api/teacher/schedule?week_start=YYYY-MM-DD&teacher_id=&student_id=
 func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	role, _ := c.Get("role")
-	if role != string(models.RoleTeacher) && role != string(models.RoleAdmin) {
+	if role != string(models.RoleTeacher) && !models.IsAdminRole(role.(string)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для преподавателей"})
 		return
 	}
@@ -584,7 +590,7 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 
 func (h *UserStudentHandler) GetTeacherScheduleOptions(c *gin.Context) {
 	role, _ := c.Get("role")
-	if role != string(models.RoleTeacher) && role != string(models.RoleAdmin) {
+	if role != string(models.RoleTeacher) && !models.IsAdminRole(role.(string)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для преподавателей"})
 		return
 	}

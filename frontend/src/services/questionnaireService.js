@@ -24,6 +24,7 @@ const questionnaireService = {
   },
   adminUpdateStatus: (id, status, adminNote = '') =>
     api.put(`/admin/questionnaires/${id}/status`, { status, admin_note: adminNote }).then(r => r.data),
+  adminAnonymize: (id) => api.post(`/admin/questionnaires/${id}/anonymize`).then(r => r.data),
   adminDelete: (id) => api.delete(`/admin/questionnaires/${id}`).then(r => r.data),
 }
 

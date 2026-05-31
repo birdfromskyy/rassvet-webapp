@@ -4,9 +4,13 @@ import {
   Container, Paper, Typography, Box, Button, Chip, CircularProgress,
   Table, TableBody, TableCell, TableHead, TableRow, TextField,
   Dialog, DialogTitle, DialogContent, DialogActions, Select,
-  MenuItem, FormControl, InputLabel,
+  MenuItem, FormControl, InputLabel, Tooltip,
 } from '@mui/material'
-import { ArrowBack as BackIcon } from '@mui/icons-material'
+import {
+  ArrowBack as BackIcon,
+  DeleteSweep as AnonymizeIcon,
+  DeleteForever as HardDeleteIcon,
+} from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import consultationService from '../services/consultationService'
 
@@ -68,8 +72,14 @@ export default function AdminConsultations() {
     finally { setSaving(false) }
   }
 
+  const handleAnonymize = async (id) => {
+    if (!window.confirm('Удалить персональные данные заявки?\nСтатус и запись сохранятся в БД.')) return
+    try { await consultationService.adminAnonymize(id); toast.success('Данные очищены'); load() }
+    catch { toast.error('Ошибка') }
+  }
+
   const handleDelete = async (id) => {
-    if (!window.confirm('Удалить заявку?')) return
+    if (!window.confirm('ПОЛНОЕ удаление записи из БД без возможности восстановления.')) return
     try { await consultationService.adminDelete(id); load() }
     catch { toast.error('Ошибка удаления') }
   }
@@ -153,10 +163,20 @@ export default function AdminConsultations() {
                         <Button size="small" variant="outlined" onClick={() => openDialog(r)}>
                           Открыть
                         </Button>
-                        <Button size="small" variant="outlined" color="error"
-                          onClick={() => handleDelete(r.id)}>
-                          Удалить
-                        </Button>
+                        <Tooltip title="Удалить ПД, запись сохраняется">
+                          <Button size="small" variant="outlined" color="warning"
+                            startIcon={<AnonymizeIcon />}
+                            onClick={() => handleAnonymize(r.id)}>
+                            Очистить
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Полностью удалить из БД">
+                          <Button size="small" variant="outlined" color="error"
+                            startIcon={<HardDeleteIcon />}
+                            onClick={() => handleDelete(r.id)}>
+                            Удалить
+                          </Button>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>

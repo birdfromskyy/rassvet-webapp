@@ -152,13 +152,37 @@ func (h *ConsultationHandler) AdminUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, req)
 }
 
-// DELETE /api/admin/consultations/:id
+// POST /api/admin/consultations/:id/anonymize
+// Clears all PII fields, keeps the record with status and contact_method.
+func (h *ConsultationHandler) AdminAnonymize(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	var req models.ConsultationRequest
+	if err := h.db.First(&req, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Заявка не найдена"})
+		return
+	}
+	req.ParentFio = ""
+	req.Phone = ""
+	req.ChildFio = ""
+	req.ChildAge = ""
+	req.ContactEmail = ""
+	req.RequestText = ""
+	req.IPAddress = ""
+	h.db.Save(&req)
+	c.JSON(http.StatusOK, req)
+}
+
+// DELETE /api/admin/consultations/:id — permanently remove from DB
 func (h *ConsultationHandler) AdminDelete(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
 		return
 	}
-	h.db.Delete(&models.ConsultationRequest{}, id)
+	h.db.Unscoped().Delete(&models.ConsultationRequest{}, id)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

@@ -22,9 +22,9 @@ func NewNotificationHandler(db *gorm.DB) *NotificationHandler {
 // For admin-targeted notifications pass role="admin" and userID=0; the function
 // will fan out to all users with role="admin".
 func CreateNotification(db *gorm.DB, userID uint, role, title, body, link string) {
-	if role == "admin" {
+	if models.IsAdminRole(role) {
 		var admins []models.User
-		db.Where("role = 'admin'").Find(&admins)
+		db.Where("role IN ('admin','superadmin')").Find(&admins)
 		for _, a := range admins {
 			db.Create(&models.Notification{
 				UserID: a.ID,
