@@ -251,6 +251,32 @@ func (h *UserStudentHandler) DeleteUser(c *gin.Context) {
 		_ = os.Remove(filepath.Join("./private_uploads/questionnaires", q.FileName))
 	}
 
+	// Delete physical files for child doc submissions
+	var children []models.ChildDocSubmission
+	h.db.Unscoped().Where("user_id = ?", targetID).Find(&children)
+	for _, ch := range children {
+		for _, f := range parseFileList(ch.IppsuFiles) {
+			_ = os.Remove(filepath.Join("./private_uploads/docs", f))
+		}
+		for _, f := range parseFileList(ch.BirthCertFiles) {
+			_ = os.Remove(filepath.Join("./private_uploads/docs", f))
+		}
+		for _, f := range parseFileList(ch.ChildSnilsFiles) {
+			_ = os.Remove(filepath.Join("./private_uploads/docs", f))
+		}
+	}
+
+	// Delete physical files for parent profile
+	var profile models.ParentProfile
+	if h.db.Unscoped().Where("user_id = ?", targetID).First(&profile).Error == nil {
+		for _, f := range parseFileList(profile.PassportFiles) {
+			_ = os.Remove(filepath.Join("./private_uploads/docs", f))
+		}
+		for _, f := range parseFileList(profile.SnilsFiles) {
+			_ = os.Remove(filepath.Join("./private_uploads/docs", f))
+		}
+	}
+
 	// Cascade: remove all related records (hard delete via Unscoped)
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Questionnaire{})
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Notification{})

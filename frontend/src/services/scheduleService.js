@@ -353,6 +353,10 @@ const scheduleService = {
 		const r = await api.post(`/admin/schedules/${scheduleId}/copy-manual-from-prev-week`)
 		return r.data
 	},
+	bulkUpdateSlotsOrigin: async (scheduleId, origin) => {
+		const r = await api.patch(`/admin/schedules/${scheduleId}/slots/bulk-origin`, { origin })
+		return r.data
+	},
 	// ========== USERS (admin) ==========
 	getUsers: async () => {
 		const r = await api.get('/admin/users')

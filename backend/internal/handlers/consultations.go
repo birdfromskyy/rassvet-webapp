@@ -93,6 +93,14 @@ func (h *ConsultationHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "id": req.ID})
 }
 
+// GET /api/consultations/mine — authenticated user's own consultation requests
+func (h *ConsultationHandler) GetMine(c *gin.Context) {
+	userID := c.GetUint("userID")
+	var list []models.ConsultationRequest
+	h.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&list)
+	c.JSON(http.StatusOK, list)
+}
+
 // GET /api/admin/consultations
 func (h *ConsultationHandler) AdminList(c *gin.Context) {
 	var list []models.ConsultationRequest
@@ -145,7 +153,7 @@ func (h *ConsultationHandler) AdminUpdate(c *gin.Context) {
 			if body.AdminNote != "" {
 				body_ += " Примечание: " + body.AdminNote
 			}
-			CreateNotification(h.db, *req.UserID, "", title, body_, "/dashboard")
+			CreateNotification(h.db, *req.UserID, "", title, body_, "/profile")
 		}
 	}
 

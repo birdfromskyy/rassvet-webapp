@@ -854,6 +854,48 @@ func (h *ScheduleHandler) ClearAutoSchedule(c *gin.Context) {
 	h.respondWithSchedule(c, &schedule)
 }
 
+// PATCH /api/admin/schedules/:id/slots/bulk-origin
+// Body: { "origin": "manual" | "auto" }
+// Sets origin for ALL non-cancelled slots of the schedule.
+func (h *ScheduleHandler) BulkUpdateSlotsOrigin(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID расписания"})
+		return
+	}
+
+	var body struct {
+		Origin string `json:"origin" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if body.Origin != string(models.ScheduleSlotOriginManual) && body.Origin != string(models.ScheduleSlotOriginAuto) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "origin должен быть 'manual' или 'auto'"})
+		return
+	}
+
+	var schedule models.Schedule
+	if err := h.db.First(&schedule, scheduleID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Расписание не найдено"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения расписания"})
+		return
+	}
+
+	if err := h.db.Model(&models.ScheduleSlot{}).
+		Where("schedule_id = ? AND status != ?", scheduleID, models.ScheduleSlotStatusCancelled).
+		Update("origin", body.Origin).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить происхождение слотов"})
+		return
+	}
+
+	h.respondWithSchedule(c, &schedule)
+}
+
 func (h *ScheduleHandler) ClearManualSlots(c *gin.Context) {
 	scheduleID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || scheduleID <= 0 {
@@ -998,6 +1040,8 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		Preload("GroupLesson.Enrollments.Student").
 		Preload("Exclusions").
 		Preload("Exclusions.Student").
+		Preload("GroupLessonAttendance").
+		Preload("GroupLessonAttendance.Student").
 		Where("schedule_id = ?", schedule.ID).
 		Order("weekday ASC, start_time ASC, id ASC").
 		Find(&slots).Error; err != nil {

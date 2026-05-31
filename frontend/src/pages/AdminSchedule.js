@@ -218,6 +218,9 @@ const AdminSchedule = () => {
 	// Delete single slot confirmation dialog
 	const [deleteSlotDialog, setDeleteSlotDialog] = useState({ open: false, slotId: null, slotLabel: '' })
 	const deleteManualTimerRef = useRef(null)
+	// Bulk origin change dialog
+	const [bulkOriginDialog, setBulkOriginDialog] = useState({ open: false, origin: 'manual', countdown: 3 })
+	const bulkOriginTimerRef = useRef(null)
 
 	// Generation settings
 	const [maxGapMinutes, setMaxGapMinutes] = useState(30)
@@ -527,6 +530,39 @@ const AdminSchedule = () => {
 			toast.success('Ручные слоты удалены')
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка удаления ручных слотов')
+		}
+	}
+
+	const openBulkOriginDialog = (origin) => {
+		setBulkOriginDialog({ open: true, origin, countdown: 3 })
+		let count = 3
+		bulkOriginTimerRef.current = setInterval(() => {
+			count -= 1
+			setBulkOriginDialog(prev => ({ ...prev, countdown: count }))
+			if (count <= 0) {
+				clearInterval(bulkOriginTimerRef.current)
+				bulkOriginTimerRef.current = null
+			}
+		}, 1000)
+	}
+
+	const closeBulkOriginDialog = () => {
+		if (bulkOriginTimerRef.current) {
+			clearInterval(bulkOriginTimerRef.current)
+			bulkOriginTimerRef.current = null
+		}
+		setBulkOriginDialog({ open: false, origin: 'manual', countdown: 3 })
+	}
+
+	const confirmBulkOrigin = async () => {
+		const { origin } = bulkOriginDialog
+		closeBulkOriginDialog()
+		try {
+			const data = await scheduleService.bulkUpdateSlotsOrigin(scheduleData.schedule.id, origin)
+			setScheduleData(data)
+			toast.success(origin === 'manual' ? 'Все занятия переведены в ручной режим' : 'Все занятия переведены в авто режим')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Ошибка изменения происхождения')
 		}
 	}
 
@@ -1083,13 +1119,20 @@ const AdminSchedule = () => {
 	if (scheduleData?.slots) {
 		for (const slot of scheduleData.slots) {
 			if (filterStudentId) {
+				const id = Number(filterStudentId)
 				if (slot.slot_type === 'group') {
-					const enrolled = slot.group_lesson?.enrollments?.some(
-						e => e.student_id === Number(filterStudentId),
-					)
-					if (!enrolled) continue
+					const hasAttendance = (slot.group_lesson_attendance?.length ?? 0) > 0
+					if (hasAttendance) {
+						// Attendance records are the source of truth for this specific slot
+						if (!slot.group_lesson_attendance.some(a => a.student_id === id)) continue
+					} else {
+						// No per-slot attendance yet — fall back to base enrollments minus exclusions
+						const enrolled = slot.group_lesson?.enrollments?.some(e => e.student_id === id)
+						const excluded = slot.exclusions?.some(ex => ex.student_id === id)
+						if (!enrolled || excluded) continue
+					}
 				} else {
-					if (slot.student_id !== Number(filterStudentId)) continue
+					if (slot.student_id !== id) continue
 				}
 			}
 			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId)) continue
@@ -1272,6 +1315,27 @@ const AdminSchedule = () => {
 								onClick={openDeleteManualDialog}
 							>
 								Удалить ручные
+							</Button>
+
+							<Divider orientation='vertical' flexItem sx={{ mx: 0.5 }} />
+
+							<Button
+								size='small'
+								variant='outlined'
+								color='secondary'
+								onClick={() => openBulkOriginDialog('manual')}
+								disabled={generating}
+							>
+								Всё → Ручное
+							</Button>
+							<Button
+								size='small'
+								variant='outlined'
+								color='secondary'
+								onClick={() => openBulkOriginDialog('auto')}
+								disabled={generating}
+							>
+								Всё → Авто
 							</Button>
 
 							<Divider orientation='vertical' flexItem sx={{ mx: 0.5 }} />
@@ -2370,6 +2434,38 @@ const AdminSchedule = () => {
 						{deleteManualDialog.countdown > 0
 							? `Удалить (${deleteManualDialog.countdown})`
 							: 'Удалить'}
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Bulk origin change confirmation dialog */}
+			<Dialog
+				open={bulkOriginDialog.open}
+				onClose={closeBulkOriginDialog}
+				maxWidth='xs'
+				fullWidth
+			>
+				<DialogTitle>
+					{bulkOriginDialog.origin === 'manual' ? 'Перевести всё в ручной режим?' : 'Перевести всё в авто режим?'}
+				</DialogTitle>
+				<DialogContent>
+					<Typography variant='body2'>
+						{bulkOriginDialog.origin === 'manual'
+							? 'Все занятия расписания будут помечены как ручные. Они не будут удалены при следующей генерации.'
+							: 'Все занятия расписания будут помечены как авто. При следующей генерации авто-занятия будут заменены.'}
+					</Typography>
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={closeBulkOriginDialog}>Отмена</Button>
+					<Button
+						variant='contained'
+						color='secondary'
+						onClick={confirmBulkOrigin}
+						disabled={bulkOriginDialog.countdown > 0}
+					>
+						{bulkOriginDialog.countdown > 0
+							? `Вы уверены? (${bulkOriginDialog.countdown})`
+							: 'Подтвердить'}
 					</Button>
 				</DialogActions>
 			</Dialog>

@@ -9,6 +9,10 @@ const consultationService = {
   createAuth: (data) =>
     api.post('/consultations/auth', data).then(r => r.data),
 
+  // Authenticated user: get own consultation requests
+  getMine: () =>
+    api.get('/consultations/mine').then(r => r.data),
+
   // Admin
   adminList: () => api.get('/admin/consultations').then(r => r.data),
   adminUpdate: (id, data) => api.put(`/admin/consultations/${id}`, data).then(r => r.data),
