@@ -36,7 +36,7 @@ const MODULES = [
     path: "/admin/cms/news",
   },
   {
-    title: "История центра",
+    title: "История и достижения",
     description: "Хронология событий и достижений организации.",
     icon: HistoryIcon,
     path: "/admin/cms/history",
@@ -48,19 +48,19 @@ const MODULES = [
     path: "/admin/cms/docs",
   },
   {
-    title: "Внутренний распорядок",
+    title: "Правила внутреннего распорядка",
     description: "Документы с правилами внутреннего распорядка.",
     icon: RulesIcon,
     path: "/admin/cms/rules",
   },
   {
-    title: "Независимая оценка",
+    title: "Независимая оценка качества",
     description: "Материалы раздела оценки качества услуг.",
     icon: RatingIcon,
     path: "/admin/cms/rating",
   },
   {
-    title: "Материальная база",
+    title: "Материально-техническое обеспечение",
     description: "Помещения, зоны, оборудование и фотографии.",
     icon: FinIcon,
     path: "/admin/cms/fin-zones",
@@ -96,7 +96,7 @@ const MODULES = [
     path: "/admin/cms/achievements",
   },
   {
-    title: "Награды",
+    title: "Наши награды",
     description: "Дипломы, сертификаты и благодарности.",
     icon: AwardsIcon,
     path: "/admin/cms/awards",
