@@ -2,36 +2,28 @@ package middleware
 
 import (
 	"backend/internal/utils"
-	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
-func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
+func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		// Cookie takes priority (browser); Authorization header as fallback (API/mobile clients)
+		tokenString, _ := c.Cookie("token")
+		if tokenString == "" {
+			tokenString = strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		}
+		if tokenString == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			c.Abort()
 			return
 		}
 
-		tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
-
 		claims, err := utils.ValidateToken(tokenString, jwtSecret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Недействительный токен"})
-			c.Abort()
-			return
-		}
-
-		// Check token blacklist (set on logout)
-		blacklistKey := "blacklist:" + tokenString
-		if exists, _ := rdb.Exists(context.Background(), blacklistKey).Result(); exists > 0 {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Токен аннулирован"})
 			c.Abort()
 			return
 		}

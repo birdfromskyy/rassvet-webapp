@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,11 +14,10 @@ import (
 	"time"
 
 	"backend/internal/models"
-	"backend/internal/utils"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -40,17 +38,20 @@ var (
 		".jpeg": true,
 		".png":  true,
 	}
+	allowedDocMIMEs = map[string]bool{
+		"application/pdf": true,
+		"image/jpeg":      true,
+		"image/png":       true,
+	}
 	phoneRe = regexp.MustCompile(`^\+7\d{10}$`)
 )
 
 type DocumentHandler struct {
-	db        *gorm.DB
-	jwtSecret string
-	rdb       *redis.Client
+	db *gorm.DB
 }
 
-func NewDocumentHandler(db *gorm.DB, jwtSecret string, rdb *redis.Client) *DocumentHandler {
-	return &DocumentHandler{db: db, jwtSecret: jwtSecret, rdb: rdb}
+func NewDocumentHandler(db *gorm.DB) *DocumentHandler {
+	return &DocumentHandler{db: db}
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,6 +124,17 @@ func (h *DocumentHandler) uploadMultipleFiles(c *gin.Context, fieldBase string, 
 		ext := strings.ToLower(filepath.Ext(fh.Filename))
 		if !allowedDocExts[ext] {
 			return saved, totalSize, fmt.Errorf("недопустимый формат «%s» (разрешены PDF, JPG, PNG)", fh.Filename)
+		}
+
+		f, openErr := fh.Open()
+		if openErr != nil {
+			return saved, totalSize, fmt.Errorf("ошибка чтения файла «%s»", fh.Filename)
+		}
+		mtype, _ := mimetype.DetectReader(f)
+		f.Close()
+		mimeBase := strings.ToLower(strings.TrimSpace(strings.SplitN(mtype.String(), ";", 2)[0]))
+		if !allowedDocMIMEs[mimeBase] {
+			return saved, totalSize, fmt.Errorf("содержимое файла «%s» не соответствует расширению (разрешены PDF, JPG, PNG)", fh.Filename)
 		}
 
 		totalSize += fh.Size
@@ -500,44 +512,19 @@ func (h *DocumentHandler) UpdateChildDocs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"submission": sub})
 }
 
-// GET /api/documents/file/:filename[?token=<jwt>]
-// This route is registered OUTSIDE the auth middleware so that the browser can
-// open it directly in a new tab. Auth is validated here manually from either
-// the Authorization header or the ?token= query param.
+// GET /api/documents/file/:filename
+// Auth is handled by AuthMiddleware (httpOnly cookie). userID and role come from context.
 // Authenticated users may access their own files; admins may access any file.
 func (h *DocumentHandler) ServePrivateFile(c *gin.Context) {
 	filename := c.Param("filename")
 
-	// Prevent path traversal
 	if strings.Contains(filename, "/") || strings.Contains(filename, "..") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректное имя файла"})
 		return
 	}
 
-	// Resolve token: Authorization header takes precedence, then ?token= param.
-	tokenStr := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if tokenStr == "" {
-		tokenStr = c.Query("token")
-	}
-	if tokenStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
-		return
-	}
-
-	claims, err := utils.ValidateToken(tokenStr, h.jwtSecret)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Недействительный токен"})
-		return
-	}
-
-	// Reject tokens that were blacklisted on logout.
-	if exists, _ := h.rdb.Exists(context.Background(), "blacklist:"+tokenStr).Result(); exists > 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Токен аннулирован"})
-		return
-	}
-
-	userID := claims.UserID
-	role   := claims.Role
+	userID := c.GetUint("userID")
+	role := c.GetString("role")
 
 	if !models.IsAdminRole(role) && !h.userOwnsFile(userID, filename) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Доступ запрещён"})
@@ -666,6 +653,32 @@ func (h *DocumentHandler) AdminDeleteParentProfile(c *gin.Context) {
 }
 
 // DELETE /api/admin/documents/user/:userId/personal-data
+// POST /api/admin/documents/parent/:userId/anonymize
+// Deletes physical passport/SNILS files and clears PII, but keeps the profile record + status.
+func (h *DocumentHandler) AdminAnonymizeParentProfile(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("userId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
+		return
+	}
+	var profile models.ParentProfile
+	if err := h.db.Where("user_id = ?", userId).First(&profile).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Профиль не найден"})
+		return
+	}
+	for _, f := range parseFileList(profile.PassportFiles) {
+		_ = os.Remove(filepath.Join(privateDocsDir, f))
+	}
+	for _, f := range parseFileList(profile.SnilsFiles) {
+		_ = os.Remove(filepath.Join(privateDocsDir, f))
+	}
+	profile.Phone = ""
+	profile.PassportFiles = "[]"
+	profile.SnilsFiles = "[]"
+	h.db.Save(&profile)
+	c.JSON(http.StatusOK, gin.H{"parent_profile": profile})
+}
+
 // Erases ALL personal data: child submissions + parent profile.
 func (h *DocumentHandler) AdminDeletePersonalData(c *gin.Context) {
 	userId, err := strconv.Atoi(c.Param("userId"))

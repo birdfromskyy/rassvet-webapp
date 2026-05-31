@@ -13,6 +13,7 @@ import (
 
 	"backend/internal/models"
 
+	"github.com/gabriel-vasile/mimetype"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -38,6 +39,12 @@ var allowedQuestionnaireExts = map[string]bool{
 	".pdf":  true,
 	".doc":  true,
 	".docx": true,
+}
+
+var allowedQuestionnaireMIMEs = map[string]bool{
+	"application/pdf":   true,
+	"application/msword": true,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 }
 
 // GET /api/questionnaire — get current user's questionnaire
@@ -83,6 +90,19 @@ func (h *QuestionnaireHandler) Upload(c *gin.Context) {
 	ext := strings.ToLower(filepath.Ext(fh.Filename))
 	if !allowedQuestionnaireExts[ext] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Допустимые форматы: PDF, DOC, DOCX"})
+		return
+	}
+
+	qf, openErr := fh.Open()
+	if openErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка чтения файла"})
+		return
+	}
+	mtype, _ := mimetype.DetectReader(qf)
+	qf.Close()
+	mimeBase := strings.ToLower(strings.TrimSpace(strings.SplitN(mtype.String(), ";", 2)[0]))
+	if !allowedQuestionnaireMIMEs[mimeBase] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Содержимое файла не соответствует расширению. Допустимые форматы: PDF, DOC, DOCX"})
 		return
 	}
 
