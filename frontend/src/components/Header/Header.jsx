@@ -19,6 +19,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { siteSettingService } from "../../services/cmsService";
 import notificationService from "../../services/notificationService";
+import { useAuth } from "../../contexts/AuthContext";
 
 const searchPages = [
   { title: "Главная", path: "/main" },
@@ -100,7 +101,8 @@ function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef(null);
-  const isLoggedIn = !!localStorage.getItem("token");
+  const { isAuthenticated } = useAuth() || {};
+  const isLoggedIn = !!isAuthenticated;
 
   const navigate = useNavigate();
 

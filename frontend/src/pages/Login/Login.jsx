@@ -41,7 +41,7 @@ const Login = ({ onLogin }) => {
     try {
       const response = await authService.login(formData);
 
-      onLogin(response.token, response.user);
+      onLogin(response.user);
 
       toast.success("Вход выполнен успешно!");
       navigate("/dashboard");

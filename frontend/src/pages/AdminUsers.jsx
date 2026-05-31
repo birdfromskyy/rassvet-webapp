@@ -49,6 +49,7 @@ import { toast } from "react-toastify";
 import scheduleService from "../services/scheduleService";
 import documentService from "../services/documentService";
 import { isAdmin, isSuperAdmin as isSuperAdminRole } from "../utils/roles";
+import { useAuth } from "../contexts/AuthContext";
 import "./AdminModule.scss";
 
 const MODULE_TITLE = "Пользователи";
@@ -62,15 +63,6 @@ const EMPTY_FORM = {
   role: "user",
 };
 
-const getCallerRole = () => {
-  try {
-    return JSON.parse(localStorage.getItem("user") || "null")?.role || "";
-  } catch {
-    return "";
-  }
-};
-
-const isSuperAdmin = () => isSuperAdminRole(getCallerRole());
 
 const CHARSET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
 const generatePassword = () =>
@@ -95,6 +87,8 @@ const getRoleColor = (role) => {
 
 const UserFormFields = ({ form, setForm, isEdit, targetIsSuperAdmin }) => {
   const [showPwd, setShowPwd] = React.useState(false);
+  const { user: currentUser } = useAuth() || {};
+  const isSuperAdmin = () => isSuperAdminRole(currentUser?.role);
 
   const handleGenerate = () => {
     const pwd = generatePassword();
@@ -189,6 +183,8 @@ const UserFormFields = ({ form, setForm, isEdit, targetIsSuperAdmin }) => {
 
 const AdminUsers = () => {
   const navigate = useNavigate();
+  const { user: currentUser } = useAuth() || {};
+  const isSuperAdmin = () => isSuperAdminRole(currentUser?.role);
 
   const [users, setUsers] = useState([]);
   const [students, setStudents] = useState([]);
@@ -502,11 +498,7 @@ const AdminUsers = () => {
                       </TableCell>
                       <TableCell align="center">
                         {u.role === "superadmin" ? (
-                          <Tooltip title="Редактировать">
-                            <IconButton size="small" onClick={() => openEditDialog(u)}>
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          <Typography variant="caption" color="text.disabled">—</Typography>
                         ) : isSuperAdmin() || !isAdmin(u.role) ? (
                           <>
                             <Tooltip title="Редактировать пользователя">

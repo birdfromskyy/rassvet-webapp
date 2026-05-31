@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import authService from "./services/authService";
+import { AuthContext } from "./contexts/AuthContext";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -70,43 +72,36 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const userData = localStorage.getItem("user");
-
-    if (token && userData) {
-      setIsAuthenticated(true);
-      setUser(JSON.parse(userData));
-    }
-    setLoading(false);
+    authService.getMe()
+      .then(userData => {
+        setIsAuthenticated(true);
+        setUser(userData);
+      })
+      .catch(() => {
+        setIsAuthenticated(false);
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleLogin = (token, userData) => {
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(userData));
+  const handleLogin = (userData) => {
     setIsAuthenticated(true);
     setUser(userData);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
     setIsAuthenticated(false);
     setUser(null);
   };
 
-  // Добавьте эту функцию для обновления пользователя
   const handleUpdateUser = (updatedUser) => {
-    // Если email изменился и не верифицирован - НЕ обновляем user
     if (
       updatedUser.is_verified === false &&
       updatedUser.email !== user?.email
     ) {
-      // Пользователь будет выведен из системы на фронтенде
       return;
     }
-
     setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
   if (loading) {
@@ -114,7 +109,7 @@ function App() {
   }
 
   return (
-    <>
+    <AuthContext.Provider value={{ isAuthenticated, user, handleLogin, handleLogout, handleUpdateUser }}>
       <AccessibilityPanel />
       <ScrollToTop />
       <Routes>
@@ -294,7 +289,7 @@ function App() {
         />
       </Routes>
       <ToastContainer position="top-right" />
-    </>
+    </AuthContext.Provider>
   );
 }
 
