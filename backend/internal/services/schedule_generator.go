@@ -1131,6 +1131,11 @@ func (g *ScheduleGenerator) ScoreCandidate(candidate CandidateSlot, task WeeklyT
 		studentMatch := false
 		if slot.SlotType == models.SlotTypeGroup {
 			if slot.GroupLessonID != nil && isStudentEnrolledInGroup(task.StudentID, *slot.GroupLessonID, ctx.GroupLessonEnrollments) {
+				// Don't score proximity to group slots that ignore student windows —
+				// individual lessons are independent of them.
+				if slot.GroupLesson != nil && slot.GroupLesson.IgnoreStudentWindows {
+					continue
+				}
 				studentMatch = true
 			}
 		} else {
@@ -1772,6 +1777,11 @@ func (g *ScheduleGenerator) createsLargeStudentGap(
 		studentMatch := false
 		if slot.SlotType == models.SlotTypeGroup {
 			if slot.GroupLessonID != nil && isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
+				// Group slots placed outside student windows must not constrain
+				// individual lesson gap — they are independent of student schedule.
+				if slot.GroupLesson != nil && slot.GroupLesson.IgnoreStudentWindows {
+					continue
+				}
 				studentMatch = true
 			}
 		} else if slot.StudentID != nil && *slot.StudentID == studentID {
