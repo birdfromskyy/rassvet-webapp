@@ -12,11 +12,14 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -29,13 +32,15 @@ type AuthHandler struct {
 }
 
 type PendingRegistration struct {
-	Email        string `json:"email"`
-	PasswordHash string `json:"password_hash"`
-	FirstName    string `json:"first_name"`
-	LastName     string `json:"last_name"`
-	MiddleName   string `json:"middle_name"`
-	Code         string `json:"code"`
-	Attempts     int    `json:"attempts"`
+	Email          string `json:"email"`
+	PasswordHash   string `json:"password_hash"`
+	FirstName      string `json:"first_name"`
+	LastName       string `json:"last_name"`
+	MiddleName     string `json:"middle_name"`
+	Code           string `json:"code"`
+	Attempts       int    `json:"attempts"`
+	ConsentGiven   bool   `json:"consent_given"`
+	ConsentVersion string `json:"consent_version"`
 }
 
 type PendingEmailVerification struct {
@@ -52,6 +57,68 @@ type PendingPasswordReset struct {
 
 const verificationCodeCooldown = 60 * time.Second
 const maxVerificationAttempts = 5
+const currentConsentVersion = "v1"
+
+const accessTokenMaxAge  = 30 * 60          // 30 min in seconds (matches JWT TTL)
+const refreshTokenTTL    = 7 * 24 * time.Hour
+const refreshTokenMaxAge = 7 * 24 * 60 * 60 // 7 days in seconds
+
+func refreshKey(token string) string { return "refresh:" + token }
+
+// issueTokenPair generates a new access JWT + refresh UUID, sets both cookies,
+// and stores the refresh token in Redis.
+func (h *AuthHandler) issueTokenPair(c *gin.Context, userID uint, role string) error {
+	accessToken, err := utils.GenerateToken(userID, role, h.cfg.JWTSecret)
+	if err != nil {
+		return err
+	}
+
+	refreshToken := uuid.NewString()
+	payload, _ := json.Marshal(map[string]interface{}{
+		"user_id": userID,
+		"role":    role,
+	})
+	if err := h.rdb.Set(c.Request.Context(), refreshKey(refreshToken), payload, refreshTokenTTL).Err(); err != nil {
+		return err
+	}
+
+	secure := h.cfg.IsProduction
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "token",
+		Value:    accessToken,
+		Path:     "/",
+		MaxAge:   accessTokenMaxAge,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/api/refresh",
+		MaxAge:   refreshTokenMaxAge,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+	return nil
+}
+
+// clearAuthCookies removes both auth cookies and deletes the refresh token from Redis.
+func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
+	secure := h.cfg.IsProduction
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "token", Value: "", Path: "/",
+		MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "refresh_token", Value: "", Path: "/api/refresh",
+		MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+	})
+	if rt, err := c.Cookie("refresh_token"); err == nil && rt != "" {
+		_ = h.rdb.Del(c.Request.Context(), refreshKey(rt)).Err()
+	}
+}
 
 var (
 	pwUpperRe = regexp.MustCompile(`[A-Z]`)
@@ -89,11 +156,12 @@ func validatePassword(p string) error {
 
 
 type RegisterRequest struct {
-	Email      string `json:"email"       binding:"required,email,max=254"`
-	Password   string `json:"password"    binding:"required,min=8,max=128"`
-	FirstName  string `json:"first_name"  binding:"required,max=100"`
-	LastName   string `json:"last_name"   binding:"required,max=100"`
-	MiddleName string `json:"middle_name"                  binding:"max=100"`
+	Email        string `json:"email"          binding:"required,email,max=254"`
+	Password     string `json:"password"       binding:"required,min=8,max=128"`
+	FirstName    string `json:"first_name"     binding:"required,max=100"`
+	LastName     string `json:"last_name"      binding:"required,max=100"`
+	MiddleName   string `json:"middle_name"    binding:"max=100"`
+	ConsentGiven bool   `json:"consent_given"`
 }
 
 type LoginRequest struct {
@@ -140,6 +208,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	if !req.ConsentGiven {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Необходимо согласие на обработку персональных данных"})
+		return
+	}
+
 	if err := validatePassword(req.Password); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -174,12 +247,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	code := generateCode()
 	pending := PendingRegistration{
-		Email:        req.Email,
-		PasswordHash: string(hashedPassword),
-		FirstName:    strings.TrimSpace(req.FirstName),
-		LastName:     strings.TrimSpace(req.LastName),
-		MiddleName:   strings.TrimSpace(req.MiddleName),
-		Code:         code,
+		Email:          req.Email,
+		PasswordHash:   string(hashedPassword),
+		FirstName:      strings.TrimSpace(req.FirstName),
+		LastName:       strings.TrimSpace(req.LastName),
+		MiddleName:     strings.TrimSpace(req.MiddleName),
+		Code:           code,
+		ConsentGiven:   true,
+		ConsentVersion: currentConsentVersion,
 	}
 
 	data, err := json.Marshal(pending)
@@ -276,21 +351,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(user.ID, string(user.Role), h.cfg.JWTSecret)
-	if err != nil {
+	if err := h.issueTokenPair(c, user.ID, string(user.Role)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
-
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   3600,
-		HttpOnly: true,
-		Secure:   h.cfg.IsProduction,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
@@ -491,14 +555,17 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 			return
 		}
 
+		now := time.Now()
 		user := models.User{
-			Email:      pending.Email,
-			Password:   pending.PasswordHash,
-			FirstName:  pending.FirstName,
-			LastName:   pending.LastName,
-			MiddleName: pending.MiddleName,
-			Role:       models.RoleUser,
-			IsVerified: true,
+			Email:          pending.Email,
+			Password:       pending.PasswordHash,
+			FirstName:      pending.FirstName,
+			LastName:       pending.LastName,
+			MiddleName:     pending.MiddleName,
+			Role:           models.RoleUser,
+			IsVerified:     true,
+			ConsentGivenAt: &now,
+			ConsentVersion: pending.ConsentVersion,
 		}
 		if err := h.db.Create(&user).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать пользователя"})
@@ -568,16 +635,64 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "token",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   h.cfg.IsProduction,
-		SameSite: http.SameSiteLaxMode,
-	})
+	// Blacklist the current access token so it can't be reused within its remaining TTL.
+	if cookie, err := c.Cookie("token"); err == nil && cookie != "" {
+		if claims, err := utils.ValidateToken(cookie, h.cfg.JWTSecret); err == nil {
+			if ttl := time.Until(claims.ExpiresAt.Time); ttl > 0 {
+				_ = h.rdb.Set(c.Request.Context(), "blacklist:"+cookie, "1", ttl).Err()
+			}
+		}
+	}
+	h.clearAuthCookies(c)
 	c.JSON(http.StatusOK, gin.H{"message": "Выход выполнен успешно"})
+}
+
+// POST /api/refresh
+// Issues a new access token + rotates the refresh token.
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	rt, err := c.Cookie("refresh_token")
+	if err != nil || rt == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Сессия истекла, войдите снова"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	raw, err := h.rdb.Get(ctx, refreshKey(rt)).Result()
+	if err == redis.Nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Сессия истекла, войдите снова"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
+
+	var payload struct {
+		UserID uint   `json:"user_id"`
+		Role   string `json:"role"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
+
+	// Verify user still exists and is not deleted.
+	var user models.User
+	if err := h.db.First(&user, payload.UserID).Error; err != nil {
+		_ = h.rdb.Del(ctx, refreshKey(rt)).Err()
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь не найден"})
+		return
+	}
+
+	// Rotate: delete old refresh token and issue a new pair.
+	_ = h.rdb.Del(ctx, refreshKey(rt)).Err()
+
+	if err := h.issueTokenPair(c, user.ID, string(user.Role)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (h *AuthHandler) GetMe(c *gin.Context) {
@@ -863,4 +978,77 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			"is_verified": user.IsVerified,
 		},
 	})
+}
+
+// DELETE /api/me
+// Deletes the authenticated user's account and all their personal data (152-ФЗ right to erasure).
+func (h *AuthHandler) DeleteMyAccount(c *gin.Context) {
+	userID, _ := c.Get("userID")
+	uid := userID.(uint)
+
+	// Delete child doc submissions (files + records)
+	var children []models.ChildDocSubmission
+	h.db.Where("user_id = ?", uid).Find(&children)
+	for _, ch := range children {
+		for _, f := range parseFileListAuth(ch.IppsuFiles) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		for _, f := range parseFileListAuth(ch.BirthCertFiles) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		for _, f := range parseFileListAuth(ch.ChildSnilsFiles) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		h.db.Unscoped().Delete(&ch)
+	}
+
+	// Delete parent profile (files + record)
+	var profile models.ParentProfile
+	if h.db.Where("user_id = ?", uid).First(&profile).Error == nil {
+		for _, f := range parseFileListAuth(profile.PassportFiles) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		for _, f := range parseFileListAuth(profile.SnilsFiles) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		h.db.Unscoped().Delete(&profile)
+	}
+
+	// Delete questionnaire (file + record)
+	var q models.Questionnaire
+	if h.db.Where("user_id = ?", uid).First(&q).Error == nil {
+		if q.FileName != "" {
+			_ = os.Remove(filepath.Join(questionnaireDir, q.FileName))
+		}
+		h.db.Unscoped().Delete(&q)
+	}
+
+	// Anonymize consultation requests (keep record for admin stats, detach from user)
+	h.db.Model(&models.ConsultationRequest{}).Where("user_id = ?", uid).Update("user_id", nil)
+
+	// Delete notifications
+	h.db.Unscoped().Where("user_id = ?", uid).Delete(&models.Notification{})
+
+	// Soft-delete the user
+	h.db.Delete(&models.User{}, uid)
+
+	// Blacklist the current access token + clear both cookies + delete refresh token.
+	if cookie, err := c.Cookie("token"); err == nil && cookie != "" {
+		if claims, err := utils.ValidateToken(cookie, h.cfg.JWTSecret); err == nil {
+			if ttl := time.Until(claims.ExpiresAt.Time); ttl > 0 {
+				_ = h.rdb.Set(c.Request.Context(), "blacklist:"+cookie, "1", ttl).Err()
+			}
+		}
+	}
+	h.clearAuthCookies(c)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Аккаунт и все персональные данные удалены"})
+}
+
+// parseFileListAuth parses a JSON array of filenames stored as a string in the DB.
+// Mirrors the same helper in documents.go to avoid cross-handler dependency.
+func parseFileListAuth(raw string) []string {
+	var list []string
+	_ = json.Unmarshal([]byte(raw), &list)
+	return list
 }

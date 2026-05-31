@@ -45,6 +45,11 @@ const authService = {
 		const response = await api.put('/profile', data)
 		return response.data
 	},
+
+	deleteAccount: async () => {
+		const response = await api.delete('/me')
+		return response.data
+	},
 }
 
 export default authService

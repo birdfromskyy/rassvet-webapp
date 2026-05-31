@@ -65,6 +65,8 @@ import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
 import Achievements from "./pages/Achievements/Achievements";
 import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest";
 import AccessibilityPanel from "./components/AccessibilityPanel/AccessibilityPanel";
+import PrivacyPolicy from "./pages/PrivacyPolicy/PrivacyPolicy";
+import AdminPrivacyPolicy from "./pages/AdminPrivacyPolicy/AdminPrivacyPolicy";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -259,6 +261,7 @@ function App() {
             <Route path="/admin/cms/achievements" element={<AdminAchievements />} />
             <Route path="/admin/cms/awards" element={<AdminAwards />} />
             <Route path="/admin/cms/shorts" element={<AdminShorts />} />
+            <Route path="/admin/cms/privacy" element={<AdminPrivacyPolicy />} />
           </Route>
         </Route>
 
@@ -281,6 +284,7 @@ function App() {
         <Route path="/donation" element={<Donation />} />
         <Route path="/social-service-form" element={<SocialServiceForm />} />
         <Route path="/achievements" element={<Achievements />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route
           path="/"
           element={

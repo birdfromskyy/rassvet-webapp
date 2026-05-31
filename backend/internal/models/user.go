@@ -36,6 +36,9 @@ type User struct {
 	Role       UserRole `gorm:"default:user" json:"role"`
 	IsVerified bool     `gorm:"default:false" json:"is_verified"`
 
+	ConsentGivenAt *time.Time `json:"consent_given_at"`
+	ConsentVersion string     `json:"consent_version"`
+
 	Reviews []Review `json:"reviews,omitempty"`
 }
 

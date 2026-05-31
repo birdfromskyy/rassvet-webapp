@@ -640,6 +640,14 @@ func (h *DocumentHandler) deleteUserParentProfile(userId int) {
 	}
 }
 
+// DELETE /api/documents/parent
+// Allows the authenticated user to delete their own parent profile (files + record).
+func (h *DocumentHandler) DeleteMyParentProfile(c *gin.Context) {
+	userID := c.GetUint("userID")
+	h.deleteUserParentProfile(int(userID))
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 // DELETE /api/admin/documents/parent/:userId
 // Removes the parent profile record (phone + files) for a specific user.
 func (h *DocumentHandler) AdminDeleteParentProfile(c *gin.Context) {

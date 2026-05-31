@@ -22,6 +22,8 @@ const Register = () => {
     middle_name: "",
   });
 
+  const [consentGiven, setConsentGiven] = useState(false);
+
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -66,6 +68,10 @@ const Register = () => {
       newErrors.last_name = "Фамилия обязательна";
     }
 
+    if (!consentGiven) {
+      newErrors.consent = "Необходимо согласие на обработку персональных данных";
+    }
+
     return newErrors;
   };
 
@@ -84,7 +90,7 @@ const Register = () => {
     try {
       const { confirmPassword, ...dataToSend } = formData;
 
-      await authService.register(dataToSend);
+      await authService.register({ ...dataToSend, consent_given: consentGiven });
 
       toast.success(
         "Регистрация успешна! Проверьте email для подтверждения."
@@ -226,6 +232,29 @@ const Register = () => {
                     </span>
                   )}
                 </div>
+              </div>
+
+              <div className="register-form__consent">
+                <label className="register-form__consent-label">
+                  <input
+                    type="checkbox"
+                    checked={consentGiven}
+                    onChange={(e) => {
+                      setConsentGiven(e.target.checked);
+                      if (errors.consent) setErrors({ ...errors, consent: "" });
+                    }}
+                  />
+                  <span>
+                    Я даю согласие на обработку{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                      персональных данных
+                    </a>{" "}
+                    в соответствии с Федеральным законом №&nbsp;152-ФЗ
+                  </span>
+                </label>
+                {errors.consent && (
+                  <span className="register-form__error">{errors.consent}</span>
+                )}
               </div>
 
               <button
