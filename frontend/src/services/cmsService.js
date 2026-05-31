@@ -20,14 +20,10 @@ export const uploadFile = async (file) => {
   return res.data.url
 }
 
-// ── Employees ──────────────────────────────────────────────────────────────
+// ── Employees (public list only — admin management via Teachers) ───────────
 
 export const employeeService = {
   getAll: () => api.get('/employees').then(r => r.data),
-  getAllAdmin: () => api.get('/admin/employees').then(r => r.data),
-  create: (data) => api.post('/admin/employees', data).then(r => r.data),
-  update: (id, data) => api.put(`/admin/employees/${id}`, data).then(r => r.data),
-  delete: (id) => api.delete(`/admin/employees/${id}`).then(r => r.data),
 }
 
 // ── CMS Files (docs / rules / rating) ─────────────────────────────────────
