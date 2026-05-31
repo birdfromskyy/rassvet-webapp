@@ -253,3 +253,31 @@
     }
   }
 }
+/* ── Grouped layout ── */
+.admin-cms__group {
+  margin-bottom: 40px;
+
+  &:last-child { margin-bottom: 0; }
+}
+
+.admin-cms__group-title {
+  font-family: "Merriweather", serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #074462;
+  margin: 0 0 18px;
+  padding-left: 4px;
+  border-left: 4px solid #f4df00;
+  padding-left: 14px;
+}
+
+/* Schedule panel badge */
+.admin-cms__badge--schedule {
+  background: #e8f4fd;
+  color: #074462;
+}
+
+/* Actions container for back button alignment */
+.admin-cms__actions {
+  flex-shrink: 0;
+}

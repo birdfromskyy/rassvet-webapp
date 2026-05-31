@@ -314,6 +314,7 @@
 }
 
 .header__consultation,
+.header__donate,
 .header__account {
   min-height: 46px;
 
@@ -336,6 +337,18 @@
   background: #074462;
   color: #ffffff;
   border: 2px solid #074462;
+}
+
+.header__donate {
+  background: transparent;
+  color: #c9a227;
+  border: 2px solid #c9a227;
+  transition: background 0.2s, color 0.2s;
+
+  &:hover {
+    background: #c9a227;
+    color: #fff;
+  }
 }
 
 .header__account {
@@ -388,6 +401,7 @@
   }
 
   .header__consultation,
+  .header__donate,
   .header__account {
     padding: 0 22px;
     font-size: 15px;
@@ -465,10 +479,15 @@
   }
 
   .header__consultation,
+  .header__donate,
   .header__account {
     min-height: 38px;
     padding: 0 14px;
     font-size: 13px;
+  }
+
+  .header__donate {
+    display: none;
   }
 
   .header__search {
