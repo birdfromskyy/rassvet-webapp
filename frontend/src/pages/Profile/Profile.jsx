@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import authService from '../../services/authService'
 import documentService from '../../services/documentService'
 import questionnaireService from '../../services/questionnaireService'
+import consultationService from '../../services/consultationService'
 import './Profile.scss'
 
 import Header from '../../components/Header/Header'
@@ -228,8 +229,10 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
     }
   }
 
-  // ── Questionnaire status (gates document upload) ─────────────────────────
-  const [qStatus, setQStatus] = useState(null)
+  // ── Consultations & questionnaire ────────────────────────────────────────
+  const [consultations, setConsultations] = useState([])
+  const [qData, setQData]               = useState(null)   // full questionnaire object
+  const [qStatus, setQStatus]           = useState(null)   // status string
 
   // ── Document state ────────────────────────────────────────────────────────
   const [docsLoading, setDocsLoading]         = useState(true)
@@ -265,9 +268,10 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
 
   const loadDocs = useCallback(async () => {
     try {
-      const [data, q] = await Promise.all([
+      const [data, q, consults] = await Promise.all([
         documentService.getMyDocuments(),
         questionnaireService.getMine().catch(() => null),
+        consultationService.getMine().catch(() => []),
       ])
       const profile = data.parent_profile || {}
       setParentProfile(profile)
@@ -277,7 +281,9 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
       setKeepSnils(safeParseJSON(profile.snils_files))
       setNewPassport([])
       setNewSnils([])
+      setQData(q || null)
       setQStatus(q?.status || null)
+      setConsultations(Array.isArray(consults) ? consults : [])
     } catch {
       toast.error('Ошибка загрузки документов')
     } finally {
@@ -523,6 +529,90 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                 </button>
               </div>
             </form>
+
+            {/* ── Consultation requests ── */}
+            {!docsLoading && (
+              <div className="profile__card" style={{ marginTop: 32 }}>
+                <div className="profile__section">
+                  <div className="docs-section-head">
+                    <h2>Заявки на консультацию</h2>
+                    {consultations.length > 0 && (
+                      <span className="docs-count">{consultations.length}</span>
+                    )}
+                  </div>
+
+                  {consultations.length === 0 ? (
+                    <div className="profile__empty-state">
+                      <p className="docs-hint">У вас пока нет заявок на консультацию.</p>
+                      <Link to="/consultation-request" className="profile__cta-btn">
+                        Подать заявку на консультацию
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="consult-list">
+                      {consultations.map(c => {
+                        const st = statusLabel[c.status] || { text: c.status, cls: '' }
+                        return (
+                          <div key={c.id} className="consult-card">
+                            <div className="consult-card__header">
+                              <span className="consult-card__child">{c.child_fio} ({c.child_age})</span>
+                              <span className={`docs-status ${st.cls}`}>{st.text === 'На проверке' ? 'Новая' : st.text === 'Подтверждён' ? 'Обработана' : st.text}</span>
+                            </div>
+                            <p className="consult-card__meta">
+                              Связь: <strong>{c.contact_method}{c.contact_email ? ` (${c.contact_email})` : ''}</strong>
+                              {' · '}
+                              {new Date(c.created_at).toLocaleDateString('ru-RU')}
+                            </p>
+                            {c.admin_note && (
+                              <p className="consult-card__note">Примечание: {c.admin_note}</p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Questionnaire ── */}
+            {!docsLoading && (
+              <div className="profile__card" style={{ marginTop: 24 }}>
+                <div className="profile__section">
+                  <div className="docs-section-head">
+                    <h2>Анкета</h2>
+                    {qData && (
+                      <span className={`docs-status ${statusLabel[qData.status]?.cls || ''}`}>
+                        {statusLabel[qData.status]?.text || qData.status}
+                      </span>
+                    )}
+                  </div>
+
+                  {!qData ? (
+                    <div className="profile__empty-state">
+                      <p className="docs-hint">Анкета не загружена. Для подачи документов необходимо пройти анкетирование.</p>
+                      <Link to="/service-algorithm" className="profile__cta-btn">
+                        Перейти к анкетированию
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="questionnaire-info">
+                      <p className="docs-hint">
+                        {qData.status === 'approved' && 'Анкета одобрена. Вы можете подавать документы.'}
+                        {qData.status === 'pending' && 'Анкета отправлена и ожидает проверки администратором.'}
+                        {qData.status === 'rejected' && 'Требуется уточнение по анкете. Загрузите новую версию.'}
+                      </p>
+                      {qData.admin_note && (
+                        <p className="consult-card__note">Примечание администратора: {qData.admin_note}</p>
+                      )}
+                      <Link to="/service-algorithm" className="profile__cta-btn profile__cta-btn--secondary">
+                        {qData.status === 'rejected' ? 'Загрузить новую анкету' : 'Открыть страницу анкеты'}
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* ── Documents block ── */}
             {docsLoading ? (
