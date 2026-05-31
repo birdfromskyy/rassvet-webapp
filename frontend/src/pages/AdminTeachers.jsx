@@ -542,11 +542,14 @@ const AdminTeachers = () => {
           onClose={closeEdit}
           maxWidth="md"
           fullWidth
+          PaperProps={{
+            className: "admin-module-dialog",
+          }}
         >
-          <DialogTitle>
+          <DialogTitle className="admin-module-dialog__title">
             {editDialog.item ? "Редактировать сотрудника" : "Новый сотрудник"}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent className="admin-module-dialog__content">
             <Box display="flex" flexDirection="column" gap={2} sx={{ mt: 1 }}>
               <TextField
                 label="ФИО"
@@ -682,7 +685,7 @@ const AdminTeachers = () => {
               </Box>
             </Box>
           </DialogContent>
-          <DialogActions>
+          <DialogActions className="admin-module-dialog__actions">
             <Button onClick={closeEdit}>Отмена</Button>
             <Button onClick={saveTeacher} variant="contained">
               Сохранить
@@ -696,11 +699,14 @@ const AdminTeachers = () => {
           onClose={closeSubjects}
           maxWidth="sm"
           fullWidth
+          PaperProps={{
+    className: "admin-module-dialog",
+  }}
         >
-          <DialogTitle>
+          <DialogTitle className="admin-module-dialog__title">
             Предметы: {subjectsDialog.teacher?.full_name}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent className="admin-module-dialog__content">
             <Box sx={{ mt: 1 }}>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Выберите предметы, которые ведёт этот сотрудник:
@@ -738,7 +744,7 @@ const AdminTeachers = () => {
               </FormControl>
             </Box>
           </DialogContent>
-          <DialogActions>
+          <DialogActions className="admin-module-dialog__actions">
             <Button onClick={closeSubjects}>Отмена</Button>
             <Button onClick={saveSubjects} variant="contained">
               Сохранить
@@ -752,11 +758,14 @@ const AdminTeachers = () => {
           onClose={closeAvail}
           maxWidth="md"
           fullWidth
+          PaperProps={{
+    className: "admin-module-dialog",
+  }}
         >
-          <DialogTitle>
+          <DialogTitle className="admin-module-dialog__title">
             Рабочее время: {availDialog.teacher?.full_name}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent className="admin-module-dialog__content">
             <Box sx={{ mt: 1 }}>
               {availList.length > 0 ? (
                 <Table size="small" sx={{ mb: 2 }}>
@@ -861,7 +870,7 @@ const AdminTeachers = () => {
               </Box>
             </Box>
           </DialogContent>
-          <DialogActions>
+          <DialogActions className="admin-module-dialog__actions">
             <Button onClick={closeAvail}>Закрыть</Button>
           </DialogActions>
         </Dialog>
@@ -871,9 +880,12 @@ const AdminTeachers = () => {
           onClose={closeRooms}
           maxWidth="sm"
           fullWidth
+          PaperProps={{
+    className: "admin-module-dialog",
+  }}
         >
-          <DialogTitle>Кабинеты: {roomsDialog.teacher?.full_name}</DialogTitle>
-          <DialogContent>
+          <DialogTitle className="admin-module-dialog__title">Кабинеты: {roomsDialog.teacher?.full_name}</DialogTitle>
+          <DialogContent className="admin-module-dialog__content">
             <Box sx={{ mt: 1 }}>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Выберите кабинеты, в которых работает сотрудник:
@@ -930,7 +942,7 @@ const AdminTeachers = () => {
               )}
             </Box>
           </DialogContent>
-          <DialogActions>
+          <DialogActions className="admin-module-dialog__actions">
             <Button onClick={closeRooms}>Отмена</Button>
             <Button onClick={saveRooms} variant="contained">
               Сохранить
