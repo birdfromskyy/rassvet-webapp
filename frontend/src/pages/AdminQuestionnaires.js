@@ -4,9 +4,12 @@ import {
   Container, Paper, Typography, Box, Button, Chip, CircularProgress,
   Table, TableBody, TableCell, TableHead, TableRow,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Select, MenuItem, FormControl, InputLabel,
+  TextField, Select, MenuItem, FormControl, InputLabel, Tooltip,
 } from '@mui/material'
-import { ArrowBack as BackIcon, Download as DownloadIcon, Delete as DeleteIcon } from '@mui/icons-material'
+import {
+  ArrowBack as BackIcon, Download as DownloadIcon,
+  DeleteSweep as AnonymizeIcon, DeleteForever as HardDeleteIcon,
+} from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import questionnaireService from '../services/questionnaireService'
 
@@ -62,11 +65,20 @@ export default function AdminQuestionnaires() {
     setEditNote(item.admin_note || '')
   }
 
+  const handleAnonymize = async (id) => {
+    if (!window.confirm('Удалить файл анкеты и персональные данные?\nЗапись о статусе будет сохранена в БД.')) return
+    try {
+      await questionnaireService.adminAnonymize(id)
+      toast.success('Персональные данные удалены, запись сохранена')
+      load()
+    } catch { toast.error('Ошибка') }
+  }
+
   const handleDelete = async (id) => {
-    if (!window.confirm('Удалить анкету? Файл будет удалён безвозвратно.')) return
+    if (!window.confirm('ПОЛНОЕ удаление: запись, файл и все данные будут удалены из БД без возможности восстановления.')) return
     try {
       await questionnaireService.adminDelete(id)
-      toast.success('Анкета удалена')
+      toast.success('Запись удалена полностью')
       load()
     } catch { toast.error('Ошибка удаления') }
   }
@@ -142,15 +154,25 @@ export default function AdminQuestionnaires() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Box display="flex" gap={1}>
+                      <Box display="flex" gap={1} flexWrap="wrap">
                         <Button size="small" variant="outlined" onClick={() => openDialog(q)}>
                           Решение
                         </Button>
-                        <Button size="small" variant="outlined" color="error"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleDelete(q.id)}>
-                          Удалить
-                        </Button>
+                        <Tooltip title="Удалить файл и ПД, запись сохраняется">
+                          <Button size="small" variant="outlined" color="warning"
+                            startIcon={<AnonymizeIcon />}
+                            onClick={() => handleAnonymize(q.id)}
+                            disabled={!q.file_name}>
+                            Очистить
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Полностью удалить из БД">
+                          <Button size="small" variant="outlined" color="error"
+                            startIcon={<HardDeleteIcon />}
+                            onClick={() => handleDelete(q.id)}>
+                            Удалить
+                          </Button>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>

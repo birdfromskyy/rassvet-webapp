@@ -283,6 +283,7 @@ func main() {
 			// Document submissions (admin review)
 			admin.GET("/documents", documentHandler.AdminListDocuments)
 			admin.PUT("/documents/submissions/:id/status", documentHandler.AdminUpdateSubmissionStatus)
+			admin.POST("/documents/submissions/:id/anonymize", documentHandler.AdminAnonymizeSubmission)
 			admin.DELETE("/documents/submissions/:id", documentHandler.AdminDeleteSubmission)
 			admin.PUT("/documents/parent/:userId/status", documentHandler.AdminUpdateParentStatus)
 			admin.DELETE("/documents/parent/:userId", documentHandler.AdminDeleteParentProfile)
@@ -300,6 +301,7 @@ func main() {
 			// Consultations
 			admin.GET("/consultations", consultationHandler.AdminList)
 			admin.PUT("/consultations/:id", consultationHandler.AdminUpdate)
+			admin.POST("/consultations/:id/anonymize", consultationHandler.AdminAnonymize)
 			admin.DELETE("/consultations/:id", consultationHandler.AdminDelete)
 
 			// Achievements CMS
@@ -324,6 +326,7 @@ func main() {
 			admin.GET("/questionnaires", questionnaireHandler.AdminList)
 			admin.GET("/questionnaires/:id/file", questionnaireHandler.AdminServeFile)
 			admin.PUT("/questionnaires/:id/status", questionnaireHandler.AdminUpdateStatus)
+			admin.POST("/questionnaires/:id/anonymize", questionnaireHandler.AdminAnonymize)
 			admin.DELETE("/questionnaires/:id", questionnaireHandler.AdminDelete)
 		}
 

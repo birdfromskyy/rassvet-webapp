@@ -49,6 +49,7 @@ import {
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
 import documentService from '../services/documentService'
+import { isAdmin, isSuperAdmin as isSuperAdminRole } from '../utils/roles'
 
 const EMPTY_FORM = {
 	email: '',
@@ -63,7 +64,7 @@ const getCallerRole = () => {
 	try { return JSON.parse(localStorage.getItem('user') || 'null')?.role || '' }
 	catch { return '' }
 }
-const isSuperAdmin = () => getCallerRole() === 'superadmin'
+const isSuperAdmin = () => isSuperAdminRole(getCallerRole())
 
 const CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
 const generatePassword = () =>
@@ -460,7 +461,7 @@ const AdminUsers = () => {
 														<EditIcon fontSize='small' />
 													</IconButton>
 												</Tooltip>
-											) : (isSuperAdmin() || u.role !== 'admin') ? (
+											) : (isSuperAdmin() || !isAdmin(u.role)) ? (
 												<>
 													<Tooltip title='Редактировать пользователя'>
 														<IconButton size='small' onClick={() => openEditDialog(u)}>

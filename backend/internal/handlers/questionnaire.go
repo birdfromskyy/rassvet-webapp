@@ -145,7 +145,7 @@ func (h *QuestionnaireHandler) Upload(c *gin.Context) {
 
 	// Delete any previous admin notifications about THIS user's questionnaire.
 	var adminIDs []uint
-	h.db.Model(&models.User{}).Where("role = 'admin'").Pluck("id", &adminIDs)
+	h.db.Model(&models.User{}).Where("role IN ('admin','superadmin')").Pluck("id", &adminIDs)
 	if len(adminIDs) > 0 {
 		marker := fmt.Sprintf("[uid:%d]", userID)
 		h.db.Where("user_id IN ? AND title = ? AND body LIKE ?",
@@ -208,7 +208,25 @@ func (h *QuestionnaireHandler) AdminServeFile(c *gin.Context) {
 	c.FileAttachment(filePath, q.FileName)
 }
 
-// DELETE /api/admin/questionnaires/:id — remove questionnaire record and its file
+// POST /api/admin/questionnaires/:id/anonymize
+// Deletes the file from disk and clears file_name, but keeps the record + status.
+// Use this to comply with personal data regulations while preserving access rights.
+func (h *QuestionnaireHandler) AdminAnonymize(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var q models.Questionnaire
+	if err := h.db.First(&q, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Не найдено"})
+		return
+	}
+	if q.FileName != "" {
+		_ = os.Remove(filepath.Join(questionnaireDir, q.FileName))
+	}
+	q.FileName = ""
+	h.db.Save(&q)
+	c.JSON(http.StatusOK, q)
+}
+
+// DELETE /api/admin/questionnaires/:id — permanently remove record and file from DB
 func (h *QuestionnaireHandler) AdminDelete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	var q models.Questionnaire
@@ -219,7 +237,7 @@ func (h *QuestionnaireHandler) AdminDelete(c *gin.Context) {
 	if q.FileName != "" {
 		_ = os.Remove(filepath.Join(questionnaireDir, q.FileName))
 	}
-	h.db.Delete(&q)
+	h.db.Unscoped().Delete(&q)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 

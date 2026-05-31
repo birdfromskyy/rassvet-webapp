@@ -15,6 +15,13 @@ const (
 	RoleSuperAdmin UserRole = "superadmin"
 )
 
+// IsAdminRole returns true for any role that has administrator-level access.
+// Use this instead of hardcoding "admin" checks so that adding new privileged
+// roles in the future only requires changing this one function.
+func IsAdminRole(role string) bool {
+	return role == string(RoleAdmin) || role == string(RoleSuperAdmin)
+}
+
 type User struct {
 	ID        uint           `gorm:"primarykey" json:"id"`
 	CreatedAt time.Time      `json:"created_at"`

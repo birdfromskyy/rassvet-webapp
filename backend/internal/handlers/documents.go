@@ -539,7 +539,7 @@ func (h *DocumentHandler) ServePrivateFile(c *gin.Context) {
 	userID := claims.UserID
 	role   := claims.Role
 
-	if role != "admin" && !h.userOwnsFile(userID, filename) {
+	if !models.IsAdminRole(role) && !h.userOwnsFile(userID, filename) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Доступ запрещён"})
 		return
 	}
@@ -589,6 +589,36 @@ func (h *DocumentHandler) AdminDeleteSubmission(c *gin.Context) {
 
 	h.db.Unscoped().Delete(&sub)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// POST /api/admin/documents/submissions/:id/anonymize
+// Deletes files from disk and clears PII (child name, file lists), keeps record + status.
+func (h *DocumentHandler) AdminAnonymizeSubmission(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	var sub models.ChildDocSubmission
+	if err := h.db.First(&sub, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Заявка не найдена"})
+		return
+	}
+	for _, f := range parseFileList(sub.IppsuFiles) {
+		_ = os.Remove(filepath.Join(privateDocsDir, f))
+	}
+	for _, f := range parseFileList(sub.BirthCertFiles) {
+		_ = os.Remove(filepath.Join(privateDocsDir, f))
+	}
+	for _, f := range parseFileList(sub.ChildSnilsFiles) {
+		_ = os.Remove(filepath.Join(privateDocsDir, f))
+	}
+	sub.ChildName = ""
+	sub.IppsuFiles = "[]"
+	sub.BirthCertFiles = "[]"
+	sub.ChildSnilsFiles = "[]"
+	h.db.Save(&sub)
+	c.JSON(http.StatusOK, sub)
 }
 
 // deleteUserChildren removes all child submissions + physical files for a user.
