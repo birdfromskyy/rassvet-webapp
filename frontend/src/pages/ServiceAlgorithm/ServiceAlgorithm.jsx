@@ -4,17 +4,12 @@ import { isRegularUser } from "../../utils/roles";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import questionnaireService from "../../services/questionnaireService";
+import { useAuth } from "../../contexts/AuthContext";
 import "./ServiceAlgorithm.scss";
-
-// Read current user from localStorage (set by App.js on login)
-const getStoredUser = () => {
-  try { return JSON.parse(localStorage.getItem("user") || "null"); }
-  catch { return null; }
-};
 
 function ServiceAlgorithm() {
   const navigate = useNavigate();
-  const user = getStoredUser();
+  const { user } = useAuth() || {};
   const showQuestionnaire = isRegularUser(user?.role);
 
   const [qStatus, setQStatus]   = useState(null);   // null | "pending" | "approved" | "rejected"

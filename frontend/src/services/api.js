@@ -4,32 +4,22 @@ const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api'
 
 const api = axios.create({
 	baseURL: API_URL,
+	withCredentials: true,
 	headers: {
 		'Content-Type': 'application/json',
 	},
 })
 
-// Add token to requests
-api.interceptors.request.use(
-	config => {
-		const token = localStorage.getItem('token')
-		if (token) {
-			config.headers.Authorization = `Bearer ${token}`
-		}
-		return config
-	},
-	error => {
-		return Promise.reject(error)
-	}
-)
-
-// Handle response errors
+// Redirect to /login on 401, but NOT for:
+// - the initial session check (getMe on app mount) — unauthenticated users on public pages
+//   would otherwise get stuck in a redirect loop
+// - requests already originating from /login (prevents infinite reload)
 api.interceptors.response.use(
 	response => response,
 	error => {
-		if (error.response?.status === 401) {
-			localStorage.removeItem('token')
-			localStorage.removeItem('user')
+		const isInitialCheck = error.config?._isInitialCheck === true
+		const alreadyOnLogin = window.location.pathname === '/login'
+		if (error.response?.status === 401 && !isInitialCheck && !alreadyOnLogin) {
 			window.location.href = '/login'
 		}
 		return Promise.reject(error)

@@ -59,11 +59,8 @@ const documentService = {
     }).then(r => r.data)
   },
 
-  /** Build authenticated URL for a private file (token in query param for direct browser opens) */
-  fileUrl: (filename) => {
-    const token = localStorage.getItem('token')
-    return `${BASE}/documents/file/${filename}${token ? `?token=${encodeURIComponent(token)}` : ''}`
-  },
+  /** Build URL for a private file — httpOnly cookie is sent automatically by the browser */
+  fileUrl: (filename) => `${BASE}/documents/file/${filename}`,
 
   // ── Admin ──────────────────────────────────────────────────────────────────
 
@@ -85,6 +82,10 @@ const documentService = {
   /** Admin hard-deletes a child submission + files completely from DB */
   adminDeleteSubmission: (id) =>
     api.delete(`/admin/documents/submissions/${id}`).then(r => r.data),
+
+  /** Admin clears parent profile PII (files + phone), keeps the record + status */
+  adminAnonymizeParentProfile: (userId) =>
+    api.post(`/admin/documents/parent/${userId}/anonymize`).then(r => r.data),
 
   /** Admin deletes parent profile record + files (phone, passport, snils) */
   adminDeleteParentProfile: (userId) =>

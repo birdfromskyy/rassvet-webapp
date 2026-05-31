@@ -91,13 +91,8 @@ const StatusChip = ({ status }) => {
 };
 
 const openPrivateFile = (filename) => {
-  const token = localStorage.getItem("token");
   const base = process.env.REACT_APP_API_URL || "http://localhost:8080/api";
-  const url = `${base}/documents/file/${filename}${
-    token ? `?token=${encodeURIComponent(token)}` : ""
-  }`;
-
-  window.open(url, "_blank");
+  window.open(`${base}/documents/file/${filename}`, "_blank");
 };
 
 const FileLinks = ({ files }) => {
@@ -365,6 +360,11 @@ const AdminDocuments = () => {
     userId: null,
     email: "",
   });
+  const [anonymizeParentDialog, setAnonymizeParentDialog] = useState({
+    open: false,
+    userId: null,
+    email: "",
+  });
 
   const load = useCallback(async () => {
     try {
@@ -545,6 +545,24 @@ const AdminDocuments = () => {
                           >
                             Изменить статус
                           </Button>
+
+                          <Tooltip title="Удалить файлы и номер телефона, запись сохраняется">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="warning"
+                              startIcon={<AnonymizeIcon />}
+                              onClick={() =>
+                                setAnonymizeParentDialog({
+                                  open: true,
+                                  userId: userDoc.user_id,
+                                  email: userDoc.email,
+                                })
+                              }
+                            >
+                              Очистить
+                            </Button>
+                          </Tooltip>
 
                           <Button
                             size="small"
@@ -755,6 +773,23 @@ const AdminDocuments = () => {
               toast.success("Заявка удалена");
               load();
             })
+          }
+        />
+
+        <DeleteDialog
+          open={anonymizeParentDialog.open}
+          title="Очистить данные родителя"
+          description={`Файлы паспорта, СНИЛС и номер телефона пользователя ${anonymizeParentDialog.email} будут удалены. Запись о профиле и его статус сохранятся в БД.`}
+          onClose={() =>
+            setAnonymizeParentDialog({ open: false, userId: null, email: "" })
+          }
+          onConfirm={() =>
+            documentService.adminAnonymizeParentProfile(anonymizeParentDialog.userId).then(
+              () => {
+                toast.success("Данные родителя очищены, запись сохранена");
+                load();
+              }
+            )
           }
         />
 

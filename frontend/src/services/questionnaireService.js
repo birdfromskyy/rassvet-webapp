@@ -10,17 +10,15 @@ const questionnaireService = {
     }).then(r => r.data)
   },
   getFileUrl: () => {
-    const token = localStorage.getItem('token')
     const base = process.env.REACT_APP_API_URL || 'http://localhost:8080/api'
-    return `${base}/questionnaire/file?token=${encodeURIComponent(token || '')}`
+    return `${base}/questionnaire/file`
   },
 
   // Admin
   adminList: () => api.get('/admin/questionnaires').then(r => r.data),
   adminFileUrl: (id) => {
-    const token = localStorage.getItem('token')
     const base = process.env.REACT_APP_API_URL || 'http://localhost:8080/api'
-    return `${base}/admin/questionnaires/${id}/file?token=${encodeURIComponent(token || '')}`
+    return `${base}/admin/questionnaires/${id}/file`
   },
   adminUpdateStatus: (id, status, adminNote = '') =>
     api.put(`/admin/questionnaires/${id}/status`, { status, admin_note: adminNote }).then(r => r.data),

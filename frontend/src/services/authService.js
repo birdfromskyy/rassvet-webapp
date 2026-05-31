@@ -27,7 +27,7 @@ const authService = {
 	},
 
 	getMe: async () => {
-		const response = await api.get('/me')
+		const response = await api.get('/me', { _isInitialCheck: true })
 		return response.data
 	},
 
