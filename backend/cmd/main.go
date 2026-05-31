@@ -7,8 +7,13 @@ import (
 	"backend/internal/middleware"
 	"backend/internal/models"
 	"backend/internal/services"
+	"context"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -105,6 +110,7 @@ func main() {
 	r.POST("/api/resend-code",    middleware.IPRateLimit(rdb, 5, 5*time.Minute),  authHandler.ResendCode)
 	r.POST("/api/forgot-password",middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.ForgotPassword)
 	r.POST("/api/reset-password", middleware.IPRateLimit(rdb, 10, 15*time.Minute), authHandler.ResetPassword)
+	r.POST("/api/refresh",        middleware.IPRateLimit(rdb, 30, 5*time.Minute),  authHandler.Refresh)
 
 	// Consultation request — public (rate limited: 3 per hour per IP for guests)
 	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), consultationHandler.Create)
@@ -131,6 +137,7 @@ func main() {
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
 		protected.PUT("/profile", authHandler.UpdateProfile)
+		protected.DELETE("/me", authHandler.DeleteMyAccount)
 		protected.POST("/logout", authHandler.Logout)
 		protected.GET("/me", authHandler.GetMe)
 
@@ -354,6 +361,7 @@ func main() {
 		// Document submissions (parent + children docs)
 		protected.GET("/documents", documentHandler.GetMyDocuments)
 		protected.POST("/documents/parent", documentHandler.SaveParentDocs)
+		protected.DELETE("/documents/parent", documentHandler.DeleteMyParentProfile)
 		protected.POST("/documents/children", documentHandler.AddChildDocs)
 		protected.DELETE("/documents/children/:id", documentHandler.DeleteChildSubmission)
 		protected.PUT("/documents/children/:id", documentHandler.UpdateChildDocs)
@@ -374,17 +382,20 @@ func main() {
 		protected.GET("/questionnaire/file", questionnaireHandler.ServeFile)
 	}
 
-	// Background goroutine: daily check for expired ИППСУ → create in-app notifications
+	// Background context — cancelled on graceful shutdown to stop background workers.
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+
+	// Background goroutine: daily check for expired ИППСУ → create in-app notifications.
 	go func() {
+		type row struct {
+			ID              uint
+			ChildName       string
+			IppsuExpiryDate *time.Time
+			UserID          uint
+			UserFirstName   string
+			UserLastName    string
+		}
 		for {
-			type row struct {
-				ID              uint
-				ChildName       string
-				IppsuExpiryDate *time.Time
-				UserID          uint
-				UserFirstName   string
-				UserLastName    string
-			}
 			var rows []row
 			db.Raw(`
 				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
@@ -405,30 +416,61 @@ func main() {
 				}
 				fullName := strings.TrimSpace(r.UserLastName + " " + r.UserFirstName)
 
-				// Notify the user
 				handlers.CreateNotification(db, r.UserID, "",
 					"Срок действия ИППСУ истёк",
 					"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истёк "+expiryStr+
 						". Пожалуйста, загрузите обновлённый документ в личном кабинете.",
 					"/profile",
 				)
-				// Notify all admins
 				handlers.CreateNotification(db, 0, "admin",
 					"Истёк срок ИППСУ",
 					"У клиента "+fullName+" истёк срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
 					"/admin/documents",
 				)
-				// Mark as notified so we don't repeat
 				db.Model(&models.ChildDocSubmission{}).
 					Where("id = ?", r.ID).
 					Update("expiry_notified", true)
 			}
 
-			time.Sleep(24 * time.Hour)
+			select {
+			case <-bgCtx.Done():
+				return
+			case <-time.After(24 * time.Hour):
+			}
 		}
 	}()
 
-	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatal("Failed to start server:", err)
+	// HTTP server with explicit timeouts.
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	go func() {
+		log.Printf("Server listening on :%s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Block until SIGINT or SIGTERM.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutdown signal received, draining connections...")
+
+	bgCancel() // Stop background workers.
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server stopped cleanly")
 }
