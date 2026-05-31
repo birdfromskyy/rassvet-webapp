@@ -36,8 +36,8 @@ services:
     networks:
       - app-network
     volumes:
-      - ./backend/.env:/root/.env
       - uploads_data:/app/uploads
+      - private_uploads_data:/app/private_uploads
 
   frontend:
     build: ./frontend
@@ -61,10 +61,13 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
+    command: redis-server --appendonly yes
     ports:
       - '6379:6379'
     networks:
       - app-network
+    volumes:
+      - redis_data:/data
 
 networks:
   app-network:
@@ -73,3 +76,5 @@ networks:
 volumes:
   postgres_data:
   uploads_data:
+  private_uploads_data:
+  redis_data:

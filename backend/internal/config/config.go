@@ -18,6 +18,7 @@ type Config struct {
 	JWTSecret     string
 	Port          string
 	FrontendURL   string
+	IsProduction  bool
 	EmailFrom     string
 	EmailPassword string
 	SMTPHost      string
@@ -44,6 +45,7 @@ func Load() *Config {
 		JWTSecret:     requireEnv("JWT_SECRET"),
 		Port:          getEnv("PORT", "8080"),
 		FrontendURL:   getEnv("FRONTEND_URL", "http://localhost:3000"),
+		IsProduction:  getEnv("IS_PRODUCTION", "") == "true",
 		EmailFrom:     getEnv("EMAIL_FROM", ""),
 		EmailPassword: getEnv("EMAIL_PASSWORD", ""),
 		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
