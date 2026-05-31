@@ -507,3 +507,112 @@
     justify-content: stretch;
   }
 }
+/* ── IPPSU consent checkbox ── */
+.profile__ippsu-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    accent-color: #c84b31;
+    cursor: pointer;
+  }
+
+  a {
+    color: #c84b31;
+    text-decoration: underline;
+    &:hover { text-decoration: none; }
+  }
+}
+
+/* ── Account danger zone ── */
+.profile-danger-zone {
+  background: #fff8f7;
+  border-top: 1px solid #f5ddd9;
+  padding: 48px 0 56px;
+
+  &__title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #c84b31;
+    margin-bottom: 12px;
+  }
+
+  &__desc {
+    color: #555;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 680px;
+    margin-bottom: 24px;
+  }
+
+  &__confirm {
+    p {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 14px;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__btn {
+    background: #c84b31;
+    color: #fff;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    &:hover { background: #a33d27; }
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+  }
+
+  &__btn-cancel {
+    background: transparent;
+    color: #555;
+    border: 1px solid #ccc;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.2s;
+
+    &:hover { border-color: #888; }
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+  }
+}
+
+.profile__delete-btn {
+  background: transparent;
+  border: 1px solid #e53e3e;
+  color: #e53e3e;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #e53e3e;
+    color: #fff;
+  }
+}

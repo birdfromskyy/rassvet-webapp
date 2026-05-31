@@ -18,6 +18,7 @@ import {
   ContactPhone as ConsultationsIcon,
   Description as QuestionnaireIcon,
   VideoLibrary as ShortsIcon,
+  Security as PrivacyIcon,
 } from "@mui/icons-material";
 
 import "./AdminCMSPanel.scss";
@@ -118,6 +119,12 @@ const MODULES = [
     description: "Видео-истории на главной странице.",
     icon: ShortsIcon,
     path: "/admin/cms/shorts",
+  },
+  {
+    title: "Политика ПДн",
+    description: "Политика обработки персональных данных (152-ФЗ). Редактируется без деплоя.",
+    icon: PrivacyIcon,
+    path: "/admin/cms/privacy",
   },
 ];
 

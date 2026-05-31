@@ -248,12 +248,17 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
   const [parentSaving, setParentSaving]       = useState(false)
 
   // Child add form state
-  const [childFormOpen, setChildFormOpen]     = useState(false)
-  const [childName, setChildName]             = useState('')
-  const [ippsuFiles, setIppsuFiles]           = useState([])
-  const [birthCertFiles, setBirthCertFiles]   = useState([])
-  const [childSnilsFiles, setChildSnilsFiles] = useState([])
-  const [childSaving, setChildSaving]         = useState(false)
+  const [childFormOpen, setChildFormOpen]       = useState(false)
+  const [childName, setChildName]               = useState('')
+  const [ippsuFiles, setIppsuFiles]             = useState([])
+  const [birthCertFiles, setBirthCertFiles]     = useState([])
+  const [childSnilsFiles, setChildSnilsFiles]   = useState([])
+  const [childSaving, setChildSaving]           = useState(false)
+  const [ippsuConsentGiven, setIppsuConsentGiven] = useState(false)
+
+  // Account deletion state
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
 
   // Child edit form state (for rejected submissions)
   const [editingChildId, setEditingChildId]   = useState(null)
@@ -370,6 +375,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
     if (ippsuFiles.length === 0)      { toast.error('Загрузите ИППСУ'); return }
     if (birthCertFiles.length === 0)  { toast.error('Загрузите свидетельство о рождении'); return }
     if (childSnilsFiles.length === 0) { toast.error('Загрузите СНИЛС ребёнка'); return }
+    if (!ippsuConsentGiven) { toast.error('Необходимо согласие на обработку сведений о здоровье ребёнка (ИППСУ)'); return }
     setChildSaving(true)
     try {
       await documentService.addChildDocs({
@@ -384,6 +390,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
       setIppsuFiles([])
       setBirthCertFiles([])
       setChildSnilsFiles([])
+      setIppsuConsentGiven(false)
       loadDocs()
     } catch (err) {
       toast.error(err.response?.data?.error || 'Ошибка отправки')
@@ -447,6 +454,32 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
   }
 
   const canAddChild = children.length < MAX_CHILDREN
+
+  const handleDeleteParentProfile = async () => {
+    if (!window.confirm('Удалить документы родителя (паспорт, СНИЛС)? Это действие нельзя отменить.')) return
+    try {
+      await documentService.deleteMyParentProfile()
+      toast.success('Документы родителя удалены')
+      loadDocs()
+    } catch {
+      toast.error('Ошибка удаления')
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    setDeleteAccountLoading(true)
+    try {
+      await authService.deleteAccount()
+      toast.success('Аккаунт удалён')
+      if (onLogout) onLogout()
+      navigate('/')
+    } catch {
+      toast.error('Ошибка при удалении аккаунта. Попробуйте позже.')
+    } finally {
+      setDeleteAccountLoading(false)
+      setDeleteAccountOpen(false)
+    }
+  }
 
   return (
     <>
@@ -681,6 +714,15 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                     <button type="submit" className="profile__save" disabled={parentSaving}>
                       {parentSaving ? 'Сохранение...' : 'Сохранить документы'}
                     </button>
+                    {parentProfile?.status && (
+                      <button
+                        type="button"
+                        className="profile__delete-btn"
+                        onClick={handleDeleteParentProfile}
+                      >
+                        Удалить документы
+                      </button>
+                    )}
                   </div>
                 </form>
 
@@ -921,6 +963,22 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                         >
                           Отмена
                         </button>
+                        <label className="profile__ippsu-consent">
+                          <input
+                            type="checkbox"
+                            checked={ippsuConsentGiven}
+                            onChange={e => setIppsuConsentGiven(e.target.checked)}
+                          />
+                          <span>
+                            Я даю явное согласие на обработку сведений о здоровье ребёнка
+                            (документ ИППСУ) в соответствии со ст.&nbsp;10 Федерального закона
+                            №&nbsp;152-ФЗ.{' '}
+                            <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                              Политика обработки ПДн
+                            </a>
+                          </span>
+                        </label>
+
                         <button type="submit" className="profile__save" disabled={childSaving}>
                           {childSaving ? 'Отправка...' : 'Отправить на проверку'}
                         </button>
@@ -953,6 +1011,48 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                   </div>
                 )}
               </>
+            )}
+          </div>
+        </section>
+
+        {/* ── Управление аккаунтом ── */}
+        <section className="profile-danger-zone">
+          <div className="container">
+            <h2 className="profile-danger-zone__title">Управление аккаунтом</h2>
+            <p className="profile-danger-zone__desc">
+              Вы можете удалить свой аккаунт и все связанные персональные данные в соответствии
+              с правом на стирание данных (ст.&nbsp;21 Федерального закона №&nbsp;152-ФЗ).
+              Это действие <strong>необратимо</strong>: будут удалены все загруженные документы,
+              анкеты и данные профиля.
+            </p>
+
+            {!deleteAccountOpen ? (
+              <button
+                className="profile-danger-zone__btn"
+                onClick={() => setDeleteAccountOpen(true)}
+              >
+                Удалить аккаунт и все данные
+              </button>
+            ) : (
+              <div className="profile-danger-zone__confirm">
+                <p>Вы уверены? Это действие нельзя отменить.</p>
+                <div className="profile-danger-zone__actions">
+                  <button
+                    className="profile-danger-zone__btn"
+                    onClick={handleDeleteAccount}
+                    disabled={deleteAccountLoading}
+                  >
+                    {deleteAccountLoading ? 'Удаление...' : 'Да, удалить всё'}
+                  </button>
+                  <button
+                    className="profile-danger-zone__btn-cancel"
+                    onClick={() => setDeleteAccountOpen(false)}
+                    disabled={deleteAccountLoading}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </section>

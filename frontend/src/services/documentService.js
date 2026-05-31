@@ -6,6 +6,9 @@ const documentService = {
   /** Fetch current user's parent profile + child submissions */
   getMyDocuments: () => api.get('/documents').then(r => r.data),
 
+  /** Delete own parent profile (files + record) */
+  deleteMyParentProfile: () => api.delete('/documents/parent').then(r => r.data),
+
   /**
    * Save parent profile docs (phone, passport files, snils files).
    * keepPassport / keepSnils — arrays of existing filenames to retain.
