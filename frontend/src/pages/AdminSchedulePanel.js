@@ -1,16 +1,5 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-	Container,
-	Paper,
-	Typography,
-	Box,
-	Button,
-	Grid,
-	Card,
-	CardContent,
-	CardActions,
-} from '@mui/material'
 import {
 	MenuBook as SubjectIcon,
 	Person as TeacherIcon,
@@ -23,133 +12,123 @@ import {
 	Assessment as ReportsIcon,
 } from '@mui/icons-material'
 
+import './AdminCMSPanel/AdminCMSPanel.scss'
+
 const MODULES = [
 	{
 		title: 'Предметы',
-		description: 'Управление предметами и дисциплинами центра',
+		description: 'Управление предметами и дисциплинами центра.',
 		icon: SubjectIcon,
-		color: 'primary',
 		path: '/admin/schedule/subjects',
 	},
 	{
 		title: 'Преподаватели',
-		description: 'Преподаватели, их предметы, кабинеты и рабочее время',
+		description: 'Преподаватели, их предметы, кабинеты и рабочее время.',
 		icon: TeacherIcon,
-		color: 'secondary',
 		path: '/admin/schedule/teachers',
 	},
 	{
 		title: 'Ученики',
-		description: 'Ученики, их доступность и тип финансирования',
+		description: 'Ученики, их доступность и тип финансирования.',
 		icon: StudentIcon,
-		color: 'info',
 		path: '/admin/schedule/students',
 	},
 	{
 		title: 'Кабинеты',
-		description: 'Кабинеты и доступные в них предметы',
+		description: 'Кабинеты и доступные в них предметы.',
 		icon: RoomIcon,
-		color: 'success',
 		path: '/admin/schedule/rooms',
 	},
 	{
 		title: 'Назначения',
-		description: 'Связки ученик — преподаватель — предмет',
+		description: 'Связки ученик — преподаватель — предмет.',
 		icon: AssignmentIcon,
-		color: 'warning',
 		path: '/admin/schedule/assignments',
 	},
 	{
 		title: 'Групповые занятия',
-		description: 'Группы учеников с общим преподавателем и предметом',
+		description: 'Группы учеников с общим преподавателем и предметом.',
 		icon: GroupIcon,
-		color: 'secondary',
 		path: '/admin/schedule/group-lessons',
 	},
 	{
 		title: 'Расписание',
-		description: 'Генерация и управление расписанием на неделю',
+		description: 'Генерация и управление расписанием на неделю.',
 		icon: ScheduleIcon,
-		color: 'error',
 		path: '/admin/schedule/weekly',
 	},
 	{
-		title: '\u041e\u0442\u0447\u0451\u0442\u043d\u043e\u0441\u0442\u044c',
-		description: '\u0417\u0430\u043d\u044f\u0442\u0438\u044f \u043f\u043e \u0434\u0435\u0442\u044f\u043c \u0438 \u043f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044f\u043c \u0437\u0430 \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0439 \u043f\u0435\u0440\u0438\u043e\u0434',
+		title: 'Отчётность',
+		description: 'Занятия по детям и преподавателям за выбранный период.',
 		icon: ReportsIcon,
-		color: 'success',
 		path: '/admin/schedule/reports',
 	},
 ]
 
 const AdminSchedulePanel = () => {
 	const navigate = useNavigate()
+	const [search, setSearch] = useState('')
+
+	const filtered = MODULES.filter(m =>
+		`${m.title} ${m.description}`.toLowerCase().includes(search.toLowerCase().trim())
+	)
 
 	return (
-		<Container maxWidth='lg' sx={{ mt: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
-				<Box
-					display='flex'
-					justifyContent='space-between'
-					alignItems='center'
-					mb={4}
-				>
-					<Box>
-						<Typography variant='h4' gutterBottom>
-							Модуль расписания
-						</Typography>
-						<Typography variant='body2' color='text.secondary'>
-							Автоматическое формирование расписания занятий
-						</Typography>
-					</Box>
-					<Button
-						startIcon={<BackIcon />}
-						onClick={() => navigate('/dashboard')}
-					>
-						На главную
-					</Button>
-				</Box>
+		<main className="admin-cms">
+			<div className="admin-cms__container">
 
-				<Grid container spacing={3}>
-					{MODULES.map(m => {
+				<section className="admin-cms__hero">
+					<div>
+						<span className="admin-cms__badge">Расписание</span>
+						<h1>Модуль расписания</h1>
+						<p>
+							Автоматическое формирование расписания занятий с учётом окон
+							преподавателей, учеников, кабинетов и ограничений.
+						</p>
+					</div>
+					<div className="admin-cms__actions">
+						<button
+							type="button"
+							className="admin-cms__back"
+							onClick={() => navigate('/dashboard')}
+						>
+							<BackIcon />
+							На главную
+						</button>
+					</div>
+				</section>
+
+				<div className="admin-cms__search">
+					<input
+						type="text"
+						placeholder="Найти раздел..."
+						value={search}
+						onChange={e => setSearch(e.target.value)}
+					/>
+				</div>
+
+				<section className="admin-cms__grid">
+					{filtered.map(m => {
 						const Icon = m.icon
 						return (
-							<Grid item xs={12} sm={6} md={4} key={m.path}>
-								<Card
-									sx={{
-										height: '100%',
-										display: 'flex',
-										flexDirection: 'column',
-									}}
-								>
-									<CardContent sx={{ flexGrow: 1 }}>
-										<Box display='flex' alignItems='center' mb={1.5}>
-											<Icon
-												sx={{ fontSize: 36, mr: 2, color: `${m.color}.main` }}
-											/>
-											<Typography variant='h6'>{m.title}</Typography>
-										</Box>
-										<Typography variant='body2' color='text.secondary'>
-											{m.description}
-										</Typography>
-									</CardContent>
-									<CardActions>
-										<Button
-											size='small'
-											variant='contained'
-											color={m.color}
-											onClick={() => navigate(m.path)}
-										>
-											Открыть
-										</Button>
-									</CardActions>
-								</Card>
-							</Grid>
+							<article className="admin-cms-card" key={m.path}>
+								<div className="admin-cms-card__icon">
+									<Icon />
+								</div>
+								<div className="admin-cms-card__content">
+									<h2>{m.title}</h2>
+									<p>{m.description}</p>
+								</div>
+								<button type="button" onClick={() => navigate(m.path)}>
+									Открыть
+								</button>
+							</article>
 						)
 					})}
-				</Grid>
-			</Paper>
-		</Container>
+				</section>
+
+			</div>
+		</main>
 	)
 }
 

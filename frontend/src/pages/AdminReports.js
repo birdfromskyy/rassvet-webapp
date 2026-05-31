@@ -1,3 +1,4 @@
+import './AdminModule.scss'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ExcelJS from 'exceljs'
@@ -6,8 +7,6 @@ import {
 	Box,
 	Button,
 	CircularProgress,
-	Container,
-	Paper,
 	Tab,
 	Table,
 	TableBody,
@@ -310,19 +309,22 @@ const AdminReports = () => {
 	const totalHours50 = counts['50'] || 0
 
 	return (
-		<Container maxWidth='lg' sx={{ mt: 4 }}>
-			<Paper elevation={3} sx={{ p: 4 }}>
-				<Box display='flex' justifyContent='space-between' alignItems='center' mb={2}>
-					<Box>
-						<Typography variant='h5'>Отчётность</Typography>
-						<Typography variant='body2' color='text.secondary'>
-							Учитываются только утверждённые расписания
-						</Typography>
-					</Box>
-					<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')}>
-						Назад
-					</Button>
-				</Box>
+		<main className='admin-module'>
+			<div className='admin-module__container'>
+				<section className='admin-module__hero'>
+					<div>
+						<span className='admin-module__badge'>Расписание</span>
+						<h1>Отчётность</h1>
+						<p>Статистика занятий по преподавателям и детям за выбранный период. Учитываются только утверждённые расписания.</p>
+					</div>
+					<div className='admin-module__actions'>
+						<Button startIcon={<BackIcon />} onClick={() => navigate('/admin/schedule')} className='admin-module__button admin-module__button--ghost'>
+							Назад
+						</Button>
+					</div>
+				</section>
+
+				<section className='admin-module__panel'>
 
 				<Tabs value={tab} onChange={handleTabChange} sx={{ mb: 2 }}>
 					<Tab label='Преподаватели' />
@@ -481,8 +483,9 @@ const AdminReports = () => {
 						</TableContainer>
 					</>
 				)}
-			</Paper>
-		</Container>
+			</section>
+		</div>
+		</main>
 	)
 }
 
