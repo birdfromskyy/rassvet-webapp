@@ -12,7 +12,7 @@ const News = () => {
 
   const [articles, setArticles] = useState([]);
   const [popularArticles, setPopularArticles] = useState([]);
-  const [categories, setCategories] = useState([]);
+
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,20 +22,18 @@ const News = () => {
 
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
-  const [category, setCategory] = useState("");
 
   useEffect(() => {
     document.title = "Новости";
   }, []);
 
   useEffect(() => {
-    fetchCategories();
     fetchPopularArticles();
   }, []);
 
   useEffect(() => {
     fetchArticles();
-  }, [page, search, category]);
+  }, [page, search]);
 
   const fetchArticles = async () => {
     setLoading(true);
@@ -45,7 +43,6 @@ const News = () => {
         page,
         limit: 9,
         ...(search && { search }),
-        ...(category && { category }),
       };
 
       const data = await newsService.getPublishedArticles(params);
@@ -69,31 +66,12 @@ const News = () => {
     }
   };
 
-  const fetchCategories = async () => {
-    try {
-      const data = await newsService.getCategories();
-      setCategories(data || []);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   const handleSearch = (e) => {
     e.preventDefault();
     setSearch(searchInput);
     setPage(1);
   };
 
-  const getCategoryLabel = (category) => {
-    const labels = {
-      news: "Новости",
-      articles: "Статьи",
-      updates: "Обновления",
-      events: "События",
-    };
-
-    return labels[category] || category;
-  };
 
   return (
     <>
@@ -139,24 +117,6 @@ const News = () => {
                     ×
                   </button>
                 )}
-              </div>
-
-              <div className="news__select">
-                <select
-                  value={category}
-                  onChange={(e) => {
-                    setCategory(e.target.value);
-                    setPage(1);
-                  }}
-                >
-                  <option value="">Все категории</option>
-
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {getCategoryLabel(cat)}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <button type="submit" className="news__search-btn">

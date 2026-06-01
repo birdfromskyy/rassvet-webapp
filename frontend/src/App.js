@@ -53,6 +53,7 @@ import AdminConsultations from "./pages/AdminConsultations";
 import AdminAchievements from "./pages/AdminAchievements";
 import AdminAwards from "./pages/AdminAwards";
 import AdminShorts from "./pages/AdminShorts";
+import AdminVacancies from "./pages/AdminVacancies";
 import AdminQuestionnaires from "./pages/AdminQuestionnaires";
 import ChildSchedule from "./pages/ChildSchedule";
 import TeacherSchedule from "./pages/TeacherSchedule";
@@ -262,6 +263,7 @@ function App() {
             <Route path="/admin/cms/achievements" element={<AdminAchievements />} />
             <Route path="/admin/cms/awards" element={<AdminAwards />} />
             <Route path="/admin/cms/shorts" element={<AdminShorts />} />
+            <Route path="/admin/cms/vacancies" element={<AdminVacancies />} />
             <Route path="/admin/cms/privacy" element={<AdminPrivacyPolicy />} />
           </Route>
         </Route>

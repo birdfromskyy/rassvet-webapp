@@ -8,9 +8,56 @@
   display: flex;
   gap: 16px;
   overflow-x: auto;
-  padding: 4px 4px 20px;
+  padding: 4px 4px 12px;
   scrollbar-width: thin;
   align-items: flex-start;
+}
+
+.stories__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 8px;
+}
+
+.stories__pagination-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #074462;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  &:not(:disabled):hover {
+    background: #f4df00;
+    color: #074462;
+  }
+}
+
+.stories__pagination-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(7, 68, 98, 0.3);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &.is-active {
+    background: #f4df00;
+    transform: scale(1.4);
+  }
 }
 
 /* ── Preview card ──────────────────────────────────────────────────────────── */

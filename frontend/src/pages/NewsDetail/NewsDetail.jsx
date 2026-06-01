@@ -187,7 +187,7 @@ const NewsDetail = () => {
         return (
           <div key={block.id || index} className="article-file">
             <a href={fileUrl} target="_blank" rel="noopener noreferrer">
-              ⬇ {block.title || getUrlBasename(block.content) || "Скачать файл"}
+              {block.title || getUrlBasename(block.content) || "Скачать файл"}
             </a>
           </div>
         );
@@ -266,13 +266,6 @@ const NewsDetail = () => {
                 )}
               </div>
 
-              {article.tags && article.tags.length > 0 && (
-                <div className="news-detail__tags">
-                  {article.tags.map((tag, index) => (
-                    <span key={index}>{tag}</span>
-                  ))}
-                </div>
-              )}
             </article>
 
             {/* {relatedArticles.length > 0 && (

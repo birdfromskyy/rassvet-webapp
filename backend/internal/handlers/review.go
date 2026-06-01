@@ -38,7 +38,7 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 
 	// Проверяем, есть ли у пользователя существующий отзыв
 	var existingReview models.Review
-	err := h.db.Where("user_id = ? AND status IN ?", userID, []models.ReviewStatus{
+	err := h.db.Where("user_id = ? AND status IN ?", userID.(uint), []models.ReviewStatus{
 		models.StatusPending,
 		models.StatusApproved,
 	}).First(&existingReview).Error
@@ -53,8 +53,9 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 		return
 	}
 
+	uid := userID.(uint)
 	review := models.Review{
-		UserID:      userID.(uint),
+		UserID:      &uid,
 		Rating:      req.Rating,
 		Content:     req.Content,
 		IsAnonymous: req.IsAnonymous,
@@ -131,6 +132,36 @@ func (h *ReviewHandler) CheckUserReview(c *gin.Context) {
 	})
 }
 
+// AdminCreateReview — creates an external review on behalf of admin (auto-approved).
+func (h *ReviewHandler) AdminCreateReview(c *gin.Context) {
+	var req struct {
+		AuthorName     string `json:"author_name" binding:"required"`
+		SourcePlatform string `json:"source_platform"`
+		Rating         int    `json:"rating" binding:"required,min=1,max=5"`
+		Content        string `json:"content" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	review := models.Review{
+		AdminAuthorName: req.AuthorName,
+		SourcePlatform:  req.SourcePlatform,
+		Rating:          req.Rating,
+		Content:         req.Content,
+		Status:          models.StatusApproved,
+	}
+
+	if err := h.db.Create(&review).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать отзыв"})
+		return
+	}
+
+	review.AuthorName = review.AdminAuthorName
+	c.JSON(http.StatusCreated, review)
+}
+
 func (h *ReviewHandler) GetPublishedReviews(c *gin.Context) {
 	var reviews []models.Review
 
@@ -139,24 +170,20 @@ func (h *ReviewHandler) GetPublishedReviews(c *gin.Context) {
 		return
 	}
 
-	// Process author names - ИСПРАВЛЯЕМ БАГ С ПЕРВОЙ БУКВОЙ ФАМИЛИИ
 	for i := range reviews {
-		if !reviews[i].IsAnonymous && reviews[i].User.ID != 0 {
-			if reviews[i].User.LastName != "" {
-				// Используем руны для корректной работы с Unicode
-				lastNameRunes := []rune(reviews[i].User.LastName)
-				if len(lastNameRunes) > 0 {
-					reviews[i].AuthorName = reviews[i].User.FirstName + " " + string(lastNameRunes[0]) + "."
-				} else {
-					reviews[i].AuthorName = reviews[i].User.FirstName
-				}
+		if reviews[i].UserID == nil {
+			// External admin-created review
+			reviews[i].AuthorName = reviews[i].AdminAuthorName
+		} else if reviews[i].IsAnonymous || reviews[i].User.ID == 0 {
+			reviews[i].AuthorName = "Анонимный пользователь"
+		} else {
+			lastNameRunes := []rune(reviews[i].User.LastName)
+			if len(lastNameRunes) > 0 {
+				reviews[i].AuthorName = reviews[i].User.FirstName + " " + string(lastNameRunes[0]) + "."
 			} else {
 				reviews[i].AuthorName = reviews[i].User.FirstName
 			}
-		} else {
-			reviews[i].AuthorName = "Анонимный пользователь"
 		}
-		// Clear user data from response
 		reviews[i].User = models.User{}
 	}
 

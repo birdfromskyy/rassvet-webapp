@@ -11,6 +11,7 @@ function Awards() {
   const [awards, setAwards]       = useState([]);
   const [loading, setLoading]     = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lightbox, setLightbox]   = useState(null);
 
   useEffect(() => {
     awardService.getPublic()
@@ -72,6 +73,9 @@ function Awards() {
                     <img
                       src={getUploadUrl(awards[activeIndex].image_url)}
                       alt={awards[activeIndex].title}
+                      onClick={() => setLightbox(awards[activeIndex])}
+                      style={{ cursor: "zoom-in" }}
+                      title="Нажмите для просмотра"
                     />
                     {awards[activeIndex].title && (
                       <h2>{awards[activeIndex].title}</h2>
@@ -106,6 +110,17 @@ function Awards() {
           </div>
         </section>
       </main>
+      {lightbox && (
+        <div className="awards-lightbox" onClick={() => setLightbox(null)}>
+          <button className="awards-lightbox__close" onClick={() => setLightbox(null)} aria-label="Закрыть">×</button>
+          <img
+            src={getUploadUrl(lightbox.image_url)}
+            alt={lightbox.title}
+            onClick={e => e.stopPropagation()}
+          />
+          {lightbox.title && <p className="awards-lightbox__caption">{lightbox.title}</p>}
+        </div>
+      )}
       <Footer />
     </div>
   );

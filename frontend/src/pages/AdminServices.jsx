@@ -423,6 +423,8 @@ export default function AdminServices() {
               onChange={f("title")}
               fullWidth
               required
+              multiline
+              rows={2}
             />
 
             <TextField
