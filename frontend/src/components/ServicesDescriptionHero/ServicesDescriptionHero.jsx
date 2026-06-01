@@ -12,7 +12,7 @@ function ServicesDescriptionHero() {
 
           <p>
             Центр предоставляет услуги в соответствии с{" "}
-            <a href="ССЫЛКА_НА_ДОКУМЕНТ" target="_blank" rel="noreferrer">
+            <a href="https://depsr.admhmao.ru/dokumenty/hmao/postanovleniya-pravitelstva-hmao/398875/" target="_blank" rel="noreferrer">
               Постановлением от 6 сентября 2014 года №326-п «О порядке
               предоставления социальных услуг поставщиками социальных услуг в
               Ханты-Мансийском автономном округе – Югре»

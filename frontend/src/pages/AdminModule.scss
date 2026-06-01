@@ -9,7 +9,6 @@
   width: min(100% - 48px, 1400px);
   margin: 0 auto;
 }
-
 .admin-module__hero {
   margin-bottom: 28px;
   padding: 36px;
@@ -454,3 +453,8 @@
     color: #8a9fb0;
   }
 }
+
+.no-radius {
+  border-radius: 0 !important;
+}
+

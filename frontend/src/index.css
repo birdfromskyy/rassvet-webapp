@@ -96,3 +96,31 @@ body {
     font-size: 15px !important;
   }
 }
+
+.home-smooth-scroll {
+  scroll-behavior: smooth;
+}
+
+.home-reveal {
+  opacity: 0;
+  transform: translateY(50px);
+
+  transition:
+    opacity 0.9s ease,
+    transform 0.9s ease;
+
+  will-change: opacity, transform;
+}
+
+.home-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
