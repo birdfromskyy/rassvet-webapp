@@ -1,0 +1,327 @@
+.page--vacancies {
+  background: #f7f4ec;
+}
+
+.vacancies {
+  background: #f7f4ec;
+  color: #074462;
+}
+
+.vacancies__hero {
+  padding: 76px 0 54px;
+}
+
+.vacancies__hero-inner {
+  display: block;
+  text-align: center;
+  align-items: center;
+  gap: 42px;
+
+  h1 {
+    margin: 11px 0 11px;
+
+    font-family: "Merriweather", serif;
+    font-size: clamp(42px, 6vw, 76px);
+    line-height: 0.98;
+
+    color: #074462;
+  }
+
+  p {
+    margin: 0;
+
+    color: #35586b;
+    font-size: 21px;
+    line-height: 1.6;
+  }
+}
+
+.vacancies__hero-card {
+  padding: 32px;
+
+  border-radius: 32px;
+  background: #ffffff;
+
+  box-shadow: 0 18px 42px rgba(7, 68, 98, 0.12);
+
+  svg {
+    width: 58px;
+    height: 58px;
+    margin-bottom: 20px;
+    color: #074462;
+  }
+
+  strong {
+    display: block;
+    margin-bottom: 10px;
+
+    font-family: "Merriweather", serif;
+    font-size: 34px;
+    color: #074462;
+  }
+
+  span {
+    color: #35586b;
+    font-size: 18px;
+    line-height: 1.45;
+  }
+}
+
+.vacancies__advantages {
+  padding: 0 0 52px;
+}
+
+.vacancies__advantages-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+
+  article {
+    padding: 26px;
+
+    border-radius: 26px;
+    background: #ffffff;
+
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.1);
+  }
+
+  svg {
+    width: 42px;
+    height: 42px;
+    margin-bottom: 16px;
+    color: #074462;
+  }
+
+  h2 {
+    margin: 0 0 10px;
+
+    font-family: "Merriweather", serif;
+    font-size: 24px;
+    color: #074462;
+  }
+
+  p {
+    margin: 0;
+    color: #35586b;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+}
+
+.vacancies__list {
+  padding: 0 0 90px;
+}
+
+.vacancies__title {
+  margin: 0 0 30px;
+
+  text-align: center;
+  font-family: "Merriweather", serif;
+  font-size: clamp(36px, 4vw, 56px);
+  color: #074462;
+}
+
+.vacancies__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.vacancy-card {
+  padding: 32px;
+
+  border-radius: 34px;
+  background: #ffffff;
+
+  box-shadow: 0 18px 42px rgba(7, 68, 98, 0.12);
+}
+
+.vacancy-card__top {
+  padding-bottom: 22px;
+  margin-bottom: 24px;
+
+  border-bottom: 1px solid rgba(7, 68, 98, 0.12);
+
+  span {
+    display: inline-flex;
+    margin-bottom: 12px;
+    padding: 8px 16px;
+
+    border-radius: 999px;
+    background: #f4df00;
+
+    color: #074462;
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  h2 {
+    margin: 0;
+
+    font-family: "Merriweather", serif;
+    font-size: 32px;
+    line-height: 1.15;
+    color: #074462;
+  }
+}
+
+.vacancy-card__section {
+  margin-bottom: 22px;
+
+  h3 {
+    margin: 0 0 10px;
+
+    color: #074462;
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  li {
+    margin-bottom: 8px;
+
+    color: #35586b;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+}
+
+.vacancy-card__contact {
+  margin-top: 28px;
+  padding: 22px;
+
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+
+  border-radius: 24px;
+  background: rgba(244, 223, 0, 0.28);
+
+  svg {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    color: #074462;
+  }
+
+  h3 {
+    margin: 0 0 8px;
+    color: #074462;
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0 0 4px;
+    color: #074462;
+    font-size: 16px;
+    font-weight: 800;
+  }
+}
+
+@media (max-width: 980px) {
+  .vacancies__hero-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .vacancies__hero-card {
+    max-width: 520px;
+  }
+
+  .vacancies__advantages-grid,
+  .vacancies__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .vacancies__hero {
+    padding: 48px 0 38px;
+  }
+
+  .vacancies__hero-inner {
+    h1 {
+      font-size: 38px;
+    }
+
+    p {
+      font-size: 18px;
+    }
+  }
+
+  .vacancy-card {
+    padding: 24px;
+    border-radius: 28px;
+  }
+
+  .vacancy-card__top h2 {
+    font-size: 26px;
+  }
+}
+
+.vacancies__contact {
+  padding: 0 0 90px;
+}
+
+.vacancies__contact-card {
+  max-width: 850px;
+  margin: 0 auto;
+
+  padding: 42px;
+
+  text-align: center;
+
+  border-radius: 34px;
+
+  background: #074462;
+  color: #ffffff;
+
+  box-shadow: 0 18px 42px rgba(7, 68, 98, 0.16);
+
+  h2 {
+    margin: 0 0 14px;
+
+    font-family: "Merriweather", serif;
+    font-size: clamp(30px, 4vw, 46px);
+
+    color: #ffffff;
+  }
+
+  p {
+    margin: 0 auto 26px;
+    max-width: 650px;
+
+    font-size: 18px;
+    line-height: 1.6;
+
+    opacity: 0.95;
+  }
+}
+
+.vacancies__contact-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 220px;
+  height: 56px;
+
+  padding: 0 28px;
+
+  border-radius: 999px;
+
+  background: #f4df00;
+  color: #074462;
+
+  font-weight: 900;
+  text-decoration: none;
+
+  transition: 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}

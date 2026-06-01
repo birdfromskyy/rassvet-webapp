@@ -67,6 +67,7 @@ import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest
 import AccessibilityPanel from "./components/AccessibilityPanel/AccessibilityPanel";
 import PrivacyPolicy from "./pages/PrivacyPolicy/PrivacyPolicy";
 import AdminPrivacyPolicy from "./pages/AdminPrivacyPolicy/AdminPrivacyPolicy";
+import Vacancies from "./pages/Vacancies/Vacancies";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -282,6 +283,7 @@ function App() {
         <Route path="/services-description" element={<ServicesDescription />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/donation" element={<Donation />} />
+        <Route path="/vacancies" element={<Vacancies />} />
         <Route path="/social-service-form" element={<SocialServiceForm />} />
         <Route path="/achievements" element={<Achievements />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
