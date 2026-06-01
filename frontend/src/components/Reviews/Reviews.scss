@@ -125,6 +125,59 @@
   letter-spacing: 1px;
 }
 
+.reviews__source {
+  font-size: 12px;
+  color: #6f858f;
+  margin-top: 4px;
+}
+
+.reviews__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 0 0 32px;
+}
+
+.reviews__pg-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: #074462;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  &:not(:disabled):hover {
+    background: #f4df00;
+    color: #074462;
+  }
+}
+
+.reviews__pg-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(7, 68, 98, 0.3);
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &.is-active {
+    background: #074462;
+    transform: scale(1.4);
+  }
+}
+
 .reviews__btn {
   display: inline-flex;
   align-items: center;

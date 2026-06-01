@@ -54,11 +54,7 @@ const NewsCard = ({ article, variant = 'default' }) => {
 
       <div className="news-card__content">
         <div className="news-card__meta">
-          {article.category && (
-            <span className="news-card__category">
-              {getCategoryLabel(article.category)}
-            </span>
-          )}
+          <span className="news-card__category">Новости</span>
 
           {article.view_count > 0 && (
             <span className="news-card__views">👁 {article.view_count}</span>

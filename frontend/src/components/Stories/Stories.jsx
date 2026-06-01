@@ -16,9 +16,12 @@ const toVkEmbed = (url, autoplay = false) => {
 
 const isVk = (url) => !!(url && (url.includes("vk.com") || url.includes("vkvideo")));
 
+const PER_PAGE = 6;
+
 function Stories() {
   const [stories, setStories] = useState([]);
   const [activeIndex, setActiveIndex] = useState(null);
+  const [page, setPage] = useState(0);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -50,11 +53,15 @@ function Stories() {
 
   if (stories.length === 0) return null;
 
+  const totalPages = Math.ceil(stories.length / PER_PAGE);
+  const visible = stories.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+
   return (
     <section className="stories">
       <div className="container">
         <div className="stories__row">
-          {stories.map((story, index) => {
+          {visible.map((story) => {
+            const index = stories.indexOf(story);
             const embedUrl = toVkEmbed(story.video_url);
             return (
               <button
@@ -91,6 +98,31 @@ function Stories() {
             );
           })}
         </div>
+
+        {totalPages > 1 && (
+          <div className="stories__pagination">
+            <button
+              className="stories__pagination-btn"
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={page === 0}
+              aria-label="Предыдущие"
+            >←</button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i}
+                className={`stories__pagination-dot${i === page ? " is-active" : ""}`}
+                onClick={() => setPage(i)}
+                aria-label={`Страница ${i + 1}`}
+              />
+            ))}
+            <button
+              className="stories__pagination-btn"
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              aria-label="Следующие"
+            >→</button>
+          </div>
+        )}
       </div>
 
       {activeStory && (

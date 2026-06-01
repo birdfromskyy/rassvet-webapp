@@ -1,83 +1,24 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
-import { FiBriefcase, FiClock, FiPhone, FiUserCheck } from "react-icons/fi";
+import { FiPhone } from "react-icons/fi";
 import "./Vacancies.scss";
 import { Link } from "react-router-dom";
-const vacancies = [
-  {
-    title: "Воспитатель на группу кратковременного пребывания",
-    education: [
-      'Среднее профессиональное или высшее образование в рамках укрупненной группы по направлению "Образование и педагогические науки".',
-      "Высшее образование или среднее профессиональное образование и дополнительное профессиональное образование по направлению деятельности в организации.",
-    ],
-    experience: ["Требования к опыту практической работы не предъявляются."],
-    requirements: [
-      "Отсутствие судимости за преступления, состав и виды которых установлены законодательством РФ.",
-      "Наличие медицинской книжки.",
-    ],
-    duties: [
-      "Уход и присмотр за детьми на группе кратковременного пребывания.",
-      "Планирование групповой деятельности.",
-      "Проведение групповых мероприятий.",
-      "Помощь в гигиенических процедурах и выполнении бытовых рутин.",
-      "Сопровождение группы на выездных культурно-досуговых мероприятиях.",
-    ],
-    qualities: [
-      "Аккуратность.",
-      "Ответственность.",
-      "Добросовестность.",
-      "Пунктуальность.",
-      "Стрессоустойчивость.",
-    ],
-    conditions: [
-      "Гибкий график.",
-      "Официальное трудоустройство.",
-      "Бесплатное питание.",
-      "Возможность обучения и повышения квалификации за счёт работодателя.",
-    ],
-    contact: ["+7 (904) 459-31-02", "Оксана Александровна", "MAX"],
-  },
-  {
-    title: "Психолог",
-    education: [
-      "Высшее образование — бакалавриат.",
-      "Высшее образование — бакалавриат непрофильное и дополнительное профессиональное образование по программам профессиональной переподготовки по профилю деятельности.",
-    ],
-    experience: ["Требования к опыту практической работы не предъявляются."],
-    requirements: [
-      "Отсутствие судимости за преступления, состав и виды которых установлены законодательством РФ.",
-      "Наличие медицинской книжки.",
-    ],
-    duties: [
-      "Проведение индивидуальных коррекционно-развивающих занятий с детьми.",
-      "Психологическая диагностика.",
-      "Психологическое консультирование.",
-      "Психологическая коррекция.",
-      "Сопровождение детей на групповых культурно-досуговых мероприятиях.",
-    ],
-    qualities: [
-      "Аккуратность.",
-      "Ответственность.",
-      "Добросовестность.",
-      "Пунктуальность.",
-      "Стрессоустойчивость.",
-    ],
-    conditions: [
-      "Гибкий график.",
-      "Официальное трудоустройство.",
-      "Бесплатное питание.",
-      "Возможность обучения и повышения квалификации за счёт работодателя.",
-    ],
-    contact: ["+7 (904) 459-31-02", "Оксана Александровна", "MAX"],
-  },
-];
+import vacancyService from "../../services/vacancyService";
+
+const parseJson = (str) => {
+  try {
+    return JSON.parse(str || "[]");
+  } catch {
+    return str ? [str] : [];
+  }
+};
 
 function VacancySection({ title, items }) {
+  if (!items || items.length === 0) return null;
   return (
     <div className="vacancy-card__section">
       <h3>{title}</h3>
-
       <ul>
         {items.map((item, index) => (
           <li key={index}>{item}</li>
@@ -88,8 +29,16 @@ function VacancySection({ title, items }) {
 }
 
 function Vacancies() {
+  const [vacancies, setVacancies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     document.title = "Вакансии";
+    vacancyService
+      .getPublic()
+      .then(setVacancies)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -116,41 +65,91 @@ function Vacancies() {
           <div className="container">
             <h2 className="vacancies__title">Открытые вакансии</h2>
 
-            <div className="vacancies__grid">
-              {vacancies.map((vacancy) => (
-                <article className="vacancy-card" key={vacancy.title}>
-                  <div className="vacancy-card__top">
-                    <span>Вакансия</span>
-                    <h2>{vacancy.title}</h2>
-                  </div>
+            {loading ? (
+              <p style={{ textAlign: "center", color: "#55707f" }}>
+                Загрузка...
+              </p>
+            ) : vacancies.length === 0 ? (
+              <p style={{ textAlign: "center", color: "#55707f" }}>
+                На данный момент открытых вакансий нет.
+              </p>
+            ) : (
+              <div className="vacancies__grid">
+                {vacancies.map((vacancy) => (
+                  <article className="vacancy-card" key={vacancy.id}>
+                    <div className="vacancy-card__top">
+                      <span>Вакансия</span>
+                      <h2>{vacancy.title}</h2>
+                    </div>
 
-                  <VacancySection title="Образование" items={vacancy.education} />
-                  <VacancySection title="Опыт" items={vacancy.experience} />
-                  <VacancySection title="Особые требования" items={vacancy.requirements} />
-                  <VacancySection title="Должностные обязанности" items={vacancy.duties} />
-                  <VacancySection title="Пожелания к личным качествам" items={vacancy.qualities} />
-                  <VacancySection title="Условия работы" items={vacancy.conditions} />
-                </article>
-              ))}
+                    <VacancySection
+                      title="Образование"
+                      items={parseJson(vacancy.education)}
+                    />
+                    <VacancySection
+                      title="Опыт"
+                      items={parseJson(vacancy.experience)}
+                    />
+                    <VacancySection
+                      title="Особые требования"
+                      items={parseJson(vacancy.requirements)}
+                    />
+                    <VacancySection
+                      title="Должностные обязанности"
+                      items={parseJson(vacancy.duties)}
+                    />
+                    <VacancySection
+                      title="Пожелания к личным качествам"
+                      items={parseJson(vacancy.qualities)}
+                    />
+                    <VacancySection
+                      title="Условия работы"
+                      items={parseJson(vacancy.conditions)}
+                    />
+
+                    {(vacancy.contact_phone || vacancy.contact_name) && (
+                      <div className="vacancy-card__contact">
+                        <FiPhone />
+                        <div>
+                          <h3>Контактная информация</h3>
+                          {vacancy.contact_phone && (
+                            <p>{vacancy.contact_phone}</p>
+                          )}
+                          {vacancy.contact_name && (
+                            <p>{vacancy.contact_name}</p>
+                          )}
+                          {vacancy.contact_messengers && (
+                            <p style={{ fontWeight: 400, opacity: 0.8 }}>
+                              {vacancy.contact_messengers}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="vacancies__contact">
+          <div className="container">
+            <div className="vacancies__contact-card">
+              <h2>Заинтересовала вакансия?</h2>
+
+              <p>
+                Свяжитесь с нами любым удобным способом. Мы ответим на ваши
+                вопросы, расскажем подробнее об условиях работы и договоримся о
+                собеседовании.
+              </p>
+
+              <Link to="/contacts" className="vacancies__contact-btn">
+                Перейти в контакты
+              </Link>
             </div>
           </div>
         </section>
-        <section className="vacancies__contact">
-  <div className="container">
-    <div className="vacancies__contact-card">
-      <h2>Заинтересовала вакансия?</h2>
-
-      <p>
-        Свяжитесь с нами любым удобным способом. Мы ответим на ваши вопросы,
-        расскажем подробнее об условиях работы и договоримся о собеседовании.
-      </p>
-
-      <Link to="/contacts" className="vacancies__contact-btn">
-        Перейти в контакты
-      </Link>
-    </div>
-  </div>
-</section>
       </main>
 
       <Footer />

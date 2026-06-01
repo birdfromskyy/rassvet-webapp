@@ -37,7 +37,7 @@
   display: grid;
   grid-template-columns: 420px minmax(0, 1fr);
   gap: 34px;
-  align-items: center;
+  align-items: stretch;
 
   background: #ffffff;
   border-radius: 34px;
@@ -54,19 +54,22 @@
 }
 
 .achievement-card__media {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 
   img {
     width: 100%;
-    height: 280px;
+    flex: 3;
+    min-height: 200px;
     object-fit: cover;
     border-radius: 28px;
     display: block;
   }
 
   img:nth-child(2) {
-    height: 220px;
+    flex: 2;
+    min-height: 160px;
   }
 }
 

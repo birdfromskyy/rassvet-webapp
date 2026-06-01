@@ -27,6 +27,11 @@ const reviewService = {
 	},
 
 	// Admin endpoints
+	adminCreateExternal: async (data) => {
+		const response = await api.post('/admin/reviews/external', data)
+		return response.data
+	},
+
 	getAllReviews: async (status = '') => {
 		const params = status ? `?status=${status}` : ''
 		const response = await api.get(`/admin/reviews${params}`)

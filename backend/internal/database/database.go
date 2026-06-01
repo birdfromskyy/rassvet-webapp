@@ -92,6 +92,10 @@ func Migrate(db *gorm.DB) {
 
 		// CMS: video shorts for the main page stories section
 		&models.VideoShort{},
+
+		// CMS: vacancies
+		&models.Vacancy{},
+
 	)
 
 	if err != nil {

@@ -34,7 +34,6 @@ import "./AdminModule.scss";
 
 const emptyForm = {
   title: "",
-  description: "",
   file_url: "",
   sort_order: 0,
   is_active: true,
@@ -64,9 +63,7 @@ export default function AdminCmsFiles({ section, title }) {
   const publicPageUrl = getPublicPageUrl(section);
 
   const filteredFiles = files.filter((file) => {
-    const value = `${file.title} ${file.description || ""} ${
-      file.file_url || ""
-    }`.toLowerCase();
+    const value = `${file.title} ${file.file_url || ""}`.toLowerCase();
 
     return value.includes(search.toLowerCase().trim());
   });
@@ -199,7 +196,6 @@ export default function AdminCmsFiles({ section, title }) {
                   <TableRow>
                     <TableCell width={90}>Порядок</TableCell>
                     <TableCell>Название</TableCell>
-                    <TableCell>Описание</TableCell>
                     <TableCell>Файл</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell align="right">Действия</TableCell>
@@ -212,17 +208,6 @@ export default function AdminCmsFiles({ section, title }) {
                       <TableCell>{file.sort_order}</TableCell>
 
                       <TableCell>{file.title}</TableCell>
-
-                      <TableCell
-                        sx={{
-                          maxWidth: 260,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {file.description || "—"}
-                      </TableCell>
 
                       <TableCell>
                         {file.file_url ? (
@@ -309,21 +294,6 @@ export default function AdminCmsFiles({ section, title }) {
                   title: e.target.value,
                 }))
               }
-            />
-
-            <TextField
-              label="Описание"
-              value={form.description}
-              fullWidth
-              multiline
-              rows={3}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  description: e.target.value,
-                }))
-              }
-              helperText="Необязательно"
             />
 
             <TextField

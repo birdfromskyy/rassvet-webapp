@@ -49,12 +49,6 @@ import "./AdminModule.scss";
 const MODULE_TITLE = "Новости";
 const PUBLIC_PAGE_URL = "/news";
 
-const CATEGORIES = [
-  { value: "news", label: "Новости" },
-  { value: "articles", label: "Статьи" },
-  { value: "updates", label: "Обновления" },
-  { value: "events", label: "События" },
-];
 
 const BLOCK_TYPES = [
   { type: "text", label: "Текст", icon: TextIcon },
@@ -67,8 +61,6 @@ const emptyMeta = {
   title: "",
   slug: "",
   summary: "",
-  category: "news",
-  tags: "",
   featured_image: "",
   status: "draft",
 };
@@ -169,8 +161,6 @@ export default function AdminNews() {
       title: article.title,
       slug: article.slug,
       summary: article.summary || "",
-      category: article.category || "news",
-      tags: article.tags || "",
       featured_image: article.featured_image || "",
       status: article.status || "draft",
     });
@@ -350,7 +340,6 @@ export default function AdminNews() {
                   <TableRow>
                     <TableCell>Заголовок</TableCell>
                     <TableCell>Slug</TableCell>
-                    <TableCell>Категория</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell>Дата</TableCell>
                     <TableCell align="right">Действия</TableCell>
@@ -364,11 +353,6 @@ export default function AdminNews() {
 
                       <TableCell>
                         <code>{a.slug}</code>
-                      </TableCell>
-
-                      <TableCell>
-                        {CATEGORIES.find((c) => c.value === a.category)
-                          ?.label || a.category}
                       </TableCell>
 
                       <TableCell>
@@ -488,47 +472,19 @@ export default function AdminNews() {
               }
             />
 
-            <Box display="flex" gap={2}>
-              <FormControl fullWidth>
-                <InputLabel>Категория</InputLabel>
-                <Select
-                  value={meta.category}
-                  label="Категория"
-                  onChange={(e) =>
-                    setMeta((m) => ({ ...m, category: e.target.value }))
-                  }
-                >
-                  {CATEGORIES.map((c) => (
-                    <MenuItem key={c.value} value={c.value}>
-                      {c.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl fullWidth>
-                <InputLabel>Статус</InputLabel>
-                <Select
-                  value={meta.status}
-                  label="Статус"
-                  onChange={(e) =>
-                    setMeta((m) => ({ ...m, status: e.target.value }))
-                  }
-                >
-                  <MenuItem value="draft">Черновик</MenuItem>
-                  <MenuItem value="published">Опубликована</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            <TextField
-              label="Теги (через запятую)"
-              value={meta.tags}
-              onChange={(e) =>
-                setMeta((m) => ({ ...m, tags: e.target.value }))
-              }
-              fullWidth
-            />
+            <FormControl fullWidth>
+              <InputLabel>Статус</InputLabel>
+              <Select
+                value={meta.status}
+                label="Статус"
+                onChange={(e) =>
+                  setMeta((m) => ({ ...m, status: e.target.value }))
+                }
+              >
+                <MenuItem value="draft">Черновик</MenuItem>
+                <MenuItem value="published">Опубликована</MenuItem>
+              </Select>
+            </FormControl>
 
             <Box>
               <Typography variant="body2" color="text.secondary" mb={1}>
@@ -540,8 +496,13 @@ export default function AdminNews() {
                   <img
                     src={getUploadUrl(meta.featured_image)}
                     alt=""
-                    height={80}
-                    style={{ borderRadius: 4, objectFit: "cover" }}
+                    style={{
+                      width: "100%",
+                      maxHeight: 220,
+                      objectFit: "cover",
+                      borderRadius: 12,
+                      display: "block",
+                    }}
                   />
                 </Box>
               )}
