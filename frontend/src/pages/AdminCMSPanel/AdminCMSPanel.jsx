@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   People as EmployeesIcon,
+  RateReview as ReviewsIcon,
   Folder as FilesIcon,
   Gavel as RulesIcon,
   EmojiEvents as RatingIcon,
@@ -19,6 +20,7 @@ import {
   Description as QuestionnaireIcon,
   VideoLibrary as ShortsIcon,
   Security as PrivacyIcon,
+  Work as VacanciesIcon,
 } from "@mui/icons-material";
 
 import "./AdminCMSPanel.scss";
@@ -38,6 +40,7 @@ const GROUPS = [
     title: "О центре",
     modules: [
       { title: "Сотрудники", description: "Преподаватели, фото, квалификация и карточки специалистов.", icon: EmployeesIcon, path: "/admin/schedule/teachers" },
+      { title: "Вакансии", description: "Открытые вакансии центра: требования, обязанности, условия работы.", icon: VacanciesIcon, path: "/admin/cms/vacancies" },
       { title: "Услуги", description: "Карточки и описание направлений помощи.", icon: ServicesIcon, path: "/admin/cms/services" },
       { title: "Материально-техническое обеспечение", description: "Помещения, зоны, оборудование и фотографии.", icon: FinIcon, path: "/admin/cms/fin-zones" },
     ],
@@ -53,6 +56,7 @@ const GROUPS = [
   {
     title: "Клиенты и заявки",
     modules: [
+      { title: "Отзывы", description: "Модерация отзывов с сайта и добавление внешних отзывов (2ГИС, Яндекс и др.).", icon: ReviewsIcon, path: "/admin/reviews" },
       { title: "Заявки на консультацию", description: "Входящие заявки от родителей.", icon: ConsultationsIcon, path: "/admin/consultations" },
       { title: "Анкеты родителей", description: "Входные анкеты и данные по детям.", icon: QuestionnaireIcon, path: "/admin/questionnaires" },
       { title: "Документы родителей", description: "Проверка документов, поданных родителями.", icon: DocsIcon, path: "/admin/documents" },
