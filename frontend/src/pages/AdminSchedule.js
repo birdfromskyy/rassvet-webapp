@@ -1551,7 +1551,7 @@ const AdminSchedule = () => {
 										{daySlots.length} {daySlots.length === 1 ? 'занятие' : daySlots.length < 5 ? 'занятия' : 'занятий'}
 									</span>
 								</div>
-								<TableContainer>
+								<TableContainer className='no-radius'>
 									<Table size='small'>
 										<TableHead>
 											<TableRow>
