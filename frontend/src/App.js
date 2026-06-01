@@ -17,7 +17,7 @@ import Structure from "./pages/Structure";
 import Rating from "./pages/Rating";
 import ServicesDescription from "./pages/ServicesDescription";
 import Contacts from "./pages/Contacts";
-import Donation from "./pages/Donation";
+import Donation from "./pages/Donation/Donation";
 import SocialServiceForm from "./pages/SocialServiceForm";
 import Awards from "./pages/Awards/Awards";
 import Login from "./pages/Login/Login";
