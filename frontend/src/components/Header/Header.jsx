@@ -318,7 +318,7 @@ function Header() {
               </NavLink>
 
               <NavLink
-                to="/"
+                to="/vacancies"
                 className="header__nav-link"
                 onClick={closeMenu}
               >
