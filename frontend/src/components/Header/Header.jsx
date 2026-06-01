@@ -20,6 +20,7 @@ import logo from "../../assets/logo.png";
 import { siteSettingService } from "../../services/cmsService";
 import notificationService from "../../services/notificationService";
 import { useAuth } from "../../contexts/AuthContext";
+import { FiHeart, FiBriefcase } from "react-icons/fi";
 
 const searchPages = [
   { title: "Главная", path: "/main" },
@@ -113,13 +114,19 @@ function Header() {
   );
 
   useEffect(() => {
-    siteSettingService.getAll().then(setCmsSettings).catch(() => {});
+    siteSettingService
+      .getAll()
+      .then(setCmsSettings)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!isLoggedIn) return;
     const load = () => {
-      notificationService.getUnreadCount().then(({ count }) => setUnreadCount(count)).catch(() => {});
+      notificationService
+        .getUnreadCount()
+        .then(({ count }) => setUnreadCount(count))
+        .catch(() => {});
     };
     load();
     const interval = setInterval(load, 60000); // poll every minute
@@ -128,7 +135,10 @@ function Header() {
 
   useEffect(() => {
     if (!bellOpen) return;
-    notificationService.getAll().then(setNotifications).catch(() => {});
+    notificationService
+      .getAll()
+      .then(setNotifications)
+      .catch(() => {});
   }, [bellOpen]);
 
   useEffect(() => {
@@ -152,7 +162,9 @@ function Header() {
       await notificationService.markOneRead(n.id);
       setUnreadCount((c) => Math.max(0, c - 1));
       setNotifications((prev) =>
-        prev.map((item) => item.id === n.id ? { ...item, is_read: true } : item)
+        prev.map((item) =>
+          item.id === n.id ? { ...item, is_read: true } : item,
+        ),
       );
     }
     setBellOpen(false);
@@ -295,6 +307,24 @@ function Header() {
                 <FiPhone />
                 <span>Контакты</span>
               </NavLink>
+
+              <NavLink
+                to="/donation"
+                className="header__nav-link"
+                onClick={closeMenu}
+              >
+                <FiHeart  />
+                <span>Помочь</span>
+              </NavLink>
+
+              <NavLink
+                to="/"
+                className="header__nav-link"
+                onClick={closeMenu}
+              >
+                <FiBriefcase />
+                <span>Вакансии</span>
+              </NavLink>
             </nav>
 
             <div className="header__search">
@@ -346,7 +376,11 @@ function Header() {
               Записаться
             </Link>
 
-            <Link to={isLoggedIn ? "/dashboard" : "/login"} className="header__account" onClick={closeMenu}>
+            <Link
+              to={isLoggedIn ? "/dashboard" : "/login"}
+              className="header__account"
+              onClick={closeMenu}
+            >
               Личный кабинет
             </Link>
 
@@ -360,7 +394,9 @@ function Header() {
                 >
                   <FiBell />
                   {unreadCount > 0 && (
-                    <span className="header__bell-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                    <span className="header__bell-badge">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
                   )}
                 </button>
 
@@ -385,13 +421,23 @@ function Header() {
                             className={`header__bell-item${n.is_read ? "" : " header__bell-item--unread"}`}
                             onClick={() => handleNotifClick(n)}
                           >
-                            <span className="header__bell-title">{n.title}</span>
-                            <span className="header__bell-body">{n.body.replace(/^\[uid:\d+\]\s*/, '')}</span>
+                            <span className="header__bell-title">
+                              {n.title}
+                            </span>
+                            <span className="header__bell-body">
+                              {n.body.replace(/^\[uid:\d+\]\s*/, "")}
+                            </span>
                             <span className="header__bell-time">
-                              {new Date(n.created_at).toLocaleDateString("ru-RU", {
-                                day: "2-digit", month: "2-digit", year: "numeric",
-                                hour: "2-digit", minute: "2-digit",
-                              })}
+                              {new Date(n.created_at).toLocaleDateString(
+                                "ru-RU",
+                                {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
                             </span>
                           </button>
                         ))
