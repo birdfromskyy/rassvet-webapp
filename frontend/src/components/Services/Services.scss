@@ -68,17 +68,24 @@
 
 .services__grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
-  align-items: stretch;
+  align-items: start;
 }
 
 .services__card {
+  display: flex;
+  flex-direction: column;
+
+  width: 100%;
+
   background: #ffffff;
   border-radius: 28px;
   box-shadow: 0 10px 28px rgba(7, 68, 98, 0.08);
   border: 1px solid rgba(7, 68, 98, 0.06);
+
   overflow: hidden;
+
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -93,13 +100,18 @@
 
 .services__card-top {
   width: 100%;
+  min-height: 168px;
+
   border: none;
   background: transparent;
   text-align: left;
+
   padding: 26px 24px 22px;
+
   cursor: pointer;
+
   display: grid;
-  grid-template-columns: 72px 1fr 30px;
+  grid-template-columns: 72px minmax(0, 1fr) 30px;
   gap: 18px;
   align-items: start;
 }
@@ -107,12 +119,15 @@
 .services__icon-wrap {
   width: 72px;
   height: 72px;
+
   border-radius: 22px;
   background: #fefbf4;
+
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+
   border: 3px dashed #2a617f;
 }
 
@@ -129,14 +144,17 @@
 
 .services__card-title {
   margin: 0 0 10px;
+
   font-family: "Merriweather", serif;
   font-size: 24px;
   line-height: 1.2;
+
   color: #074462;
 }
 
 .services__card-text {
   margin: 0;
+
   color: #2a617f;
   font-size: 17px;
   line-height: 1.45;
@@ -145,32 +163,41 @@
 .services__toggle {
   width: 30px;
   height: 30px;
+
   border-radius: 50%;
   background: #ffea0081;
   color: #074462b4;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   font-size: 22px;
   line-height: 1;
+
   margin-top: 4px;
 }
 
 .services__card-body {
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.35s ease, padding 0.35s ease;
+
   padding: 0 24px;
+
+  transition:
+    max-height 0.35s ease,
+    padding 0.35s ease;
 }
 
 .services__card-body.is-open {
-  max-height: 500px;
+  max-height: 700px;
   padding: 0 24px 24px;
 }
 
 .services__list {
   margin: 0;
   padding-left: 20px;
+
   color: #215c7d;
   font-size: 16px;
   line-height: 1.5;
@@ -180,13 +207,50 @@
   margin-top: 8px;
 }
 
-@media (max-width: 1100px) {
+.btn-actions {
+  display: block;
+  text-align: center;
+  align-items: center;
+  padding-top: 40px;
+  margin-bottom: 5%;
+}
+
+@media (max-width: 1200px) {
   .services {
     padding: 68px 0 78px;
   }
 
+  .services__title {
+    font-size: 44px;
+  }
+
+  .services__grid {
+    gap: 18px;
+  }
+
+  .services__card-top {
+    min-height: 150px;
+    grid-template-columns: 64px minmax(0, 1fr) 30px;
+    padding: 22px;
+  }
+
+  .services__icon-wrap {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+@media (max-width: 900px) {
+  .services {
+    padding: 56px 0 66px;
+  }
+
   .services__grid {
     grid-template-columns: 1fr;
+  }
+
+  .services__heading {
+    margin-bottom: 30px;
   }
 
   .services__title {
@@ -194,7 +258,11 @@
   }
 
   .services__subtitle {
-    font-size: 18px;
+    font-size: 17px;
+  }
+
+  .services__card-top {
+    min-height: auto;
   }
 }
 
@@ -231,7 +299,7 @@
   }
 
   .services__card-top {
-    grid-template-columns: 56px 1fr 28px;
+    grid-template-columns: 56px minmax(0, 1fr) 28px;
     gap: 14px;
     padding: 20px 18px 18px;
   }
@@ -261,92 +329,16 @@
     font-size: 20px;
   }
 
+  .services__card-body {
+    padding: 0 18px;
+  }
+
   .services__card-body.is-open {
     padding: 0 18px 18px;
   }
 
   .services__list {
     font-size: 15px;
-  }
-}
-
-.services__card-body {
-  max-height: 0;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-.services__card-body.is-open {
-  max-height: 1000px;
-  margin-top: 10px;
-}
-
-.services__card {
-  position: relative;
-  overflow: hidden;
-}
-
-.services__card-body {
-  max-height: 0 !important;
-  overflow: hidden !important;
-  padding: 0 24px !important;
-  margin-top: 0 !important;
-  transition: max-height 0.35s ease, margin-top 0.35s ease, padding 0.35s ease;
-}
-
-.services__card-body.is-open {
-  max-height: 1000px !important;
-  padding: 0 24px 24px !important;
-  margin-top: 12px !important;
-}
-
-.services__list {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.services__list li + li {
-  margin-top: 8px;
-}
-
-@media (max-width: 1200px) {
-  .services {
-    padding: 68px 0 78px;
-  }
-
-  .services__title {
-    font-size: 44px;
-  }
-
-  .services__grid {
-    gap: 18px;
-  }
-
-  .services__card-top {
-    grid-template-columns: 64px 1fr 30px;
-    padding: 22px;
-  }
-}
-
-@media (max-width: 900px) {
-  .services {
-    padding: 56px 0 66px;
-  }
-
-  .services__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .services__heading {
-    margin-bottom: 30px;
-  }
-
-  .services__title {
-    font-size: 34px;
-  }
-
-  .services__subtitle {
-    font-size: 17px;
   }
 }
 
@@ -364,7 +356,7 @@
   }
 
   .services__card-top {
-    grid-template-columns: 48px 1fr 26px;
+    grid-template-columns: 48px minmax(0, 1fr) 26px;
     gap: 12px;
     padding: 18px 14px;
   }
@@ -388,20 +380,15 @@
     font-size: 14px;
   }
 
+  .services__card-body {
+    padding: 0 14px;
+  }
+
   .services__card-body.is-open {
-    padding: 0 14px 18px !important;
+    padding: 0 14px 18px;
   }
 
   .services__list {
     font-size: 14px;
   }
-}
-
-
-.btn-actions {
-  display: block;
-  text-align: center;
-  align-items: center;
-  padding-top: 40px;
-  margin-bottom: 5%;
 }
