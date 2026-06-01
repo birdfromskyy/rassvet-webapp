@@ -17,13 +17,14 @@ func NewFinZoneHandler(db *gorm.DB) *FinZoneHandler {
 }
 
 type FinZoneRequest struct {
-	Title     string `json:"title" binding:"required"`
-	Accent    string `json:"accent"`
-	Text      string `json:"text"`
-	ImageURL  string `json:"image_url"`
-	Items     string `json:"items"` // JSON array string
-	SortOrder int    `json:"sort_order"`
-	IsActive  *bool  `json:"is_active"`
+	Title        string `json:"title"`
+	Text         string `json:"text"`
+	ImageURL     string `json:"image_url"`
+	ImageURL2    string `json:"image_url_2"`
+	ImageCaption string `json:"image_caption"`
+	Items        string `json:"items"` // JSON array string
+	SortOrder    int    `json:"sort_order"`
+	IsActive     *bool  `json:"is_active"`
 }
 
 func (h *FinZoneHandler) GetFinZones(c *gin.Context) {
@@ -51,13 +52,13 @@ func (h *FinZoneHandler) CreateFinZone(c *gin.Context) {
 	}
 
 	zone := models.FinZone{
-		Title:     req.Title,
-		Accent:    req.Accent,
-		Text:      req.Text,
-		ImageURL:  req.ImageURL,
-		Items:     req.Items,
-		SortOrder: req.SortOrder,
-		IsActive:  isActive,
+		Title:        req.Title,
+		Text:         req.Text,
+		ImageURL:     req.ImageURL,
+		ImageURL2:    req.ImageURL2,
+		ImageCaption: req.ImageCaption,
+		SortOrder:    req.SortOrder,
+		IsActive:     isActive,
 	}
 
 	if err := h.db.Create(&zone).Error; err != nil {
@@ -83,10 +84,10 @@ func (h *FinZoneHandler) UpdateFinZone(c *gin.Context) {
 	}
 
 	zone.Title = req.Title
-	zone.Accent = req.Accent
 	zone.Text = req.Text
 	zone.ImageURL = req.ImageURL
-	zone.Items = req.Items
+	zone.ImageURL2 = req.ImageURL2
+	zone.ImageCaption = req.ImageCaption
 	zone.SortOrder = req.SortOrder
 	if req.IsActive != nil {
 		zone.IsActive = *req.IsActive

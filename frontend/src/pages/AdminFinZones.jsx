@@ -37,10 +37,10 @@ const PUBLIC_PAGE_URL = "/fin-activities";
 
 const emptyForm = {
   title: "",
-  accent: "",
   text: "",
   image_url: "",
-  items: "",
+  image_url_2: "",
+  image_caption: "",
   sort_order: 0,
   is_active: true,
 };
@@ -53,7 +53,6 @@ export default function AdminFinZones() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [itemsText, setItemsText] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
@@ -70,43 +69,24 @@ export default function AdminFinZones() {
     load();
   }, []);
 
-  const parseItems = (str) => {
-    try {
-      return JSON.parse(str || "[]");
-    } catch {
-      return [];
-    }
-  };
-
   const filteredZones = zones.filter((zone) => {
-    const value = `${zone.title} ${zone.accent || ""} ${zone.text || ""} ${parseItems(
-      zone.items
-    ).join(" ")}`.toLowerCase();
-
+    const value = `${zone.title} ${zone.text || ""}`.toLowerCase();
     return value.includes(search.toLowerCase().trim());
   });
 
   const openCreate = () => {
     setEditing(null);
     setForm({ ...emptyForm, sort_order: zones.length });
-    setItemsText("");
     setOpen(true);
   };
 
   const openEdit = (zone) => {
     setEditing(zone);
     setForm({ ...zone });
-
-    try {
-      setItemsText(JSON.parse(zone.items || "[]").join("\n"));
-    } catch {
-      setItemsText("");
-    }
-
     setOpen(true);
   };
 
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = async (e, field = "image_url") => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -114,10 +94,7 @@ export default function AdminFinZones() {
 
     try {
       const url = await uploadFile(file);
-      setForm((f) => ({
-        ...f,
-        image_url: url,
-      }));
+      setForm((f) => ({ ...f, [field]: url }));
     } finally {
       setUploading(false);
     }
@@ -125,26 +102,12 @@ export default function AdminFinZones() {
 
   const handleSave = async () => {
     setSaving(true);
-
     try {
-      const items = JSON.stringify(
-        itemsText
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      );
-
-      const payload = {
-        ...form,
-        items,
-      };
-
       if (editing) {
-        await finZoneService.update(editing.id, payload);
+        await finZoneService.update(editing.id, form);
       } else {
-        await finZoneService.create(payload);
+        await finZoneService.create(form);
       }
-
       setOpen(false);
       load();
     } finally {
@@ -232,8 +195,7 @@ export default function AdminFinZones() {
                 <TableHead>
                   <TableRow>
                     <TableCell width={90}>Порядок</TableCell>
-                    <TableCell>Название</TableCell>
-                    <TableCell>Метка</TableCell>
+                    <TableCell>Заголовок</TableCell>
                     <TableCell>Фото</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell align="right">Действия</TableCell>
@@ -245,9 +207,7 @@ export default function AdminFinZones() {
                     <TableRow key={zone.id}>
                       <TableCell>{zone.sort_order}</TableCell>
 
-                      <TableCell>{zone.title}</TableCell>
-
-                      <TableCell>{zone.accent || "—"}</TableCell>
+                      <TableCell>{zone.title || <span style={{color:'#aaa',fontStyle:'italic'}}>вводный блок</span>}</TableCell>
 
                       <TableCell>
                         {zone.image_url ? (
@@ -320,102 +280,79 @@ export default function AdminFinZones() {
 
           <DialogContent className="admin-module-dialog__content">
             <TextField
-              label="Название зоны"
+              label="Заголовок раздела"
               value={form.title}
               fullWidth
-              required
               onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  title: e.target.value,
-                }))
+                setForm((f) => ({ ...f, title: e.target.value }))
               }
+              helperText='Например: "Помещение для дневного пребывания". Оставьте пустым для вводного блока (без заголовка).'
             />
 
             <TextField
-              label="Метка"
-              value={form.accent}
-              fullWidth
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  accent: e.target.value,
-                }))
-              }
-              helperText="Например: Планировка, Оборудование"
-            />
-
-            <TextField
-              label="Описание"
+              label="Текст"
               value={form.text}
               fullWidth
               multiline
-              rows={3}
+              rows={4}
               onChange={(e) =>
                 setForm((f) => ({
                   ...f,
                   text: e.target.value,
                 }))
               }
-              helperText="Необязательно"
+              helperText="Новый абзац — двойной Enter (пустая строка). Одиночный Enter объединяется с предыдущей строкой."
             />
 
-            <TextField
-              label="Список элементов"
-              value={itemsText}
-              fullWidth
-              multiline
-              rows={5}
-              onChange={(e) => setItemsText(e.target.value)}
-              helperText="Каждая строка — отдельный элемент"
-            />
-
+            {/* Photo 1 */}
             <Box>
               <Typography variant="body2" color="text.secondary" mb={1}>
-                Фото зоны
+                Фото 1
               </Typography>
-
               {form.image_url && (
                 <Box mb={1}>
-                  <img
-                    src={getUploadUrl(form.image_url)}
-                    alt=""
-                    height={130}
-                    style={{
-                      width: "100%",
-                      borderRadius: 12,
-                      objectFit: "cover",
-                    }}
-                  />
+                  <img src={getUploadUrl(form.image_url)} alt="" style={{ width: "100%", maxHeight: 160, borderRadius: 12, objectFit: "cover" }} />
                 </Box>
               )}
-
-              <Button variant="outlined" component="label" disabled={uploading}>
-                {uploading ? "Загружается..." : "Загрузить фото"}
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={handleImageUpload}
-                />
+              <Button variant="outlined" component="label" size="small" disabled={uploading}>
+                {uploading ? "Загружается..." : "Загрузить фото 1"}
+                <input type="file" accept="image/*" hidden onChange={(e) => handleImageUpload(e, "image_url")} />
               </Button>
-
               {form.image_url && (
-                <Button
-                  color="error"
-                  sx={{ ml: 1 }}
-                  onClick={() =>
-                    setForm((f) => ({
-                      ...f,
-                      image_url: "",
-                    }))
-                  }
-                >
+                <Button size="small" color="error" sx={{ ml: 1 }} onClick={() => setForm((f) => ({ ...f, image_url: "" }))}>
                   Удалить
                 </Button>
               )}
             </Box>
+
+            {/* Photo 2 */}
+            <Box>
+              <Typography variant="body2" color="text.secondary" mb={1}>
+                Фото 2 (необязательно)
+              </Typography>
+              {form.image_url_2 && (
+                <Box mb={1}>
+                  <img src={getUploadUrl(form.image_url_2)} alt="" style={{ width: "100%", maxHeight: 160, borderRadius: 12, objectFit: "cover" }} />
+                </Box>
+              )}
+              <Button variant="outlined" component="label" size="small" disabled={uploading}>
+                {uploading ? "Загружается..." : "Загрузить фото 2"}
+                <input type="file" accept="image/*" hidden onChange={(e) => handleImageUpload(e, "image_url_2")} />
+              </Button>
+              {form.image_url_2 && (
+                <Button size="small" color="error" sx={{ ml: 1 }} onClick={() => setForm((f) => ({ ...f, image_url_2: "" }))}>
+                  Удалить
+                </Button>
+              )}
+            </Box>
+
+            <TextField
+              label="Подпись под фотографиями"
+              value={form.image_caption}
+              fullWidth
+              onChange={(e) => setForm((f) => ({ ...f, image_caption: e.target.value }))}
+              placeholder="Рисунки 1, 2 – Здание и детская площадка"
+            />
 
             <TextField
               label="Порядок отображения"
@@ -452,7 +389,7 @@ export default function AdminFinZones() {
             <Button
               variant="contained"
               onClick={handleSave}
-              disabled={saving || !form.title}
+              disabled={saving || (!form.title && !form.text)}
             >
               {saving ? "Сохранение..." : "Сохранить"}
             </Button>
