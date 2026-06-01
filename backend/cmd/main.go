@@ -81,6 +81,9 @@ func main() {
 	// Shorts (video) handler
 	shortHandler := handlers.NewShortHandler(db)
 
+	// Vacancies handler
+	vacancyHandler := handlers.NewVacancyHandler(db)
+
 	// CMS handlers
 	cmsFileHandler := handlers.NewCmsFileHandler(db)
 	historyHandler := handlers.NewHistoryHandler(db)
@@ -115,10 +118,11 @@ func main() {
 	// Consultation request — public (rate limited: 3 per hour per IP for guests)
 	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), consultationHandler.Create)
 
-	// Public CMS: achievements, awards
+	// Public CMS: achievements, awards, vacancies
 	r.GET("/api/achievements", achievementHandler.GetPublic)
 	r.GET("/api/awards", awardHandler.GetPublic)
 	r.GET("/api/shorts", shortHandler.GetPublic)
+	r.GET("/api/vacancies", vacancyHandler.GetPublic)
 
 	// Public CMS routes (no auth required)
 	r.GET("/api/employees", teacherHandler.GetPublicTeachers)
@@ -131,6 +135,7 @@ func main() {
 	r.GET("/api/fin-zones", finZoneHandler.GetFinZones)
 	r.GET("/api/site-settings", siteSettingHandler.GetAll)
 	r.GET("/api/site-settings/:key", siteSettingHandler.GetByKey)
+	r.GET("/api/reviews", reviewHandler.GetPublishedReviews)
 
 	// Protected API routes
 	protected := r.Group("/api")
@@ -141,7 +146,6 @@ func main() {
 		protected.POST("/logout", authHandler.Logout)
 		protected.GET("/me", authHandler.GetMe)
 
-		protected.GET("/reviews", reviewHandler.GetPublishedReviews)
 		protected.POST("/reviews", reviewHandler.CreateReview)
 		protected.GET("/my-reviews", reviewHandler.GetMyReviews)
 		protected.GET("/reviews/check", reviewHandler.CheckUserReview)
@@ -157,6 +161,7 @@ func main() {
 			admin.DELETE("/reviews/:id", adminHandler.DeleteReview)
 			admin.PUT("/reviews/:id/approve", adminHandler.ApproveReview)
 			admin.PUT("/reviews/:id/reject", adminHandler.RejectReview)
+			admin.POST("/reviews/external", reviewHandler.AdminCreateReview)
 
 			// File upload
 			admin.POST("/upload", handlers.UploadFile)
@@ -341,6 +346,13 @@ func main() {
 			admin.POST("/shorts", shortHandler.Create)
 			admin.PUT("/shorts/:id", shortHandler.Update)
 			admin.DELETE("/shorts/:id", shortHandler.Delete)
+
+			// Vacancies CMS
+			admin.GET("/vacancies", vacancyHandler.GetAll)
+			admin.POST("/vacancies", vacancyHandler.Create)
+			admin.PUT("/vacancies/:id", vacancyHandler.Update)
+			admin.DELETE("/vacancies/:id", vacancyHandler.Delete)
+
 
 			// Questionnaires review
 			admin.GET("/questionnaires", questionnaireHandler.AdminList)
