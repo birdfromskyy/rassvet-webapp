@@ -139,7 +139,7 @@ func main() {
 
 	// Protected API routes
 	protected := r.Group("/api")
-	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret, rdb))
 	{
 		protected.PUT("/profile", authHandler.UpdateProfile)
 		protected.DELETE("/me", authHandler.DeleteMyAccount)

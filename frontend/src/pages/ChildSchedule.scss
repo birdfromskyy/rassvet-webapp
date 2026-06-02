@@ -1,0 +1,59 @@
+/* Переиспользует стили из TeacherSchedule.scss — дополнения для ChildSchedule */
+
+.schedule__child-selector {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.schedule__child-name {
+  font-family: "Merriweather", serif;
+  font-size: 20px;
+  color: #074462;
+  font-weight: 700;
+  flex: 1;
+}
+
+.schedule__child-btn {
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: #f7df00;
+  color: #074462;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.schedule__child-btn:hover {
+  opacity: 0.8;
+}
+
+.schedule__child-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.schedule__child-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(7, 68, 98, 0.2);
+  transition: background 0.15s;
+}
+
+.schedule__child-dot--active {
+  background: #074462;
+}

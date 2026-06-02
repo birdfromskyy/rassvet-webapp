@@ -70,17 +70,6 @@ const NewsDetail = () => {
     });
   };
 
-  const getCategoryLabel = (category) => {
-    const labels = {
-      news: "Новости",
-      articles: "Статьи",
-      updates: "Обновления",
-      events: "События",
-    };
-
-    return labels[category] || category;
-  };
-
   const getVkEmbedUrl = (url) => {
     if (!url) return null;
 

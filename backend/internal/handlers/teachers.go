@@ -18,10 +18,10 @@ func NewTeacherHandler(db *gorm.DB) *TeacherHandler {
 	return &TeacherHandler{db: db}
 }
 
-// GetPublicTeachers returns teachers marked as show_on_site=true, ordered for the public /employees page.
+// GetPublicTeachers returns active teachers marked as show_on_site=true, ordered for the public /employees page.
 func (h *TeacherHandler) GetPublicTeachers(c *gin.Context) {
 	var teachers []models.Teacher
-	h.db.Where("show_on_site = ?", true).Order("sort_order_cms ASC, id ASC").Find(&teachers)
+	h.db.Where("show_on_site = ? AND is_active = ?", true, true).Order("sort_order_cms ASC, id ASC").Find(&teachers)
 	c.JSON(http.StatusOK, teachers)
 }
 

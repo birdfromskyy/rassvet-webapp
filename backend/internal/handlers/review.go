@@ -18,7 +18,7 @@ func NewReviewHandler(db *gorm.DB) *ReviewHandler {
 
 type CreateReviewRequest struct {
 	Rating      int    `json:"rating" binding:"required,min=1,max=5"`
-	Content     string `json:"content" binding:"required"`
+	Content     string `json:"content" binding:"required,min=10,max=5000"`
 	IsAnonymous bool   `json:"is_anonymous"`
 }
 

@@ -26,19 +26,17 @@ type CreateAssignmentRequest struct {
 	FundingType     string  `json:"funding_type"`
 	VisitsPerWeek   int     `json:"visits_per_week" binding:"required"`
 	DurationMin     int     `json:"duration_min" binding:"required"`
-	Status          string  `json:"status"`
-	AllowSubstitute *bool `json:"allow_substitute"`
+	Status          string `json:"status"`
 }
 
 type UpdateAssignmentRequest struct {
-	StudentID       *uint   `json:"student_id"`
-	TeacherID       *uint   `json:"teacher_id"`
-	SubjectID       *uint   `json:"subject_id"`
-	FundingType     string  `json:"funding_type"`
-	VisitsPerWeek   *int    `json:"visits_per_week"`
-	DurationMin     *int    `json:"duration_min"`
-	Status          string  `json:"status"`
-	AllowSubstitute *bool `json:"allow_substitute"`
+	StudentID     *uint  `json:"student_id"`
+	TeacherID     *uint  `json:"teacher_id"`
+	SubjectID     *uint  `json:"subject_id"`
+	FundingType   string `json:"funding_type"`
+	VisitsPerWeek *int   `json:"visits_per_week"`
+	DurationMin   *int   `json:"duration_min"`
+	Status        string `json:"status"`
 }
 
 type CreateAssignmentWeekOverrideRequest struct {
@@ -229,11 +227,6 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		fundingType = req.FundingType
 	}
 
-	allowSubstitute := false
-	if req.AllowSubstitute != nil {
-		allowSubstitute = *req.AllowSubstitute
-	}
-
 	var student models.Student
 	if err := h.db.First(&student, req.StudentID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -290,14 +283,13 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 	}
 
 	assignment := models.Assignment{
-		StudentID:       req.StudentID,
-		TeacherID:       req.TeacherID,
-		SubjectID:       req.SubjectID,
-		FundingType:     fundingType,
-		VisitsPerWeek:   req.VisitsPerWeek,
-		DurationMin:     req.DurationMin,
-		Status:          status,
-		AllowSubstitute: allowSubstitute,
+		StudentID:     req.StudentID,
+		TeacherID:     req.TeacherID,
+		SubjectID:     req.SubjectID,
+		FundingType:   fundingType,
+		VisitsPerWeek: req.VisitsPerWeek,
+		DurationMin:   req.DurationMin,
+		Status:        status,
 	}
 
 	if err := h.db.Create(&assignment).Error; err != nil {
@@ -401,10 +393,6 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 			return
 		}
 		assignment.Status = req.Status
-	}
-
-	if req.AllowSubstitute != nil {
-		assignment.AllowSubstitute = *req.AllowSubstitute
 	}
 
 	if newStudentID != assignment.StudentID {

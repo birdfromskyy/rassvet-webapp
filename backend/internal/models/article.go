@@ -7,8 +7,6 @@ type Article struct {
 	Title         string         `json:"title" gorm:"type:varchar(500);not null"`
 	Slug          string         `json:"slug" gorm:"type:varchar(500);not null"`
 	Summary       string         `json:"summary" gorm:"type:text"`
-	Category      string         `json:"category" gorm:"type:varchar(100)"`
-	Tags          string         `json:"tags" gorm:"type:text"` // comma-separated
 	FeaturedImage string         `json:"featured_image" gorm:"type:text"`
 	Status        string         `json:"status" gorm:"type:varchar(20);default:'draft'"` // draft | published
 	PublishedAt   *time.Time     `json:"published_at"`

@@ -18,17 +18,6 @@ const NewsCard = ({ article, variant = 'default' }) => {
     })
   }
 
-  const getCategoryLabel = category => {
-    const labels = {
-      news: 'Новости',
-      articles: 'Статьи',
-      updates: 'Обновления',
-      events: 'События',
-    }
-
-    return labels[category] || category
-  }
-
   const imageUrl = getUploadUrl(article.featured_image)
 
   if (variant === 'compact') {
@@ -53,13 +42,6 @@ const NewsCard = ({ article, variant = 'default' }) => {
       )}
 
       <div className="news-card__content">
-        <div className="news-card__meta">
-          <span className="news-card__category">Новости</span>
-
-          {article.view_count > 0 && (
-            <span className="news-card__views">👁 {article.view_count}</span>
-          )}
-        </div>
 
         <h2>{article.title}</h2>
 

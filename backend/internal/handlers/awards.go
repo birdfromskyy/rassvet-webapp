@@ -59,6 +59,12 @@ func (h *AwardHandler) Update(c *gin.Context) {
 // DELETE /api/admin/awards/:id
 func (h *AwardHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	h.db.Delete(&models.Award{}, id)
+	var item models.Award
+	if err := h.db.First(&item, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
+		return
+	}
+	h.db.Unscoped().Delete(&item)
+	deleteUploadFile(item.ImageURL)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

@@ -46,8 +46,8 @@ const Login = ({ onLogin }) => {
       toast.success("Вход выполнен успешно!");
       navigate("/dashboard");
     } catch (error) {
-      if (error.response?.data?.error === "Email not verified") {
-        toast.error("Email не подтвержден. Проверьте почту.");
+      if (error.response?.data?.error?.includes("не подтверждён")) {
+        toast.error("Email не подтверждён. Проверьте почту.");
         navigate("/verify-email", { state: { email: formData.email } });
       } else {
         setError(error.response?.data?.error || "Ошибка входа");
@@ -84,6 +84,8 @@ const Login = ({ onLogin }) => {
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="example@mail.ru"
+                    required
+                    maxLength={254}
                     autoFocus
                   />
                 </div>
@@ -98,6 +100,8 @@ const Login = ({ onLogin }) => {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="Введите пароль"
+                    required
+                    maxLength={128}
                   />
                 </div>
               </div>

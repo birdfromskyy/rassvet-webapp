@@ -17,12 +17,11 @@ func NewCmsFileHandler(db *gorm.DB) *CmsFileHandler {
 }
 
 type CmsFileRequest struct {
-	Section     string `json:"section" binding:"required"` // docs | rules | rating
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description"`
-	FileURL     string `json:"file_url"`
-	SortOrder   int    `json:"sort_order"`
-	IsActive    *bool  `json:"is_active"`
+	Section   string `json:"section" binding:"required"` // docs | rules | rating
+	Title     string `json:"title" binding:"required"`
+	FileURL   string `json:"file_url"`
+	SortOrder int    `json:"sort_order"`
+	IsActive  *bool  `json:"is_active"`
 }
 
 // GetBySection returns active files for the given section, ordered by sort_order.
@@ -67,12 +66,11 @@ func (h *CmsFileHandler) CreateFile(c *gin.Context) {
 	}
 
 	file := models.CmsFile{
-		Section:     req.Section,
-		Title:       req.Title,
-		Description: req.Description,
-		FileURL:     req.FileURL,
-		SortOrder:   req.SortOrder,
-		IsActive:    isActive,
+		Section:   req.Section,
+		Title:     req.Title,
+		FileURL:   req.FileURL,
+		SortOrder: req.SortOrder,
+		IsActive:  isActive,
 	}
 
 	if err := h.db.Create(&file).Error; err != nil {
@@ -99,7 +97,6 @@ func (h *CmsFileHandler) UpdateFile(c *gin.Context) {
 
 	file.Section = req.Section
 	file.Title = req.Title
-	file.Description = req.Description
 	file.FileURL = req.FileURL
 	file.SortOrder = req.SortOrder
 	if req.IsActive != nil {
@@ -116,9 +113,15 @@ func (h *CmsFileHandler) UpdateFile(c *gin.Context) {
 
 func (h *CmsFileHandler) DeleteFile(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.CmsFile{}, id).Error; err != nil {
+	var file models.CmsFile
+	if err := h.db.First(&file, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Файл не найден"})
+		return
+	}
+	if err := h.db.Delete(&file).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	deleteUploadFile(file.FileURL)
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
