@@ -15,10 +15,13 @@ PROJECT.md
 WORD.md
 IDEAS.md
 QaA.md
+deploy
 
 # Скрипты с кредами
 directus-init.sh
 backups/
+_export_uploads/
+scripts/
 
 # === Backend ===
 backend/tmp/
