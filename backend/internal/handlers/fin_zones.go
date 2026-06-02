@@ -103,9 +103,20 @@ func (h *FinZoneHandler) UpdateFinZone(c *gin.Context) {
 
 func (h *FinZoneHandler) DeleteFinZone(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.FinZone{}, id).Error; err != nil {
+
+	var zone models.FinZone
+	if err := h.db.First(&zone, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
+		return
+	}
+
+	if err := h.db.Delete(&zone).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	deleteUploadFile(zone.ImageURL)
+	deleteUploadFile(zone.ImageURL2)
+
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }

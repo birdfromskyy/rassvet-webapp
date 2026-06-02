@@ -295,10 +295,18 @@ func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 		profile.SubmittedAt = &now
 	}
 
-	if isNew {
-		h.db.Create(&profile)
-	} else {
-		h.db.Save(&profile)
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if isNew {
+			return tx.Create(&profile).Error
+		}
+		return tx.Save(&profile).Error
+	}); err != nil {
+		// Rollback newly uploaded files to avoid orphans
+		for _, f := range append(newPassport, newSnils...) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения документов"})
+		return
 	}
 
 	// Notify admins that parent documents were submitted
@@ -389,7 +397,14 @@ func (h *DocumentHandler) AddChildDocs(c *gin.Context) {
 		ChildSnilsFiles: marshalFileList(snilsFiles),
 		Status:          "pending",
 	}
-	h.db.Create(&sub)
+	if err := h.db.Create(&sub).Error; err != nil {
+		// Rollback newly uploaded files to avoid orphans
+		for _, f := range append(append(ippsuFiles, birthFiles...), snilsFiles...) {
+			_ = os.Remove(filepath.Join(privateDocsDir, f))
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения документов"})
+		return
+	}
 
 	// Notify admins that child documents were submitted
 	{

@@ -52,8 +52,12 @@ const Register = () => {
 
     if (!formData.password) {
       newErrors.password = "Пароль обязателен";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Пароль должен быть не менее 6 символов";
+    } else if (formData.password.length < 8) {
+      newErrors.password = "Пароль должен быть не менее 8 символов";
+    } else if (!/[A-Z]/.test(formData.password)) {
+      newErrors.password = "Пароль должен содержать хотя бы одну заглавную букву";
+    } else if (!/[0-9]/.test(formData.password)) {
+      newErrors.password = "Пароль должен содержать хотя бы одну цифру";
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -158,6 +162,7 @@ const Register = () => {
                     value={formData.first_name}
                     onChange={handleChange}
                     placeholder="Введите имя"
+                    maxLength={100}
                   />
 
                   {errors.first_name && (
@@ -176,6 +181,7 @@ const Register = () => {
                     value={formData.last_name}
                     onChange={handleChange}
                     placeholder="Введите фамилию"
+                    maxLength={100}
                   />
 
                   {errors.last_name && (
@@ -194,6 +200,7 @@ const Register = () => {
                     value={formData.middle_name}
                     onChange={handleChange}
                     placeholder="Введите отчество"
+                    maxLength={100}
                   />
                 </div>
 

@@ -410,7 +410,7 @@ const Dashboard = ({ user, onLogout }) => {
         disabled: true,
       },
       {
-        title: "Составление расписания",
+        title: "Модуль расписания",
         text: "Автоматическое формирование расписания занятий.",
         button: "Открыть",
         path: "/admin/schedule",

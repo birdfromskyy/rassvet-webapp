@@ -1,0 +1,246 @@
+.schedule-page {
+  background: #f7f4ec;
+  min-height: 100vh;
+}
+
+.schedule {
+  padding: 46px 0 80px;
+}
+
+.schedule__hero {
+  margin-bottom: 40px;
+}
+
+.schedule__title {
+  margin: 18px 0 0;
+  font-family: "Merriweather", serif;
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1;
+  color: #074462;
+}
+
+.schedule__subtitle {
+  margin: 14px 0 0;
+  color: #55707f;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+/* ── Фильтры ─────────────────────────────────────────────── */
+
+.schedule__filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+/* ── Навигация по неделям ────────────────────────────────── */
+
+.schedule__week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.schedule__week-nav button {
+  width: 46px;
+  height: 46px;
+  border: none;
+  border-radius: 999px;
+  background: #f7df00;
+  color: #074462;
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.schedule__week-nav button:hover {
+  opacity: 0.8;
+}
+
+.schedule__week-label {
+  min-width: 280px;
+  text-align: center;
+  font-family: "Merriweather", serif;
+  font-size: 20px;
+  color: #074462;
+  font-weight: 700;
+}
+
+/* ── Легенда ─────────────────────────────────────────────── */
+
+.schedule__legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.schedule__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #55707f;
+}
+
+.schedule__legend-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* ── День ────────────────────────────────────────────────── */
+
+.schedule__day {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 28px;
+  margin-bottom: 20px;
+  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.08);
+}
+
+.schedule__day-title {
+  margin: 0 0 20px;
+  font-family: "Merriweather", serif;
+  font-size: 22px;
+  color: #074462;
+}
+
+/* ── Слоты ───────────────────────────────────────────────── */
+
+.schedule__slots {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule__slot {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr 1fr 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: #f7f4ec;
+}
+
+.schedule__slot--group {
+  background: rgba(76, 175, 80, 0.08);
+}
+
+.schedule__slot--individual {
+  background: rgba(7, 68, 98, 0.06);
+}
+
+.schedule__slot-time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(7, 68, 98, 0.1);
+  color: #074462;
+  font-weight: 800;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.schedule__slot-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #074462;
+  border-radius: 999px;
+  padding: 3px 10px;
+  display: inline-block;
+  margin-top: 6px;
+}
+
+.schedule__slot-label--group {
+  background: #43a047;
+}
+
+.schedule__slot-cell {
+  color: #074462;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.schedule__slot-cell small {
+  display: block;
+  color: #8fa5b0;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+
+/* ── Состояния ───────────────────────────────────────────── */
+
+.schedule__empty {
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 52px 28px;
+  text-align: center;
+  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.08);
+}
+
+.schedule__empty p {
+  margin: 12px 0 0;
+  color: #55707f;
+  font-size: 17px;
+}
+
+.schedule__loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+/* ── Адаптив ─────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .schedule__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule__slot {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .schedule__slot-time {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .schedule {
+    padding: 28px 0 56px;
+  }
+
+  .schedule__day {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .schedule__slot {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule__week-label {
+    min-width: 0;
+    font-size: 16px;
+  }
+}

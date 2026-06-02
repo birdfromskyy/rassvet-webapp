@@ -317,7 +317,7 @@ export default function AdminServices() {
                           {service.parent_id ? (
                             parentName(service.parent_id)
                           ) : (
-                            <strong>— раздел —</strong>
+                            <strong>— верхний уровень / раздел —</strong>
                           )}
                         </TableCell>
                       )}

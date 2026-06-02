@@ -31,16 +31,20 @@ var allowedContactMethods = map[string]bool{
 // Rate-limited via IPRateLimit middleware (3/day for guests, checked here for auth users).
 func (h *ConsultationHandler) Create(c *gin.Context) {
 	var body struct {
-		ParentFio     string `json:"parent_fio"     binding:"required"`
-		Phone         string `json:"phone"          binding:"required"`
-		ChildFio      string `json:"child_fio"      binding:"required"`
-		ChildAge      string `json:"child_age"      binding:"required"`
+		ParentFio     string `json:"parent_fio"     binding:"required,max=300"`
+		Phone         string `json:"phone"          binding:"required,max=20"`
+		ChildFio      string `json:"child_fio"      binding:"required,max=300"`
+		ChildAge      string `json:"child_age"      binding:"required,max=50"`
 		ContactMethod string `json:"contact_method" binding:"required"`
 		ContactEmail  string `json:"contact_email"`
-		RequestText   string `json:"request_text"`
+		RequestText   string `json:"request_text"   binding:"max=2000"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Заполните все обязательные поля"})
+		return
+	}
+	if !phoneRe.MatchString(strings.TrimSpace(body.Phone)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Введите корректный номер телефона (+7 и 10 цифр)"})
 		return
 	}
 	if !allowedContactMethods[body.ContactMethod] {
@@ -51,8 +55,6 @@ func (h *ConsultationHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите email для связи"})
 		return
 	}
-
-	ip := c.ClientIP()
 
 	// For authenticated users: allow only 1 open request at a time
 	userID, isAuth := c.Get("userID")
@@ -71,10 +73,9 @@ func (h *ConsultationHandler) Create(c *gin.Context) {
 		ChildFio:      strings.TrimSpace(body.ChildFio),
 		ChildAge:      strings.TrimSpace(body.ChildAge),
 		ContactMethod: body.ContactMethod,
-		ContactEmail:  strings.TrimSpace(body.ContactEmail),
-		RequestText:   strings.TrimSpace(body.RequestText),
-		IPAddress:     ip,
-		Status:        "new",
+		ContactEmail: strings.TrimSpace(body.ContactEmail),
+		RequestText:  strings.TrimSpace(body.RequestText),
+		Status:       "new",
 	}
 	if isAuth {
 		uid := userID.(uint)
@@ -179,7 +180,6 @@ func (h *ConsultationHandler) AdminAnonymize(c *gin.Context) {
 	req.ChildAge = ""
 	req.ContactEmail = ""
 	req.RequestText = ""
-	req.IPAddress = ""
 	h.db.Save(&req)
 	c.JSON(http.StatusOK, req)
 }

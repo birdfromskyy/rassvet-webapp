@@ -61,6 +61,13 @@ func (h *AchievementHandler) Update(c *gin.Context) {
 // DELETE /api/admin/achievements/:id
 func (h *AchievementHandler) Delete(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
-	h.db.Delete(&models.Achievement{}, id)
+	var item models.Achievement
+	if err := h.db.First(&item, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
+		return
+	}
+	h.db.Unscoped().Delete(&item)
+	deleteUploadFile(item.ImageURL)
+	deleteUploadFile(item.SecondImageURL)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

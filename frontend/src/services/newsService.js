@@ -2,10 +2,9 @@ import api from './api'
 
 const newsService = {
   getPublishedArticles: async (params = {}) => {
-    const { page = 1, limit = 9, search, category } = params
+    const { page = 1, limit = 9, search } = params
     const query = { page, limit }
     if (search) query.search = search
-    if (category) query.category = category
 
     const res = await api.get('/articles', { params: query })
     return res.data
@@ -29,11 +28,6 @@ const newsService = {
   getRelatedArticles: async (slug, limit = 3) => {
     const res = await api.get('/articles', { params: { page: 1, limit } })
     return (res.data.articles || []).filter(a => a.slug !== slug)
-  },
-
-  getCategories: async () => {
-    const res = await api.get('/articles/categories')
-    return res.data || []
   },
 
   // Admin methods

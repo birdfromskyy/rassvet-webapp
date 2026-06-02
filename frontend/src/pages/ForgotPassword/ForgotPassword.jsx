@@ -128,9 +128,13 @@ const ForgotPassword = () => {
                     type="text"
                     name="code"
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="000000"
                     required
+                    maxLength={6}
+                    minLength={6}
+                    pattern="[0-9]{6}"
+                    inputMode="numeric"
                   />
 
                   <small>У вас есть 5 попыток ввода кода</small>

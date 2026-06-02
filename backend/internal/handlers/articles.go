@@ -29,30 +29,30 @@ type ArticleRequest struct {
 	Title         string         `json:"title" binding:"required"`
 	Slug          string         `json:"slug" binding:"required"`
 	Summary       string         `json:"summary"`
-	Category      string         `json:"category"`
-	Tags          string         `json:"tags"`
 	FeaturedImage string         `json:"featured_image"`
 	Status        string         `json:"status"` // draft | published
 	Blocks        []BlockRequest `json:"blocks"`
 }
 
 func (h *ArticleHandler) saveBlocks(articleID uint, blocks []BlockRequest) error {
-	if err := h.db.Where("article_id = ?", articleID).Delete(&models.ArticleBlock{}).Error; err != nil {
-		return err
-	}
-	for i, b := range blocks {
-		block := models.ArticleBlock{
-			ArticleID: articleID,
-			Type:      b.Type,
-			Content:   b.Content,
-			Title:     b.Title,
-			SortOrder: i,
-		}
-		if err := h.db.Create(&block).Error; err != nil {
+	return h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("article_id = ?", articleID).Delete(&models.ArticleBlock{}).Error; err != nil {
 			return err
 		}
-	}
-	return nil
+		for i, b := range blocks {
+			block := models.ArticleBlock{
+				ArticleID: articleID,
+				Type:      b.Type,
+				Content:   b.Content,
+				Title:     b.Title,
+				SortOrder: i,
+			}
+			if err := tx.Create(&block).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // GetArticles — public endpoint, only published articles with pagination.
@@ -156,8 +156,6 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 		Title:         req.Title,
 		Slug:          req.Slug,
 		Summary:       req.Summary,
-		Category:      req.Category,
-		Tags:          req.Tags,
 		FeaturedImage: req.FeaturedImage,
 		Status:        req.Status,
 	}
@@ -210,8 +208,6 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 	article.Title = req.Title
 	article.Slug = req.Slug
 	article.Summary = req.Summary
-	article.Category = req.Category
-	article.Tags = req.Tags
 	article.FeaturedImage = req.FeaturedImage
 	if req.Status != "" {
 		article.Status = req.Status
@@ -237,9 +233,26 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 
 func (h *ArticleHandler) DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
-	if err := h.db.Delete(&models.Article{}, id).Error; err != nil {
+
+	// Load article with blocks to collect file URLs before deletion
+	var article models.Article
+	if err := h.db.Preload("Blocks").First(&article, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Статья не найдена"})
+		return
+	}
+
+	if err := h.db.Delete(&article).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	// Clean up uploaded files after successful DB deletion
+	deleteUploadFile(article.FeaturedImage)
+	for _, block := range article.Blocks {
+		if block.Type == "image" || block.Type == "file" {
+			deleteUploadFile(block.Content)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }

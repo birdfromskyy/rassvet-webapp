@@ -16,7 +16,6 @@ type Assignment struct {
 	VisitsPerWeek   int       `json:"visits_per_week" gorm:"not null"`
 	DurationMin     int       `json:"duration_min" gorm:"not null"`
 	Status          string    `json:"status" gorm:"type:varchar(20);not null;default:'active';index"`
-	AllowSubstitute bool      `json:"allow_substitute" gorm:"not null;default:false"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 

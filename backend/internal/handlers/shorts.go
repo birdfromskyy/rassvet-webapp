@@ -59,7 +59,6 @@ func (h *ShortHandler) Update(c *gin.Context) {
 		return
 	}
 	item.Title = body.Title
-	item.CoverURL = body.CoverURL
 	item.VideoURL = body.VideoURL
 	item.SortOrder = body.SortOrder
 	item.IsActive = body.IsActive

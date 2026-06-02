@@ -191,9 +191,13 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
 
   const validate = () => {
     const errs = {}
+    if (!formData.first_name.trim()) errs.first_name = 'Имя обязательно'
+    if (!formData.last_name.trim())  errs.last_name  = 'Фамилия обязательна'
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) errs.email = 'Email недействителен'
     if (formData.password) {
-      if (formData.password.length < 6) errs.password = 'Пароль должен быть не менее 6 символов'
+      if (formData.password.length < 8)         errs.password = 'Пароль должен быть не менее 8 символов'
+      else if (!/[A-Z]/.test(formData.password)) errs.password = 'Пароль должен содержать хотя бы одну заглавную букву'
+      else if (!/[0-9]/.test(formData.password)) errs.password = 'Пароль должен содержать хотя бы одну цифру'
       if (formData.password !== formData.confirmPassword) errs.confirmPassword = 'Пароли не совпадают'
     }
     return errs
@@ -504,15 +508,20 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                 <div className="profile__grid profile__grid--three">
                   <label className="profile__field">
                     <span>Фамилия</span>
-                    <input name="last_name" value={formData.last_name} onChange={handleChange} />
+                    <input name="last_name" value={formData.last_name} onChange={handleChange}
+                      required maxLength={100} className={errors.last_name ? 'is-error' : ''} />
+                    {errors.last_name && <small>{errors.last_name}</small>}
                   </label>
                   <label className="profile__field">
                     <span>Имя</span>
-                    <input name="first_name" value={formData.first_name} onChange={handleChange} />
+                    <input name="first_name" value={formData.first_name} onChange={handleChange}
+                      required maxLength={100} className={errors.first_name ? 'is-error' : ''} />
+                    {errors.first_name && <small>{errors.first_name}</small>}
                   </label>
                   <label className="profile__field">
                     <span>Отчество</span>
-                    <input name="middle_name" value={formData.middle_name} onChange={handleChange} />
+                    <input name="middle_name" value={formData.middle_name} onChange={handleChange}
+                      maxLength={100} />
                   </label>
                 </div>
               </div>
@@ -523,9 +532,11 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                   <label className="profile__field">
                     <span>Email</span>
                     <input
+                      type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
+                      maxLength={254}
                       className={errors.email ? 'is-error' : ''}
                     />
                     <small>{errors.email || 'При смене email потребуется повторная верификация'}</small>

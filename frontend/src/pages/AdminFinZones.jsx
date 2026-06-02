@@ -32,7 +32,7 @@ import { finZoneService, uploadFile, getUploadUrl } from "../services/cmsService
 
 import "./AdminModule.scss";
 
-const MODULE_TITLE = "Материальная база";
+const MODULE_TITLE = "Материально-техническое обеспечение";
 const PUBLIC_PAGE_URL = "/fin-activities";
 
 const emptyForm = {
