@@ -33,6 +33,8 @@ services:
         condition: service_started
     env_file:
       - ./backend/.env
+    environment:
+      - GIN_MODE=release
     networks:
       - app-network
     volumes:
@@ -40,23 +42,18 @@ services:
       - private_uploads_data:/app/private_uploads
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # REACT_APP_API_URL is baked into the JS bundle at build time.
+        # For production: change to http://YOUR_SERVER_IP:8080/api or https://YOUR_DOMAIN/api
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080/api}
     container_name: frontend
-    ports:
-      - '3000:3000'
+
     depends_on:
       - backend
-    env_file:
-      - ./frontend/.env
     networks:
       - app-network
-    environment:
-      - REACT_APP_API_URL=http://localhost:8080/api
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
-    volumes:
-    - ./frontend:/app
-    - /app/node_modules
 
   redis:
     image: redis:7-alpine

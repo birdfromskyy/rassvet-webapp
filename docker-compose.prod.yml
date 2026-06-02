@@ -1,0 +1,44 @@
+# Production overrides for docker-compose.yml
+# No external ports exposed — nginx on host reaches containers via Docker bridge IPs directly.
+# Backend:  172.28.0.10:8080
+# Frontend: 172.28.0.11:80
+
+services:
+  postgres:
+    ports: []
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.5
+    restart: unless-stopped
+
+  redis:
+    ports: []
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.6
+    restart: unless-stopped
+
+  backend:
+    ports: []
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.10
+    restart: unless-stopped
+
+  frontend:
+    build:
+      args:
+        REACT_APP_API_URL: https://rassvethm.ru/api
+    ports: []
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.11
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
