@@ -727,35 +727,34 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		// Не раскрываем факт существования email
-		c.JSON(http.StatusOK, gin.H{"message": "Если email зарегистрирован, на него отправлен код сброса"})
-		return
-	}
+	// Respond immediately with the same message regardless of whether the email exists.
+	// Actual work runs in a goroutine to eliminate the timing side-channel.
+	c.JSON(http.StatusOK, gin.H{"message": "Если email зарегистрирован, на него отправлен код сброса"})
 
-	ctx := context.Background()
-	code := generateCode()
-	pending := PendingPasswordReset{Code: code, Attempts: 0}
+	email := req.Email
+	go func() {
+		var user models.User
+		if err := h.db.Where("email = ?", email).First(&user).Error; err != nil {
+			return
+		}
 
-	data, err := json.Marshal(pending)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-	if err := h.rdb.Set(ctx, passwordResetKey(req.Email), data, 15*time.Minute).Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
+		ctx := context.Background()
+		code := generateCode()
+		pending := PendingPasswordReset{Code: code, Attempts: 0}
 
-	emailService := services.NewEmailService(h.cfg)
-	if err := emailService.SendPasswordResetCode(req.Email, code); err != nil {
-		_ = h.rdb.Del(ctx, passwordResetKey(req.Email)).Err()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отправить письмо. Попробуйте позже"})
-		return
-	}
+		data, err := json.Marshal(pending)
+		if err != nil {
+			return
+		}
+		if err := h.rdb.Set(ctx, passwordResetKey(email), data, 15*time.Minute).Err(); err != nil {
+			return
+		}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Код сброса пароля отправлен на email"})
+		emailService := services.NewEmailService(h.cfg)
+		if err := emailService.SendPasswordResetCode(email, code); err != nil {
+			_ = h.rdb.Del(ctx, passwordResetKey(email)).Err()
+		}
+	}()
 }
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
