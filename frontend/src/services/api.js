@@ -23,19 +23,18 @@ api.interceptors.response.use(
 	async error => {
 		const original = error.config
 
-		// Skip: not a 401, or already a retry, or the initial session check,
-		// or the refresh call itself (prevents infinite loop).
 		const isInitialCheck = original?._isInitialCheck === true
 		const isRefreshCall  = original?.url?.includes('/refresh')
 		const alreadyRetried = original?._retried === true
 
+		// Skip: not a 401, already retried, or the refresh call itself.
+		// isInitialCheck does NOT skip refresh — it only suppresses the /login redirect.
 		if (
 			error.response?.status !== 401 ||
-			isInitialCheck ||
 			isRefreshCall ||
 			alreadyRetried
 		) {
-			if (error.response?.status === 401 && !isInitialCheck && !isRefreshCall) {
+			if (error.response?.status === 401 && !isRefreshCall && !isInitialCheck) {
 				window.location.href = '/login'
 			}
 			return Promise.reject(error)
@@ -49,7 +48,7 @@ api.interceptors.response.use(
 				original._retried = true
 				return api(original)
 			}).catch(() => {
-				window.location.href = '/login'
+				if (!isInitialCheck) window.location.href = '/login'
 				return Promise.reject(error)
 			})
 		}
@@ -63,7 +62,7 @@ api.interceptors.response.use(
 			return api(original)
 		} catch {
 			processQueue(new Error('refresh_failed'))
-			window.location.href = '/login'
+			if (!isInitialCheck) window.location.href = '/login'
 			return Promise.reject(error)
 		} finally {
 			isRefreshing = false
