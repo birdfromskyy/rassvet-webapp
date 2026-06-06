@@ -44,6 +44,7 @@ import {
   VisibilityOff,
   Casino as GenerateIcon,
   Search as SearchIcon,
+  School as TeacherLinkIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import scheduleService from "../services/scheduleService";
@@ -196,6 +197,12 @@ const AdminUsers = () => {
   const [children, setChildren] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
+  const [teacherDialog, setTeacherDialog] = useState({ open: false, user: null });
+  const [linkedTeacher, setLinkedTeacher] = useState(null);
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [teachers, setTeachers] = useState([]);
+  const [teacherLinkLoading, setTeacherLinkLoading] = useState(false);
+
   const [deleteDataDialog, setDeleteDataDialog] = useState({ open: false, user: null });
   const [deleteDataLoading, setDeleteDataLoading] = useState(false);
   const [deleteUserDialog, setDeleteUserDialog] = useState({ open: false, user: null });
@@ -215,10 +222,12 @@ const AdminUsers = () => {
 
   const loadAll = async () => {
     try {
-      const [usersData, studentsData] = await Promise.all([
+      const [usersData, studentsData, teachersData] = await Promise.all([
         scheduleService.getUsers(),
         scheduleService.getStudents(),
+        scheduleService.getTeachers(),
       ]);
+      setTeachers(teachersData);
 
       setUsers(usersData);
       setStudents(studentsData);
@@ -379,6 +388,53 @@ const AdminUsers = () => {
     }
   };
 
+  const openTeacherDialog = async (user) => {
+    try {
+      const data = await scheduleService.getLinkedTeacher(user.id);
+      setLinkedTeacher(data.teacher || null);
+      setSelectedTeacher(null);
+      setTeacherDialog({ open: true, user });
+    } catch {
+      toast.error("Ошибка загрузки данных преподавателя");
+    }
+  };
+
+  const closeTeacherDialog = () => {
+    setTeacherDialog({ open: false, user: null });
+    setLinkedTeacher(null);
+    setSelectedTeacher(null);
+  };
+
+  const handleLinkTeacher = async () => {
+    if (!selectedTeacher) return;
+    setTeacherLinkLoading(true);
+    try {
+      await scheduleService.linkTeacherToUser(teacherDialog.user.id, selectedTeacher.id);
+      toast.success("Преподаватель привязан");
+      const data = await scheduleService.getLinkedTeacher(teacherDialog.user.id);
+      setLinkedTeacher(data.teacher || null);
+      setSelectedTeacher(null);
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Ошибка привязки");
+    } finally {
+      setTeacherLinkLoading(false);
+    }
+  };
+
+  const handleUnlinkTeacher = async () => {
+    if (!window.confirm("Отвязать преподавателя от аккаунта?")) return;
+    setTeacherLinkLoading(true);
+    try {
+      await scheduleService.unlinkTeacherFromUser(teacherDialog.user.id);
+      toast.success("Преподаватель отвязан");
+      setLinkedTeacher(null);
+    } catch {
+      toast.error("Ошибка отвязки");
+    } finally {
+      setTeacherLinkLoading(false);
+    }
+  };
+
   const linkedStudentIds = children.map((c) => c.student_id);
   const availableStudents = students.filter((s) => !linkedStudentIds.includes(s.id));
 
@@ -513,6 +569,13 @@ const AdminUsers = () => {
                                 </Badge>
                               </IconButton>
                             </Tooltip>
+                            {u.role === "teacher" && (
+                              <Tooltip title="Привязать преподавателя">
+                                <IconButton size="small" color="secondary" onClick={() => openTeacherDialog(u)}>
+                                  <TeacherLinkIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                             <Tooltip title="Удалить персональные данные">
                               <IconButton size="small" color="error" onClick={() => setDeleteDataDialog({ open: true, user: u })}>
                                 <DeleteDataIcon fontSize="small" />
@@ -589,6 +652,48 @@ const AdminUsers = () => {
           </DialogContent>
           <DialogActions className="admin-module-dialog__actions">
             <Button onClick={closeChildDialog}>Закрыть</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={teacherDialog.open} onClose={closeTeacherDialog} maxWidth="sm" fullWidth PaperProps={{ className: "admin-module-dialog" }}>
+          <DialogTitle className="admin-module-dialog__title">
+            Привязка преподавателя: {teacherDialog.user?.first_name} {teacherDialog.user?.last_name}
+          </DialogTitle>
+          <DialogContent className="admin-module-dialog__content">
+            {linkedTeacher ? (
+              <>
+                <Typography variant="subtitle2" gutterBottom>Текущий преподаватель:</Typography>
+                <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+                  <Typography>{linkedTeacher.full_name}</Typography>
+                  <IconButton size="small" color="error" onClick={handleUnlinkTeacher} disabled={teacherLinkLoading}>
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+                <Divider />
+              </>
+            ) : (
+              <Typography color="text.secondary" mb={2}>Преподаватель не привязан</Typography>
+            )}
+            <Typography variant="subtitle2" gutterBottom>
+              {linkedTeacher ? "Сменить преподавателя:" : "Привязать преподавателя:"}
+            </Typography>
+            <Box className="admin-user-children-add">
+              <Autocomplete
+                fullWidth
+                options={teachers.filter((t) => t.is_active)}
+                getOptionLabel={(t) => t.full_name}
+                value={selectedTeacher}
+                onChange={(_, val) => setSelectedTeacher(val)}
+                noOptionsText="Преподаватели не найдены"
+                renderInput={(params) => <TextField {...params} label="Поиск преподавателя" />}
+              />
+              <Button variant="contained" startIcon={<AddIcon />} onClick={handleLinkTeacher} disabled={!selectedTeacher || teacherLinkLoading}>
+                Привязать
+              </Button>
+            </Box>
+          </DialogContent>
+          <DialogActions className="admin-module-dialog__actions">
+            <Button onClick={closeTeacherDialog}>Закрыть</Button>
           </DialogActions>
         </Dialog>
 

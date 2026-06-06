@@ -9,6 +9,9 @@ type Teacher struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
+	// Link to user account (one-to-one, nullable)
+	UserID *uint `json:"user_id,omitempty" gorm:"uniqueIndex"`
+
 	// CMS fields for public /employees page
 	Category       string `json:"category" gorm:"type:text"`
 	PhotoURL       string `json:"photo_url" gorm:"type:text"`

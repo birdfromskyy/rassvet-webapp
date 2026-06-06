@@ -25,7 +25,7 @@ const formatDateISO = date => date.toISOString().split('T')[0]
 
 const formatWeekLabel = weekStart => {
   const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekEnd.getDate() + 5)
+  weekEnd.setDate(weekEnd.getDate() + 6)
   const opts = { day: 'numeric', month: 'long' }
   return `${weekStart.toLocaleDateString('ru-RU', opts)} — ${weekEnd.toLocaleDateString('ru-RU', { ...opts, year: 'numeric' })}`
 }
@@ -57,10 +57,10 @@ const TeacherSchedule = ({ user }) => {
         const loadedTeachers = data.teachers || []
         setTeachers(loadedTeachers)
         setStudents(data.students || [])
-        const fullName = [user?.last_name, user?.first_name, user?.middle_name]
-          .filter(Boolean).join(' ').toLowerCase()
-        const ownTeacher = loadedTeachers.find(t => t.full_name?.toLowerCase() === fullName)
-        if (ownTeacher) setTeacher(ownTeacher)
+        if (user?.teacher_id) {
+          const ownTeacher = loadedTeachers.find(t => t.id === user.teacher_id)
+          if (ownTeacher) setTeacher(ownTeacher)
+        }
       })
       .catch(() => toast.error('Ошибка загрузки фильтров расписания'))
       .finally(() => setOptionsLoading(false))
@@ -116,6 +116,13 @@ const TeacherSchedule = ({ user }) => {
             <h1 className="schedule__title">Расписание занятий</h1>
             <p className="schedule__subtitle">Просмотр еженедельного расписания по преподавателям и ученикам</p>
           </div>
+
+          {!optionsLoading && !user?.teacher_id && (
+            <div className="schedule__empty">
+              <h2 className="schedule__day-title" style={{ margin: 0 }}>Аккаунт не привязан</h2>
+              <p>Ваш аккаунт ещё не привязан к конкретному преподавателю. Обратитесь к администратору.</p>
+            </div>
+          )}
 
           <div className="schedule__filters">
             <Autocomplete

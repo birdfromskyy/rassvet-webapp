@@ -749,3 +749,80 @@ func (h *TeacherHandler) UpdateTeacherRooms(c *gin.Context) {
 		"teacher_rooms": updatedRooms,
 	})
 }
+
+func (h *TeacherHandler) LinkUserToTeacher(c *gin.Context) {
+	userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
+		return
+	}
+
+	var req struct {
+		TeacherID uint `json:"teacher_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите teacher_id"})
+		return
+	}
+
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
+		return
+	}
+	if user.Role != models.RoleTeacher {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь не является сотрудником"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.First(&teacher, req.TeacherID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
+		return
+	}
+
+	uid := uint(userID)
+	if err := h.db.Model(&teacher).Update("user_id", uid).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка привязки"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель привязан к аккаунту"})
+}
+
+func (h *TeacherHandler) UnlinkUserFromTeacher(c *gin.Context) {
+	userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.Where("user_id = ?", userID).First(&teacher).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Привязанный преподаватель не найден"})
+		return
+	}
+
+	if err := h.db.Model(&teacher).Update("user_id", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка отвязки"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель отвязан от аккаунта"})
+}
+
+func (h *TeacherHandler) GetLinkedTeacher(c *gin.Context) {
+	userID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID пользователя"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.Where("user_id = ?", userID).First(&teacher).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"teacher": nil})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"teacher": teacher})
+}

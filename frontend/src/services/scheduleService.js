@@ -407,6 +407,18 @@ const scheduleService = {
 		const r = await api.get('/teacher/schedule/options')
 		return r.data
 	},
+	getLinkedTeacher: async (userId) => {
+		const r = await api.get(`/admin/users/${userId}/teacher`)
+		return r.data
+	},
+	linkTeacherToUser: async (userId, teacherId) => {
+		const r = await api.put(`/admin/users/${userId}/teacher`, { teacher_id: teacherId })
+		return r.data
+	},
+	unlinkTeacherFromUser: async (userId) => {
+		const r = await api.delete(`/admin/users/${userId}/teacher`)
+		return r.data
+	},
 }
 
 export default scheduleService
