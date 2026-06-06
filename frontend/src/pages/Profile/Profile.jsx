@@ -11,9 +11,12 @@ import Header from '../../components/Header/Header'
 import Footer from '../../components/Footer/Footer'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const MAX_PARENT_FILES = 5
-const MAX_CHILD_FILES  = 10
-const MAX_CHILDREN     = 5
+const MAX_PASSPORT_FILES     = 7
+const MAX_SNILS_PARENT_FILES = 1
+const MAX_IPPSU_FILES        = 5
+const MAX_BIRTH_CERT_FILES   = 3
+const MAX_SNILS_CHILD_FILES  = 1
+const MAX_CHILDREN           = 5
 const MAX_FILE_MB      = 5
 const ALLOWED_TYPES    = ['application/pdf', 'image/jpeg', 'image/png']
 const ALLOWED_EXT_STR  = 'PDF, JPG, PNG'
@@ -681,7 +684,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                     </div>
                     <p className="docs-hint">
                       Загрузите паспорт и СНИЛС — администратор свяжется с вами по указанному номеру.
-                      Допустимые форматы: {ALLOWED_EXT_STR}. Максимум {MAX_PARENT_FILES} файлов на тип документа, до {MAX_FILE_MB} МБ каждый.
+                      Допустимые форматы: {ALLOWED_EXT_STR}. Паспорт — до {MAX_PASSPORT_FILES} файлов, СНИЛС — {MAX_SNILS_PARENT_FILES} файл. До {MAX_FILE_MB} МБ каждый.
                     </p>
 
                     <label className="profile__field" style={{ maxWidth: 340 }}>
@@ -704,7 +707,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                         label="Паспорт"
                         existingFiles={keepPassport}
                         files={newPassport}
-                        maxFiles={MAX_PARENT_FILES}
+                        maxFiles={MAX_PASSPORT_FILES}
                         onAdd={f => setNewPassport(p => [...p, ...f])}
                         onRemoveExisting={fn => setKeepPassport(p => p.filter(x => x !== fn))}
                         onRemoveNew={i => setNewPassport(p => p.filter((_, idx) => idx !== i))}
@@ -713,7 +716,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                         label="СНИЛС родителя"
                         existingFiles={keepSnils}
                         files={newSnils}
-                        maxFiles={MAX_PARENT_FILES}
+                        maxFiles={MAX_SNILS_PARENT_FILES}
                         onAdd={f => setNewSnils(p => [...p, ...f])}
                         onRemoveExisting={fn => setKeepSnils(p => p.filter(x => x !== fn))}
                         onRemoveNew={i => setNewSnils(p => p.filter((_, idx) => idx !== i))}
@@ -780,7 +783,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                                   </label>
 
                                   <p className="docs-small-hint">
-                                    До {MAX_CHILD_FILES} файлов на тип, до {MAX_FILE_MB} МБ каждый. Суммарно не более 25 МБ.
+                                    ИППСУ — до {MAX_IPPSU_FILES} файлов, свидетельство — до {MAX_BIRTH_CERT_FILES}, СНИЛС — {MAX_SNILS_CHILD_FILES} файл. До {MAX_FILE_MB} МБ каждый. Суммарно не более 25 МБ.
                                   </p>
 
                                   <div className="docs-grid docs-grid--three">
@@ -788,7 +791,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                                       label="ИППСУ *"
                                       existingFiles={editKeepIppsu}
                                       files={editNewIppsu}
-                                      maxFiles={MAX_CHILD_FILES}
+                                      maxFiles={MAX_IPPSU_FILES}
                                       onAdd={f => setEditNewIppsu(p => [...p, ...f])}
                                       onRemoveExisting={fn => setEditKeepIppsu(p => p.filter(x => x !== fn))}
                                       onRemoveNew={i => setEditNewIppsu(p => p.filter((_, idx) => idx !== i))}
@@ -797,7 +800,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                                       label="Свидетельство о рождении *"
                                       existingFiles={editKeepBirth}
                                       files={editNewBirth}
-                                      maxFiles={MAX_CHILD_FILES}
+                                      maxFiles={MAX_BIRTH_CERT_FILES}
                                       onAdd={f => setEditNewBirth(p => [...p, ...f])}
                                       onRemoveExisting={fn => setEditKeepBirth(p => p.filter(x => x !== fn))}
                                       onRemoveNew={i => setEditNewBirth(p => p.filter((_, idx) => idx !== i))}
@@ -806,7 +809,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                                       label="СНИЛС ребёнка *"
                                       existingFiles={editKeepSnils}
                                       files={editNewSnils}
-                                      maxFiles={MAX_CHILD_FILES}
+                                      maxFiles={MAX_SNILS_CHILD_FILES}
                                       onAdd={f => setEditNewSnils(p => [...p, ...f])}
                                       onRemoveExisting={fn => setEditKeepSnils(p => p.filter(x => x !== fn))}
                                       onRemoveNew={i => setEditNewSnils(p => p.filter((_, idx) => idx !== i))}
@@ -925,8 +928,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                         </label>
 
                         <p className="docs-small-hint">
-                          До {MAX_CHILD_FILES} файлов на тип, до {MAX_FILE_MB} МБ каждый.
-                          Суммарно не более 25 МБ.
+                          ИППСУ — до {MAX_IPPSU_FILES} файлов, свидетельство — до {MAX_BIRTH_CERT_FILES}, СНИЛС — {MAX_SNILS_CHILD_FILES} файл. До {MAX_FILE_MB} МБ каждый. Суммарно не более 25 МБ.
                         </p>
 
                         <div className="docs-grid docs-grid--three">
@@ -934,7 +936,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                             label="ИППСУ"
                             existingFiles={[]}
                             files={ippsuFiles}
-                            maxFiles={MAX_CHILD_FILES}
+                            maxFiles={MAX_IPPSU_FILES}
                             onAdd={f => setIppsuFiles(p => [...p, ...f])}
                             onRemoveExisting={() => {}}
                             onRemoveNew={i => setIppsuFiles(p => p.filter((_, idx) => idx !== i))}
@@ -943,7 +945,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                             label="Свидетельство о рождении"
                             existingFiles={[]}
                             files={birthCertFiles}
-                            maxFiles={MAX_CHILD_FILES}
+                            maxFiles={MAX_BIRTH_CERT_FILES}
                             onAdd={f => setBirthCertFiles(p => [...p, ...f])}
                             onRemoveExisting={() => {}}
                             onRemoveNew={i => setBirthCertFiles(p => p.filter((_, idx) => idx !== i))}
@@ -952,7 +954,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                             label="СНИЛС ребёнка"
                             existingFiles={[]}
                             files={childSnilsFiles}
-                            maxFiles={MAX_CHILD_FILES}
+                            maxFiles={MAX_SNILS_CHILD_FILES}
                             onAdd={f => setChildSnilsFiles(p => [...p, ...f])}
                             onRemoveExisting={() => {}}
                             onRemoveNew={i => setChildSnilsFiles(p => p.filter((_, idx) => idx !== i))}

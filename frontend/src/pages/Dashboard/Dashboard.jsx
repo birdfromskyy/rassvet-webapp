@@ -403,11 +403,10 @@ const Dashboard = ({ user, onLogout }) => {
       },
       {
         title: "Поддержать центр",
-        text: "Раздел временно недоступен.",
-        button: "Недоступно",
-        path: "#",
+        text: "Поддержите деятельность нашего центра.",
+        button: "Перейти",
+        path: "/donation",
         show: isUser,
-        disabled: true,
       },
       {
         title: "Модуль расписания",

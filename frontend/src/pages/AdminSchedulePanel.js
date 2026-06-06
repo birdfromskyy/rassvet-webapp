@@ -22,8 +22,8 @@ const MODULES = [
 		path: '/admin/schedule/subjects',
 	},
 	{
-		title: 'Преподаватели',
-		description: 'Преподаватели, их предметы, кабинеты и рабочее время.',
+		title: 'Сотрудники',
+		description: 'Сотрудники, их предметы, кабинеты и рабочее время.',
 		icon: TeacherIcon,
 		path: '/admin/schedule/teachers',
 	},

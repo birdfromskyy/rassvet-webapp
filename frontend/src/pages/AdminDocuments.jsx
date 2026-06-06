@@ -564,20 +564,23 @@ const AdminDocuments = () => {
                             </Button>
                           </Tooltip>
 
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            onClick={() =>
-                              setDeleteParentDialog({
-                                open: true,
-                                userId: userDoc.user_id,
-                                email: userDoc.email,
-                              })
-                            }
-                          >
-                            Удалить данные
-                          </Button>
+                          <Tooltip title="Полностью удалить из БД">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<HardDeleteIcon />}
+                              onClick={() =>
+                                setDeleteParentDialog({
+                                  open: true,
+                                  userId: userDoc.user_id,
+                                  email: userDoc.email,
+                                })
+                              }
+                            >
+                              Удалить
+                            </Button>
+                          </Tooltip>
                         </Box>
 
                         <div className="admin-docs-files">

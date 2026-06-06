@@ -172,6 +172,12 @@ const AdminReviews = () => {
               На главную
             </Button>
             <Button
+              onClick={() => navigate("/admin/pending-reviews")}
+              className="admin-module__button admin-module__button--ghost"
+            >
+              Модерация
+            </Button>
+            <Button
               startIcon={<AddIcon />}
               onClick={() => setAddDialog(true)}
               className="admin-module__button admin-module__button--primary"

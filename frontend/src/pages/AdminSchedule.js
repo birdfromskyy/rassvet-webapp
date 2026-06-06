@@ -193,7 +193,7 @@ const AdminSchedule = () => {
 	const [filterIssueFundingType, setFilterIssueFundingType] = useState('')
 
 	// Issue sorting
-	const [issueSortBy, setIssueSortBy] = useState('student')
+	const [issueSortBy, setIssueSortBy] = useState('')
 	const [issueSortDir, setIssueSortDir] = useState('asc')
 
 	// Create slot dialog
@@ -1697,24 +1697,27 @@ const AdminSchedule = () => {
 						}
 					}
 
-					const sortIssues = list => [...list].sort((a, b) => {
-						let aVal = '', bVal = ''
-						if (issueSortBy === 'student') {
-							aVal = a.group_lesson_id ? (a.group_lesson?.name || '') : (a.student?.full_name || '')
-							bVal = b.group_lesson_id ? (b.group_lesson?.name || '') : (b.student?.full_name || '')
-						} else if (issueSortBy === 'teacher') {
-							aVal = a.teacher?.full_name || ''
-							bVal = b.teacher?.full_name || ''
-						} else if (issueSortBy === 'reason') {
-							aVal = a.message || ''
-							bVal = b.message || ''
-						} else {
-							aVal = a.subject?.name || ''
-							bVal = b.subject?.name || ''
-						}
-						const cmp = aVal.localeCompare(bVal, 'ru')
-						return issueSortDir === 'asc' ? cmp : -cmp
-					})
+					const sortIssues = list => {
+						if (!issueSortBy) return list
+						return [...list].sort((a, b) => {
+							let aVal = '', bVal = ''
+							if (issueSortBy === 'student') {
+								aVal = a.group_lesson_id ? (a.group_lesson?.name || '') : (a.student?.full_name || '')
+								bVal = b.group_lesson_id ? (b.group_lesson?.name || '') : (b.student?.full_name || '')
+							} else if (issueSortBy === 'teacher') {
+								aVal = a.teacher?.full_name || ''
+								bVal = b.teacher?.full_name || ''
+							} else if (issueSortBy === 'reason') {
+								aVal = a.message || ''
+								bVal = b.message || ''
+							} else {
+								aVal = a.subject?.name || ''
+								bVal = b.subject?.name || ''
+							}
+							const cmp = aVal.localeCompare(bVal, 'ru')
+							return issueSortDir === 'asc' ? cmp : -cmp
+						})
+					}
 
 					const filtered = issues.filter(issue => {
 						if (filterIssueStudentId && issue.student_id !== Number(filterIssueStudentId)) return false
