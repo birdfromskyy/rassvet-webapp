@@ -356,17 +356,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"user": gin.H{
-			"id":          user.ID,
-			"email":       user.Email,
-			"first_name":  user.FirstName,
-			"last_name":   user.LastName,
-			"middle_name": user.MiddleName,
-			"role":        user.Role,
-			"is_verified": user.IsVerified,
-		},
-	})
+	userResp := gin.H{
+		"id":          user.ID,
+		"email":       user.Email,
+		"first_name":  user.FirstName,
+		"last_name":   user.LastName,
+		"middle_name": user.MiddleName,
+		"role":        user.Role,
+		"is_verified": user.IsVerified,
+	}
+	if user.Role == models.RoleTeacher {
+		var teacher models.Teacher
+		if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
+			userResp["teacher_id"] = teacher.ID
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"user": userResp})
 }
 
 func (h *AuthHandler) ResendCode(c *gin.Context) {
