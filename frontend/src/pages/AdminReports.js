@@ -327,8 +327,8 @@ const AdminReports = () => {
 				<section className='admin-module__panel'>
 
 				<Tabs value={tab} onChange={handleTabChange} sx={{ mb: 2 }}>
-					<Tab label='Преподаватели' />
-					<Tab label='Дети' />
+					<Tab label='Сотрудники' />
+					<Tab label='Ученики' />
 				</Tabs>
 
 				<Box display='grid' gridTemplateColumns={{ xs: '1fr', md: '2fr 1fr 1fr auto auto' }} gap={2} mb={3}>

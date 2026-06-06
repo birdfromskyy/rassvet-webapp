@@ -458,3 +458,101 @@
   border-radius: 0 !important;
 }
 
+// ── Pending Reviews cards ─────────────────────────────────────────────────────
+.pending-reviews__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pending-reviews__card {
+  padding: 24px 28px;
+  border-radius: 20px;
+  background: #f7f4ec;
+  border: 1.5px solid rgba(7, 68, 98, 0.08);
+  transition: box-shadow 0.18s;
+
+  &:hover {
+    box-shadow: 0 6px 24px rgba(7, 68, 98, 0.08);
+  }
+}
+
+.pending-reviews__card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pending-reviews__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pending-reviews__author {
+  font-weight: 800;
+  font-size: 16px;
+  color: #074462;
+}
+
+.pending-reviews__email {
+  font-size: 13px;
+  color: #55707f;
+  margin-left: 4px;
+}
+
+.pending-reviews__date {
+  font-size: 13px;
+  color: #8a9fb0;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pending-reviews__content {
+  margin: 10px 0 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #2a4050;
+  white-space: pre-wrap;
+}
+
+.pending-reviews__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.pending-reviews__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+
+  &:active { transform: scale(0.97); }
+
+  svg { font-size: 18px !important; }
+
+  &--approve {
+    background: #e6f9f0;
+    color: #1a7f47;
+
+    &:hover { background: #ccf0df; }
+  }
+
+  &--reject {
+    background: #fde8e8;
+    color: #c0392b;
+
+    &:hover { background: #f9cccc; }
+  }
+}
+

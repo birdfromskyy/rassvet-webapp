@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import axios from "axios";
 import authService from "./services/authService";
 import { AuthContext } from "./contexts/AuthContext";
 import { Routes, Route, Navigate } from "react-router-dom";
@@ -74,6 +75,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const refreshTimerRef = useRef(null);
 
   useEffect(() => {
     authService.getMe()
@@ -87,6 +89,26 @@ function App() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Proactively refresh the access token every 25 min so 30-min expiry never triggers logout.
+  useEffect(() => {
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api';
+    if (isAuthenticated) {
+      refreshTimerRef.current = setInterval(async () => {
+        try {
+          await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true });
+        } catch {
+          // Silent failure — reactive 401 interceptor is the fallback
+        }
+      }, 25 * 60 * 1000);
+    }
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [isAuthenticated]);
 
   const handleLogin = (userData) => {
     setIsAuthenticated(true);

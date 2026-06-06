@@ -22,13 +22,16 @@ import (
 )
 
 const (
-	privateDocsDir        = "./private_uploads/docs"
-	maxParentFilesPerType = 5
-	maxChildFilesPerType  = 10
-	maxFileSizeBytes      = 5 * 1024 * 1024   // 5 MB per file
-	maxChildTotalBytes    = 25 * 1024 * 1024  // 25 MB total per child submission
-	maxParentTotalBytes   = 15 * 1024 * 1024  // 15 MB total for parent docs
-	maxChildren           = 5
+	privateDocsDir     = "./private_uploads/docs"
+	maxPassportFiles   = 7
+	maxSnilsParentFiles = 1
+	maxIppsuFiles      = 5
+	maxBirthCertFiles  = 3
+	maxSnilsChildFiles = 1
+	maxFileSizeBytes   = 5 * 1024 * 1024  // 5 MB per file
+	maxChildTotalBytes = 25 * 1024 * 1024 // 25 MB total per child submission
+	maxParentTotalBytes = 15 * 1024 * 1024 // 15 MB total for parent docs
+	maxChildren        = 5
 )
 
 var (
@@ -251,12 +254,12 @@ func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 	deletePhysicalFiles(parseFileList(profile.SnilsFiles), keepSnils)
 
 	// Upload new files
-	newPassport, passportSize, err := h.uploadMultipleFiles(c, "passport_files", maxParentFilesPerType-len(keepPassport))
+	newPassport, passportSize, err := h.uploadMultipleFiles(c, "passport_files", maxPassportFiles-len(keepPassport))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	newSnils, snilsSize, err := h.uploadMultipleFiles(c, "snils_files", maxParentFilesPerType-len(keepSnils))
+	newSnils, snilsSize, err := h.uploadMultipleFiles(c, "snils_files", maxSnilsParentFiles-len(keepSnils))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -275,12 +278,12 @@ func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 	finalPassport := append(keepPassport, newPassport...)
 	finalSnils := append(keepSnils, newSnils...)
 
-	if len(finalPassport) > maxParentFilesPerType {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Максимум %d файлов для паспорта", maxParentFilesPerType)})
+	if len(finalPassport) > maxPassportFiles {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Максимум %d файлов для паспорта", maxPassportFiles)})
 		return
 	}
-	if len(finalSnils) > maxParentFilesPerType {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Максимум %d файлов для СНИЛС", maxParentFilesPerType)})
+	if len(finalSnils) > maxSnilsParentFiles {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Максимум %d файл для СНИЛС", maxSnilsParentFiles)})
 		return
 	}
 
@@ -364,17 +367,17 @@ func (h *DocumentHandler) AddChildDocs(c *gin.Context) {
 		return
 	}
 
-	ippsuFiles, ippsuSize, err := h.uploadMultipleFiles(c, "ippsu_files", maxChildFilesPerType)
+	ippsuFiles, ippsuSize, err := h.uploadMultipleFiles(c, "ippsu_files", maxIppsuFiles)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	birthFiles, birthSize, err := h.uploadMultipleFiles(c, "birth_cert_files", maxChildFilesPerType)
+	birthFiles, birthSize, err := h.uploadMultipleFiles(c, "birth_cert_files", maxBirthCertFiles)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	snilsFiles, snilsSize, err := h.uploadMultipleFiles(c, "child_snils_files", maxChildFilesPerType)
+	snilsFiles, snilsSize, err := h.uploadMultipleFiles(c, "child_snils_files", maxSnilsChildFiles)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -488,17 +491,17 @@ func (h *DocumentHandler) UpdateChildDocs(c *gin.Context) {
 	deletePhysicalFiles(parseFileList(sub.BirthCertFiles), keepBirth)
 	deletePhysicalFiles(parseFileList(sub.ChildSnilsFiles), keepSnils)
 
-	newIppsu, ippsuSize, err := h.uploadMultipleFiles(c, "ippsu_files", maxChildFilesPerType-len(keepIppsu))
+	newIppsu, ippsuSize, err := h.uploadMultipleFiles(c, "ippsu_files", maxIppsuFiles-len(keepIppsu))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	newBirth, birthSize, err := h.uploadMultipleFiles(c, "birth_cert_files", maxChildFilesPerType-len(keepBirth))
+	newBirth, birthSize, err := h.uploadMultipleFiles(c, "birth_cert_files", maxBirthCertFiles-len(keepBirth))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	newSnilsFiles, snilsSize, err := h.uploadMultipleFiles(c, "child_snils_files", maxChildFilesPerType-len(keepSnils))
+	newSnilsFiles, snilsSize, err := h.uploadMultipleFiles(c, "child_snils_files", maxSnilsChildFiles-len(keepSnils))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
