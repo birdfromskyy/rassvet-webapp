@@ -345,25 +345,51 @@
 }
 
 .dashboard-schedule__time {
-  display: inline-flex;
-  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   padding: 10px 12px;
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(7, 68, 98, 0.08);
   color: #074462;
   font-weight: 800;
   white-space: nowrap;
+  text-align: center;
+}
+
+.dashboard-schedule__duration {
+  font-size: 12px;
+  font-weight: 600;
+  color: #55707f;
+}
+
+.dashboard-schedule__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .dashboard-schedule__item h3 {
-  margin: 0 0 6px;
+  margin: 0;
   color: #074462;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .dashboard-schedule__item p {
   margin: 0;
   color: #55707f;
+  font-size: 14px;
+}
+
+.dashboard-schedule__secondary {
+  font-size: 13px !important;
+  color: #8fa5b0 !important;
+}
+
+.dashboard-schedule__label {
+  font-weight: 600;
+  color: #7a9aaa;
 }
 
 .dashboard-schedule__empty {

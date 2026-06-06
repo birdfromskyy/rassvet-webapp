@@ -36,6 +36,26 @@ const getTodayWeekday = () => {
 const getSlotSubject = (slot) =>
   slot.subject?.name || slot.group_lesson?.name || "Занятие";
 
+const getSlotStudent = (slot) => {
+  if (slot.slot_type !== "group") return slot.student?.full_name || "—";
+  const excluded = new Set((slot.exclusions || []).map((ex) => ex.student_id));
+  return (
+    (slot.group_lesson?.enrollments || [])
+      .filter((enr) => !excluded.has(enr.student_id))
+      .map((enr) => enr.student?.full_name)
+      .filter(Boolean)
+      .join(", ") ||
+    slot.group_lesson?.name ||
+    "—"
+  );
+};
+
+const getDuration = (start, end) => {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
+};
+
 const TodayScheduleWidget = ({ user }) => {
   const navigate = useNavigate();
   const isTeacher = user?.role === "teacher";
@@ -55,27 +75,14 @@ const TodayScheduleWidget = ({ user }) => {
 
       try {
         if (isTeacher) {
-          const options = await scheduleService.getTeacherScheduleOptions();
-
-          const fullName = [
-            user?.last_name,
-            user?.first_name,
-            user?.middle_name,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-
-          const ownTeacher = options.teachers?.find(
-            (t) => t.full_name?.toLowerCase() === fullName
-          );
+          if (!user?.teacher_id) {
+            setSlots([]);
+            return;
+          }
 
           const data = await scheduleService.getTeacherPublishedSchedule(
             weekStartISO,
-            {
-              teacher_id: ownTeacher?.id || "",
-              student_id: "",
-            }
+            { teacher_id: user.teacher_id, student_id: "" }
           );
 
           setSlots(
@@ -161,6 +168,10 @@ const TodayScheduleWidget = ({ user }) => {
 
       {loading ? (
         <div className="dashboard-schedule__empty">Загружаем расписание...</div>
+      ) : isTeacher && !user?.teacher_id ? (
+        <div className="dashboard-schedule__empty">
+          Ваш аккаунт ещё не привязан к преподавателю. Обратитесь к администратору.
+        </div>
       ) : slots.length === 0 ? (
         <div className="dashboard-schedule__empty">На сегодня занятий нет</div>
       ) : (
@@ -169,12 +180,26 @@ const TodayScheduleWidget = ({ user }) => {
             <article className="dashboard-schedule__item" key={slot.id}>
               <div className="dashboard-schedule__time">
                 {slot.start_time}–{slot.end_time}
+                <span className="dashboard-schedule__duration">
+                  {getDuration(slot.start_time, slot.end_time)} мин
+                </span>
               </div>
 
-              <div>
-                <h3>{getSlotSubject(slot)}</h3>
+              <div className="dashboard-schedule__info">
+                <h3>
+                  {isTeacher ? getSlotStudent(slot) : getSlotSubject(slot)}
+                </h3>
                 <p>
-                  {slot.room_name || slot.room?.name || "Кабинет не указан"}
+                  <span className="dashboard-schedule__label">Кабинет: </span>
+                  {slot.room_name || slot.room?.name || "не указан"}
+                </p>
+                <p className="dashboard-schedule__secondary">
+                  <span className="dashboard-schedule__label">
+                    {isTeacher ? "Предмет: " : "Преподаватель: "}
+                  </span>
+                  {isTeacher
+                    ? getSlotSubject(slot)
+                    : slot.teacher?.full_name || "—"}
                 </p>
               </div>
             </article>

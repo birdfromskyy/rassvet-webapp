@@ -24,7 +24,7 @@ const formatDateISO = date => date.toISOString().split('T')[0]
 
 const formatWeekLabel = weekStart => {
   const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekEnd.getDate() + 5)
+  weekEnd.setDate(weekEnd.getDate() + 6)
   const opts = { day: 'numeric', month: 'long' }
   return `${weekStart.toLocaleDateString('ru-RU', opts)} — ${weekEnd.toLocaleDateString('ru-RU', { ...opts, year: 'numeric' })}`
 }

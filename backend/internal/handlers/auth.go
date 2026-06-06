@@ -704,14 +704,23 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"id":          user.ID,
 		"email":       user.Email,
 		"first_name":  user.FirstName,
 		"last_name":   user.LastName,
 		"middle_name": user.MiddleName,
 		"role":        user.Role,
-	})
+	}
+
+	if user.Role == models.RoleTeacher {
+		var teacher models.Teacher
+		if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
+			resp["teacher_id"] = teacher.ID
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func passwordResetKey(email string) string {

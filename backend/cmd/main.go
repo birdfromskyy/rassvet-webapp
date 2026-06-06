@@ -322,6 +322,9 @@ func main() {
 			admin.GET("/users/:id/children", userStudentHandler.GetUserChildren)
 			admin.POST("/users/:id/children", userStudentHandler.AddUserChild)
 			admin.DELETE("/users/:id/children/:studentId", userStudentHandler.RemoveUserChild)
+			admin.GET("/users/:id/teacher", teacherHandler.GetLinkedTeacher)
+			admin.PUT("/users/:id/teacher", teacherHandler.LinkUserToTeacher)
+			admin.DELETE("/users/:id/teacher", teacherHandler.UnlinkUserFromTeacher)
 
 			// Consultations
 			admin.GET("/consultations", consultationHandler.AdminList)
