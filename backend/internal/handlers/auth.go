@@ -95,7 +95,7 @@ func (h *AuthHandler) issueTokenPair(c *gin.Context, userID uint, role string) e
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
-		Path:     "/api/refresh",
+		Path:     "/",
 		MaxAge:   refreshTokenMaxAge,
 		HttpOnly: true,
 		Secure:   secure,
@@ -112,7 +112,7 @@ func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
 		MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	})
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name: "refresh_token", Value: "", Path: "/api/refresh",
+		Name: "refresh_token", Value: "", Path: "/",
 		MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	})
 	if rt, err := c.Cookie("refresh_token"); err == nil && rt != "" {
