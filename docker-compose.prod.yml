@@ -12,6 +12,7 @@ services:
     restart: unless-stopped
 
   redis:
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}" --protected-mode yes
     ports: []
     networks:
       app-network:

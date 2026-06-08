@@ -11,8 +11,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - '5433:5432'
     networks:
       - app-network
     healthcheck:
@@ -24,8 +22,6 @@ services:
   backend:
     build: ./backend
     container_name: backend
-    ports:
-      - '8080:8080'
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,8 +45,6 @@ services:
         # For production: change to http://YOUR_SERVER_IP:8080/api or https://YOUR_DOMAIN/api
         REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080/api}
     container_name: frontend
-    ports:
-      - '3000:80'
     depends_on:
       - backend
     networks:
@@ -60,8 +54,6 @@ services:
     image: redis:7-alpine
     container_name: redis
     command: redis-server --appendonly yes
-    ports:
-      - '6379:6379'
     networks:
       - app-network
     volumes:
