@@ -57,7 +57,18 @@ api.interceptors.response.use(
 		original._retried = true
 
 		try {
-			await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true })
+			// First attempt
+			try {
+				await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true })
+			} catch (firstErr) {
+				// Retry once after a short delay — handles transient cookie/Redis hiccups
+				if (firstErr.response?.status === 401) {
+					await new Promise(r => setTimeout(r, 400))
+					await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true })
+				} else {
+					throw firstErr
+				}
+			}
 			processQueue(null)
 			return api(original)
 		} catch {
