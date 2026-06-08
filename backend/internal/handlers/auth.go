@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -672,6 +673,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	rt, err := c.Cookie("refresh_token")
 	if err != nil || rt == "" {
+		log.Printf("[REFRESH] 401 no_cookie ip=%s cookie_err=%v", c.ClientIP(), err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Сессия истекла, войдите снова"})
 		return
 	}
@@ -679,10 +681,12 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	ctx := c.Request.Context()
 	raw, err := h.rdb.Get(ctx, refreshKey(rt)).Result()
 	if err == redis.Nil {
+		log.Printf("[REFRESH] 401 not_in_redis ip=%s token=%.8s...", c.ClientIP(), rt)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Сессия истекла, войдите снова"})
 		return
 	}
 	if err != nil {
+		log.Printf("[REFRESH] 500 redis_err ip=%s err=%v", c.ClientIP(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
