@@ -239,6 +239,7 @@ func main() {
 			admin.POST("/teachers", teacherHandler.CreateTeacher)
 			admin.PUT("/teachers/:id", teacherHandler.UpdateTeacher)
 			admin.PATCH("/teachers/:id/deactivate", teacherHandler.DeactivateTeacher)
+			admin.PATCH("/teachers/:id/activate", teacherHandler.ActivateTeacher)
 			admin.DELETE("/teachers/:id", teacherHandler.DeleteTeacher)
 			admin.GET("/teachers/:id/subjects", teacherHandler.GetTeacherSubjects)
 			admin.PUT("/teachers/:id/subjects", teacherHandler.UpdateTeacherSubjects)

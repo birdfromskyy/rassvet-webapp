@@ -162,7 +162,9 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 	if strings.TrimSpace(req.Name) != "" {
 		lesson.Name = req.Name
 	}
-	lesson.SubjectID = req.SubjectID
+	if req.SubjectID != nil {
+		lesson.SubjectID = req.SubjectID
+	}
 	if req.DefaultTeacherID != nil {
 		lesson.DefaultTeacherID = req.DefaultTeacherID
 	}

@@ -222,7 +222,7 @@ const AdminTeachers = () => {
         await scheduleService.deactivateTeacher(teacher.id);
         toast.success("Сотрудник деактивирован");
       } else {
-        await scheduleService.updateTeacher(teacher.id, { is_active: true });
+        await scheduleService.activateTeacher(teacher.id);
         toast.success("Сотрудник активирован");
       }
       loadAll();
