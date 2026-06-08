@@ -254,6 +254,36 @@ func (h *TeacherHandler) DeactivateTeacher(c *gin.Context) {
 	})
 }
 
+func (h *TeacherHandler) ActivateTeacher(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+
+	var teacher models.Teacher
+	if err := h.db.First(&teacher, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
+		return
+	}
+
+	teacher.IsActive = true
+
+	if err := h.db.Save(&teacher).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Teacher activated successfully",
+		"teacher": teacher,
+	})
+}
+
 func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {

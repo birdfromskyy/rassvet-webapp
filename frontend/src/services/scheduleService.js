@@ -37,6 +37,9 @@ const scheduleService = {
 	deactivateTeacher: async id => {
 		await api.patch(`/admin/teachers/${id}/deactivate`)
 	},
+	activateTeacher: async id => {
+		await api.patch(`/admin/teachers/${id}/activate`)
+	},
 	deleteTeacher: async id => {
 		await api.delete(`/admin/teachers/${id}`)
 	},
