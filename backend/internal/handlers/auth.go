@@ -101,6 +101,16 @@ func (h *AuthHandler) issueTokenPair(c *gin.Context, userID uint, role string) e
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	})
+	// Clear legacy cookie that was previously set with Path=/api/refresh
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/api/refresh",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	})
 	return nil
 }
 
@@ -113,6 +123,11 @@ func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
 	})
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name: "refresh_token", Value: "", Path: "/",
+		MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
+	})
+	// Clear legacy cookie that was previously set with Path=/api/refresh
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: "refresh_token", Value: "", Path: "/api/refresh",
 		MaxAge: -1, HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode,
 	})
 	if rt, err := c.Cookie("refresh_token"); err == nil && rt != "" {
