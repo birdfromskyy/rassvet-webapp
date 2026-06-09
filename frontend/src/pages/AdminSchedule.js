@@ -1947,9 +1947,13 @@ const AdminSchedule = () => {
 									options={groupLessons}
 									value={groupLessons.find(g => g.id === Number(slotForm.group_lesson_id)) || null}
 									getOptionLabel={g =>
-										g ? `${g.name} (${g.subject?.name || g.subject_id}, ${g.enrollments?.length || 0} уч.)` : ''
+										g ? `${g.name} (${g.subject?.name || 'Без предмета'}, ${g.enrollments?.length || 0} уч.)` : ''
 									}
-								onChange={(event, value) =>
+								onChange={(event, value) => {
+									const dur = value?.duration_min
+									const [h, m] = slotForm.start_time.split(':').map(Number)
+									const endMin = h * 60 + m + (dur || 50)
+									const endTime = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`
 									setSlotForm({
 										...slotForm,
 										group_lesson_id: value?.id || '',
@@ -1957,8 +1961,9 @@ const AdminSchedule = () => {
 										teacher_id: value?.default_teacher_id || '',
 										room_name: value?.room_name || '',
 										ignore_student_windows: value?.ignore_student_windows || false,
+										end_time: value ? endTime : slotForm.end_time,
 									})
-								}
+								}}
 									renderInput={params => (
 										<TextField {...params} label='Группа' required />
 									)}

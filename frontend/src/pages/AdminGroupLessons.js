@@ -69,6 +69,7 @@ const AdminGroupLessons = () => {
 	const [enrollOpen, setEnrollOpen] = useState(false)
 	const [enrollGroup, setEnrollGroup] = useState(null)
 	const [addStudentId, setAddStudentId] = useState('')
+	const [enrollSearch, setEnrollSearch] = useState('')
 	const [deleteConfirm, setDeleteConfirm] = useState(null)
 
 	const load = useCallback(async () => {
@@ -201,7 +202,10 @@ const AdminGroupLessons = () => {
 	}
 
 	const enrolledIds = enrollGroup?.enrollments?.map(e => e.student_id) || []
-	const availableStudents = students.filter(s => !enrolledIds.includes(s.id))
+	const availableStudents = students
+		.filter(s => !enrolledIds.includes(s.id))
+		.filter(s => s.full_name.toLowerCase().includes(enrollSearch.toLowerCase()))
+		.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))
 
 	if (loading) return <Box display='flex' justifyContent='center' mt={6}><CircularProgress /></Box>
 
@@ -354,7 +358,7 @@ const AdminGroupLessons = () => {
 				</DialogActions>
 			</Dialog>
 
-			<Dialog open={enrollOpen} onClose={() => setEnrollOpen(false)} maxWidth='sm' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
+			<Dialog open={enrollOpen} onClose={() => { setEnrollOpen(false); setEnrollSearch('') }} maxWidth='sm' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
 				<DialogTitle className='admin-module-dialog__title'>
 					Состав группы: {enrollGroup?.name}
 					<Typography variant='caption' display='block' color='text.secondary'>
@@ -363,6 +367,14 @@ const AdminGroupLessons = () => {
 				</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='subtitle2' gutterBottom>Добавить ученика</Typography>
+					<TextField
+						size='small'
+						fullWidth
+						placeholder='Поиск ученика...'
+						value={enrollSearch}
+						onChange={e => { setEnrollSearch(e.target.value); setAddStudentId('') }}
+						sx={{ mb: 1 }}
+					/>
 					<Box display='flex' gap={1} mb={2}>
 						<FormControl fullWidth size='small'>
 							<InputLabel>Ученик</InputLabel>
@@ -382,7 +394,9 @@ const AdminGroupLessons = () => {
 						<Typography color='text.secondary' variant='body2'>В группе нет учеников</Typography>
 					)}
 					<List dense>
-						{(enrollGroup?.enrollments || []).map(e => (
+						{[...(enrollGroup?.enrollments || [])].sort((a, b) =>
+							(a.student?.full_name || '').localeCompare(b.student?.full_name || '', 'ru')
+						).map(e => (
 							<ListItem key={e.id} disableGutters>
 								<ListItemText primary={e.student?.full_name || `Ученик #${e.student_id}`} />
 								<ListItemSecondaryAction>
