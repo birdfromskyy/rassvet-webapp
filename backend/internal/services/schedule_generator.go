@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const DefaultBreakMinutes = 5
+const DefaultBreakMinutes = 0
 const IdealStudentGapMinutes = 10
 const MaxStudentGapMinutes = 30
 const TeacherGapMinutes = 10
@@ -1081,9 +1081,6 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 					if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
 						continue
 					}
-					if g.createsLargeTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
-						continue
-					}
 					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 						continue
 					}
@@ -1435,9 +1432,6 @@ func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *Ge
 					}
 				}
 
-					if g.createsLargeTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
-						continue
-					}
 					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 						continue
 					}
