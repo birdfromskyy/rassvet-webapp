@@ -1091,7 +1091,7 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 			conflictErrors++
 		}
 	}
-	unplaced := len(issues)
+	unplaced := (indRequested + grpRequested) - (indScheduled + grpScheduled)
 
 	c.JSON(http.StatusOK, gin.H{
 		"schedule": gin.H{
@@ -1133,7 +1133,11 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 	}
 
 	var assignments []models.Assignment
-	if err := h.db.Where("status = ?", models.AssignmentStatusActive).Find(&assignments).Error; err == nil {
+	if err := h.db.
+		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
+		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
+		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Find(&assignments).Error; err == nil {
 		for _, a := range assignments {
 			if override, ok := assignmentOverrides[a.ID]; ok {
 				if override.Status == models.AssignmentStatusPaused {
