@@ -233,23 +233,14 @@ const AdminAssignments = () => {
 					</Box>
 					<Grid container spacing={2}>
 						<Grid item xs={12} sm={6} md={3}>
-							<FormControl fullWidth size='small'>
-								<InputLabel>Ученик</InputLabel>
-								<Select
-									value={filters.student_id}
-									label='Ученик'
-									onChange={e =>
-										setFilters({ ...filters, student_id: e.target.value })
-									}
-								>
-									<MenuItem value=''>Все</MenuItem>
-									{students.map(s => (
-										<MenuItem key={s.id} value={s.id}>
-											{s.full_name}
-										</MenuItem>
-									))}
-								</Select>
-							</FormControl>
+							<Autocomplete
+								size='small'
+								options={[...students].sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
+								getOptionLabel={s => s.full_name}
+								value={students.find(s => s.id === filters.student_id) || null}
+								onChange={(_, v) => setFilters({ ...filters, student_id: v?.id || '' })}
+								renderInput={params => <TextField {...params} label='Ученик' />}
+							/>
 						</Grid>
 						<Grid item xs={12} sm={6} md={3}>
 							<FormControl fullWidth size='small'>
@@ -337,7 +328,11 @@ const AdminAssignments = () => {
 								</TableRow>
 							</TableHead>
 							<TableBody>
-								{assignments.map(a => (
+								{[...assignments].sort((a, b) => {
+								const nameA = a.student?.full_name || findName(students, a.student_id, 'full_name') || ''
+								const nameB = b.student?.full_name || findName(students, b.student_id, 'full_name') || ''
+								return nameA.localeCompare(nameB, 'ru')
+							}).map(a => (
 									<TableRow key={a.id}>
 										<TableCell>{a.id}</TableCell>
 										<TableCell>

@@ -253,6 +253,7 @@ const AdminStudents = () => {
                     .filter((s) =>
                       s.full_name.toLowerCase().includes(search.toLowerCase()),
                     )
+                    .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))
                     .map((s) => (
                       <TableRow key={s.id}>
                         <TableCell>{s.id}</TableCell>
