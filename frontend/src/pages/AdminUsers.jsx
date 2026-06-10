@@ -436,7 +436,9 @@ const AdminUsers = () => {
   };
 
   const linkedStudentIds = children.map((c) => c.student_id);
-  const availableStudents = students.filter((s) => !linkedStudentIds.includes(s.id));
+  const availableStudents = students
+    .filter((s) => !linkedStudentIds.includes(s.id))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'));
 
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = normalizedSearch
