@@ -557,11 +557,13 @@ const AdminUsers = () => {
                           <Typography variant="caption" color="text.disabled">—</Typography>
                         ) : (
                           <>
-                            <Tooltip title="Редактировать пользователя">
-                              <IconButton size="small" onClick={() => openEditDialog(u)}>
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            {u.role !== "superadmin" && (
+                              <Tooltip title="Редактировать пользователя">
+                                <IconButton size="small" onClick={() => openEditDialog(u)}>
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                             <Tooltip title="Управление детьми">
                               <IconButton size="small" color="primary" onClick={() => openChildDialog(u)}>
                                 <Badge badgeContent={childrenCounts[u.id] || 0} color="success" invisible={(childrenCounts[u.id] || 0) === 0}>
