@@ -789,6 +789,8 @@ const AdminSchedule = () => {
 	const openCreateSlot = () => {
 		setSlotForm(EMPTY_SLOT_FORM)
 		setCreateDialog(true)
+		// Refresh group lessons to get the latest default_teacher_id
+		scheduleService.getGroupLessons({ status: 'active' }).then(setGroupLessons).catch(() => {})
 	}
 
 	const doCreateSlot = async (force = false) => {
@@ -1208,8 +1210,11 @@ const AdminSchedule = () => {
 						min={5}
 						max={120}
 						step={5}
-						onChange={e => setMaxGapMinutes(Number(e.target.value))}
-						onBlur={e => saveMaxGapMinutes(Number(e.target.value))}
+						onChange={e => {
+							const val = Number(e.target.value)
+							setMaxGapMinutes(val)
+							if (val >= 5) saveMaxGapMinutes(val)
+						}}
 					/>
 					<span className='admin-schedule-settings__label'>мин.</span>
 					{maxGapSaved && <span className='admin-schedule-settings__saved'>✓</span>}
@@ -1224,8 +1229,11 @@ const AdminSchedule = () => {
 						min={5}
 						max={60}
 						step={5}
-						onChange={e => setTeacherGapMinutes(Number(e.target.value))}
-						onBlur={e => saveTeacherGapMinutes(Number(e.target.value))}
+						onChange={e => {
+							const val = Number(e.target.value)
+							setTeacherGapMinutes(val)
+							if (val >= 5) saveTeacherGapMinutes(val)
+						}}
 					/>
 					<span className='admin-schedule-settings__label'>мин.</span>
 					{teacherGapSaved && <span className='admin-schedule-settings__saved'>✓</span>}
@@ -1954,11 +1962,14 @@ const AdminSchedule = () => {
 									const [h, m] = slotForm.start_time.split(':').map(Number)
 									const endMin = h * 60 + m + (dur || 50)
 									const endTime = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`
+									const teacherId = value?.default_teacher_id
+										?? value?.default_teacher?.id
+										?? ''
 									setSlotForm({
 										...slotForm,
 										group_lesson_id: value?.id || '',
 										subject_id: value?.subject_id || '',
-										teacher_id: value?.default_teacher_id || '',
+										teacher_id: teacherId,
 										room_name: value?.room_name || '',
 										ignore_student_windows: value?.ignore_student_windows || false,
 										end_time: value ? endTime : slotForm.end_time,
@@ -2184,7 +2195,7 @@ const AdminSchedule = () => {
 														<Autocomplete
 															fullWidth
 															size='small'
-															options={students.filter(s => !inSession.has(s.id))}
+															options={students.filter(s => !inSession.has(s.id)).sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
 															value={students.find(s => s.id === Number(addGroupStudentId)) || null}
 															getOptionLabel={s => s?.full_name || ''}
 															onChange={(_, value) => setAddGroupStudentId(value?.id || '')}
