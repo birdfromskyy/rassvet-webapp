@@ -191,6 +191,7 @@ const AdminUsers = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [childrenCounts, setChildrenCounts] = useState({});
+  const [teacherLinkedUserIds, setTeacherLinkedUserIds] = useState(new Set());
   const [search, setSearch] = useState("");
 
   const [childDialog, setChildDialog] = useState({ open: false, user: null });
@@ -228,6 +229,7 @@ const AdminUsers = () => {
         scheduleService.getTeachers(),
       ]);
       setTeachers(teachersData);
+      setTeacherLinkedUserIds(new Set(teachersData.filter(t => t.user_id).map(t => t.user_id)));
 
       setUsers(usersData);
       setStudents(studentsData);
@@ -414,6 +416,7 @@ const AdminUsers = () => {
       const data = await scheduleService.getLinkedTeacher(teacherDialog.user.id);
       setLinkedTeacher(data.teacher || null);
       setSelectedTeacher(null);
+      setTeacherLinkedUserIds(prev => new Set([...prev, teacherDialog.user.id]));
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка привязки");
     } finally {
@@ -428,6 +431,7 @@ const AdminUsers = () => {
       await scheduleService.unlinkTeacherFromUser(teacherDialog.user.id);
       toast.success("Преподаватель отвязан");
       setLinkedTeacher(null);
+      setTeacherLinkedUserIds(prev => { const s = new Set(prev); s.delete(teacherDialog.user.id); return s; });
     } catch {
       toast.error("Ошибка отвязки");
     } finally {
@@ -576,7 +580,9 @@ const AdminUsers = () => {
                             {u.role !== "user" && (
                               <Tooltip title="Привязать сотрудника">
                                 <IconButton size="small" color="secondary" onClick={() => openTeacherDialog(u)}>
-                                  <TeacherLinkIcon fontSize="small" />
+                                  <Badge variant="dot" color="success" invisible={!teacherLinkedUserIds.has(u.id)}>
+                                    <TeacherLinkIcon fontSize="small" />
+                                  </Badge>
                                 </IconButton>
                               </Tooltip>
                             )}
@@ -686,8 +692,8 @@ const AdminUsers = () => {
             <Box className="admin-user-children-add">
               <Autocomplete
                 fullWidth
-                options={teachers.filter((t) => t.is_active)}
-                getOptionLabel={(t) => t.full_name}
+                options={teachers.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
+                getOptionLabel={(t) => t.full_name + (t.is_active ? "" : " (неактивен)")}
                 value={selectedTeacher}
                 onChange={(_, val) => setSelectedTeacher(val)}
                 noOptionsText="Преподаватели не найдены"
