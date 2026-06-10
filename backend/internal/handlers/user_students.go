@@ -148,12 +148,6 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 		}
 	}
 
-	// A superadmin can only edit their own account, not another superadmin's.
-	callerID := extractUserID(c)
-	if string(user.Role) == "superadmin" && callerID != uint(userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Нельзя редактировать аккаунт другого суперадминистратора"})
-		return
-	}
 	// Superadmin role is immutable via the UI — change it directly in the database.
 	if string(user.Role) == "superadmin" && req.Role != "" && req.Role != "superadmin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Роль суперадминистратора нельзя изменить через интерфейс"})

@@ -19,10 +19,8 @@ const getMonday = (date) => {
   const d = new Date(date);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
-
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
-
   return d;
 };
 
@@ -36,12 +34,10 @@ const getTodayWeekday = () => {
 const getSlotSubject = (slot) =>
   slot.subject?.name || slot.group_lesson?.name || "Занятие";
 
-const getSlotStudent = (slot) => {
+const getSlotStudentLabel = (slot) => {
   if (slot.slot_type !== "group") return slot.student?.full_name || "—";
-  const excluded = new Set((slot.exclusions || []).map((ex) => ex.student_id));
   return (
     (slot.group_lesson?.enrollments || [])
-      .filter((enr) => !excluded.has(enr.student_id))
       .map((enr) => enr.student?.full_name)
       .filter(Boolean)
       .join(", ") ||
@@ -56,111 +52,62 @@ const getDuration = (start, end) => {
   return eh * 60 + em - (sh * 60 + sm);
 };
 
-const TodayScheduleWidget = ({ user }) => {
-  const navigate = useNavigate();
-  const isTeacher = user?.role === "teacher";
+const SlotItem = ({ slot, asTeacher }) => (
+  <article className="dashboard-schedule__item" key={slot.id}>
+    <div className="dashboard-schedule__time">
+      {slot.start_time}–{slot.end_time}
+      <span className="dashboard-schedule__duration">
+        {getDuration(slot.start_time, slot.end_time)} мин
+      </span>
+    </div>
+    <div className="dashboard-schedule__info">
+      <h3>{asTeacher ? getSlotStudentLabel(slot) : getSlotSubject(slot)}</h3>
+      <p>
+        <span className="dashboard-schedule__label">Кабинет: </span>
+        {slot.room_name || slot.room?.name || "не указан"}
+      </p>
+      <p className="dashboard-schedule__secondary">
+        <span className="dashboard-schedule__label">
+          {asTeacher ? "Предмет: " : "Преподаватель: "}
+        </span>
+        {asTeacher ? getSlotSubject(slot) : slot.teacher?.full_name || "—"}
+      </p>
+    </div>
+  </article>
+);
 
-  const [children, setChildren] = useState([]);
-  const [activeChildIndex, setActiveChildIndex] = useState(0);
+// Shows teacher's own schedule for today
+const TeacherScheduleWidget = ({ user }) => {
+  const navigate = useNavigate();
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const todayWeekday = getTodayWeekday();
   const weekStartISO = formatDateISO(getMonday(new Date()));
-  const activeChild = children[activeChildIndex];
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-
-      try {
-        if (isTeacher) {
-          if (!user?.teacher_id) {
-            setSlots([]);
-            return;
-          }
-
-          const data = await scheduleService.getTeacherPublishedSchedule(
-            weekStartISO,
-            { teacher_id: user.teacher_id, student_id: "" }
-          );
-
-          setSlots(
-            (data.slots || []).filter((slot) => slot.weekday === todayWeekday)
-          );
-        } else {
-          const childrenData = await scheduleService.getMyChildren();
-          setChildren(childrenData);
-
-          if (childrenData.length > 0) {
-            const data = await scheduleService.getChildSchedule(
-              childrenData[0].student_id,
-              weekStartISO
-            );
-
-            setSlots(
-              (data.slots || []).filter(
-                (slot) => slot.weekday === todayWeekday
-              )
-            );
-          }
-        }
-      } catch {
-        setSlots([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, [isTeacher, user, weekStartISO, todayWeekday]);
-
-  useEffect(() => {
-    if (isTeacher || !activeChild) return;
-
-    const loadChildSchedule = async () => {
-      setLoading(true);
-
-      try {
-        const data = await scheduleService.getChildSchedule(
-          activeChild.student_id,
-          weekStartISO
-        );
-
-        setSlots(
-          (data.slots || []).filter((slot) => slot.weekday === todayWeekday)
-        );
-      } catch {
-        setSlots([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadChildSchedule();
-  }, [activeChildIndex, activeChild, isTeacher, weekStartISO, todayWeekday]);
-
-  const prevChild = () => {
-    setActiveChildIndex((prev) =>
-      prev === 0 ? children.length - 1 : prev - 1
-    );
-  };
-
-  const nextChild = () => {
-    setActiveChildIndex((prev) =>
-      prev === children.length - 1 ? 0 : prev + 1
-    );
-  };
+    if (!user?.teacher_id) {
+      setLoading(false);
+      return;
+    }
+    scheduleService
+      .getTeacherPublishedSchedule(weekStartISO, {
+        teacher_id: user.teacher_id,
+        student_id: "",
+      })
+      .then((data) =>
+        setSlots((data.slots || []).filter((s) => s.weekday === todayWeekday))
+      )
+      .catch(() => setSlots([]))
+      .finally(() => setLoading(false));
+  }, [user, weekStartISO, todayWeekday]);
 
   return (
     <section className="dashboard-schedule">
       <div className="dashboard-schedule__top">
         <div>
           <span className="section-badge">Сегодня</span>
-
-          <h2>{isTeacher ? "Ваше расписание" : "Расписание ребёнка"}</h2>
+          <h2>Ваше расписание</h2>
         </div>
-
         <button onClick={() => navigate("/my-schedule")}>
           Посмотреть всё расписание
         </button>
@@ -168,51 +115,124 @@ const TodayScheduleWidget = ({ user }) => {
 
       {loading ? (
         <div className="dashboard-schedule__empty">Загружаем расписание...</div>
-      ) : isTeacher && !user?.teacher_id ? (
+      ) : !user?.teacher_id ? (
         <div className="dashboard-schedule__empty">
-          Ваш аккаунт ещё не привязан к преподавателю. Обратитесь к администратору.
+          Аккаунт не привязан к преподавателю. Обратитесь к администратору.
         </div>
       ) : slots.length === 0 ? (
         <div className="dashboard-schedule__empty">На сегодня занятий нет</div>
       ) : (
         <div className="dashboard-schedule__list">
           {slots.map((slot) => (
-            <article className="dashboard-schedule__item" key={slot.id}>
-              <div className="dashboard-schedule__time">
-                {slot.start_time}–{slot.end_time}
-                <span className="dashboard-schedule__duration">
-                  {getDuration(slot.start_time, slot.end_time)} мин
-                </span>
-              </div>
-
-              <div className="dashboard-schedule__info">
-                <h3>
-                  {isTeacher ? getSlotStudent(slot) : getSlotSubject(slot)}
-                </h3>
-                <p>
-                  <span className="dashboard-schedule__label">Кабинет: </span>
-                  {slot.room_name || slot.room?.name || "не указан"}
-                </p>
-                <p className="dashboard-schedule__secondary">
-                  <span className="dashboard-schedule__label">
-                    {isTeacher ? "Предмет: " : "Преподаватель: "}
-                  </span>
-                  {isTeacher
-                    ? getSlotSubject(slot)
-                    : slot.teacher?.full_name || "—"}
-                </p>
-              </div>
-            </article>
+            <SlotItem key={slot.id} slot={slot} asTeacher />
           ))}
         </div>
       )}
-            {!isTeacher && children.length > 1 && (
+    </section>
+  );
+};
+
+// Shows children's schedule for today (user or admin with linked children)
+const ChildScheduleWidget = () => {
+  const navigate = useNavigate();
+  const [children, setChildren] = useState([]);
+  const [activeChildIndex, setActiveChildIndex] = useState(0);
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const todayWeekday = getTodayWeekday();
+  const weekStartISO = formatDateISO(getMonday(new Date()));
+  const activeChild = children[activeChildIndex];
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const childrenData = await scheduleService.getMyChildren();
+        setChildren(childrenData);
+        if (childrenData.length > 0) {
+          const data = await scheduleService.getChildSchedule(
+            childrenData[0].student_id,
+            weekStartISO
+          );
+          setSlots(
+            (data.slots || []).filter((s) => s.weekday === todayWeekday)
+          );
+        }
+      } catch {
+        setSlots([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [weekStartISO, todayWeekday]);
+
+  useEffect(() => {
+    if (!activeChild) return;
+    const loadChildSchedule = async () => {
+      setLoading(true);
+      try {
+        const data = await scheduleService.getChildSchedule(
+          activeChild.student_id,
+          weekStartISO
+        );
+        setSlots(
+          (data.slots || []).filter((s) => s.weekday === todayWeekday)
+        );
+      } catch {
+        setSlots([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadChildSchedule();
+  }, [activeChildIndex, activeChild, weekStartISO, todayWeekday]);
+
+  return (
+    <section className="dashboard-schedule">
+      <div className="dashboard-schedule__top">
+        <div>
+          <span className="section-badge">Сегодня</span>
+          <h2>Расписание ребёнка</h2>
+        </div>
+        <button onClick={() => navigate("/my-schedule")}>
+          Посмотреть всё расписание
+        </button>
+      </div>
+
+      {children.length > 1 && (
         <div className="dashboard-schedule__switcher">
-          <button onClick={prevChild}>←</button>
-          <span>
-            {activeChild.student?.full_name}
-          </span>
-          <button onClick={nextChild}>→</button>
+          <button
+            onClick={() =>
+              setActiveChildIndex((p) =>
+                p === 0 ? children.length - 1 : p - 1
+              )
+            }
+          >
+            ←
+          </button>
+          <span>{activeChild?.student?.full_name}</span>
+          <button
+            onClick={() =>
+              setActiveChildIndex((p) =>
+                p === children.length - 1 ? 0 : p + 1
+              )
+            }
+          >
+            →
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="dashboard-schedule__empty">Загружаем расписание...</div>
+      ) : slots.length === 0 ? (
+        <div className="dashboard-schedule__empty">На сегодня занятий нет</div>
+      ) : (
+        <div className="dashboard-schedule__list">
+          {slots.map((slot) => (
+            <SlotItem key={slot.id} slot={slot} asTeacher={false} />
+          ))}
         </div>
       )}
     </section>
@@ -237,7 +257,7 @@ const Q_STATUS = {
     bg: "#fff1f2", border: "#fca5a5", color: "#991b1b",
     icon: "⚠️",
     title: "Требует уточнения",
-    body: null, // replaced by admin_note
+    body: null,
   },
 };
 
@@ -277,12 +297,10 @@ const QuestionnaireSection = () => {
   const status = q?.status;
   const statusCfg = Q_STATUS[status];
 
-  // Styles shared between upload blocks
   const btnPrimary = { background: "#f7df00", color: "#074462", border: "none", cursor: "pointer", borderRadius: 999, minHeight: 44, padding: "0 20px", fontWeight: 800, fontSize: 14 };
   const btnOutline = { background: "transparent", border: "2px solid #074462", color: "#074462", cursor: "pointer", borderRadius: 999, minHeight: 44, padding: "0 20px", fontWeight: 700, fontSize: 14 };
   const btnGhost   = { background: "transparent", border: "1px solid #ccc", color: "#64748b", cursor: "pointer", borderRadius: 999, minHeight: 36, padding: "0 14px", fontSize: 13 };
 
-  // Inline buttons: [Скачать бланк] [Выбрать/Обновить файл] or send-confirm row
   const UploadBlock = ({ inputId, showDownload }) => (
     <div style={{ marginTop: 16 }}>
       {selectedFile ? (
@@ -317,7 +335,6 @@ const QuestionnaireSection = () => {
 
   return (
     <>
-      {/* ── Анкета ─────────────────────────────────────────────────── */}
       <section className="dashboard-documents">
         <span className="section-badge">Анкета</span>
         <h2>Входная анкета</h2>
@@ -332,7 +349,6 @@ const QuestionnaireSection = () => {
           </>
         ) : (
           <>
-            {/* Цветной баннер статуса */}
             {statusCfg && (
               <div style={{
                 display: "flex", gap: 12, alignItems: "flex-start",
@@ -349,8 +365,6 @@ const QuestionnaireSection = () => {
                 </div>
               </div>
             )}
-
-            {/* Бланк + обновление файла — только если не approved */}
             {(status === "pending" || status === "rejected") && (
               <UploadBlock inputId="q-reupload" showDownload />
             )}
@@ -358,7 +372,6 @@ const QuestionnaireSection = () => {
         )}
       </section>
 
-      {/* ── Документы — только если анкета принята ─────────────────── */}
       {status === "approved" && (
         <section className="dashboard-documents">
           <span className="section-badge">Документы</span>
@@ -384,25 +397,25 @@ const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
 
   const isAdmin   = isAdminRole(user?.role);
-  const isTeacher = isTeacherRole(user?.role);
+  const isTeacher = isTeacherRole(user?.role); // role === 'teacher', not admin
   const isUser    = !isAdmin && !isTeacher;
 
+  // For admin and user roles: check if they have children linked
   const [hasChildren, setHasChildren] = useState(false);
-  const [childrenLoading, setChildrenLoading] = useState(isUser);
+  const [childrenLoading, setChildrenLoading] = useState(!isTeacher);
 
   useEffect(() => {
     document.title = "Личный кабинет";
   }, []);
 
   useEffect(() => {
-    if (!isUser) return;
-
+    if (isTeacher) return; // pure teacher role: no children check
     scheduleService
       .getMyChildren()
       .then((data) => setHasChildren(data.length > 0))
       .catch(() => setHasChildren(false))
       .finally(() => setChildrenLoading(false));
-  }, [isUser]);
+  }, [isTeacher]);
 
   const handleLogout = async () => {
     try {
@@ -417,46 +430,55 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
-  const cards = useMemo(
+  const adminCards = useMemo(
     () => [
-      {
-        title: "Отзывы",
-        text: "Оставьте отзыв о работе центра.",
-        button: "Написать отзыв",
-        path: "/reviews",
-        show: isUser,
-      },
-      {
-        title: "Поддержать центр",
-        text: "Поддержите деятельность нашего центра.",
-        button: "Перейти",
-        path: "/donation",
-        show: isUser,
-      },
       {
         title: "Модуль расписания",
         text: "Автоматическое формирование расписания занятий.",
         button: "Открыть",
         path: "/admin/schedule",
-        show: isAdmin,
       },
       {
         title: "Управление сайтом",
         text: "Редактирование публичных страниц и контента.",
         button: "CMS",
         path: "/admin/cms",
-        show: isAdmin,
       },
       {
         title: "Отзывы",
         text: "Модерация отзывов пользователей.",
         button: "Открыть",
         path: "/admin/reviews",
-        show: isAdmin,
       },
     ],
-    [isAdmin, isUser]
+    []
   );
+
+  const userCards = useMemo(
+    () => [
+      {
+        title: "Отзывы",
+        text: "Оставьте отзыв о работе центра.",
+        button: "Написать отзыв",
+        path: "/reviews",
+      },
+      {
+        title: "Поддержать центр",
+        text: "Поддержите деятельность нашего центра.",
+        button: "Перейти",
+        path: "/donation",
+      },
+    ],
+    []
+  );
+
+  const subtitle = isAdmin
+    ? "Здесь вы можете управлять расписанием, отзывами и контентом сайта."
+    : isTeacher
+    ? "Здесь вы можете просматривать своё расписание занятий."
+    : hasChildren
+    ? "Здесь вы можете смотреть расписание, оставить отзыв и поддержать Центр."
+    : "Загрузите документы, чтобы администрация смогла привязать ребёнка к вашему аккаунту.";
 
   return (
     <div className="page page--dashboard">
@@ -464,44 +486,62 @@ const Dashboard = ({ user, onLogout }) => {
 
       <main className="dashboard">
         <div className="dashboard__container container">
+
+          {/* ── Hero ── */}
           <section className="dashboard__hero">
             <div>
               <span className="section-badge">Личный кабинет</span>
-
               <h1 className="dashboard__title">
                 Здравствуйте,&nbsp;{user?.first_name}!
               </h1>
-
-              <p className="dashboard__subtitle">
-                {isAdmin
-                  ? "Здесь вы можете управлять расписанием, отзывами и контентом сайта."
-                  : isTeacher
-                  ? "Здесь вы можете просматривать своё расписание занятий."
-                  : hasChildren
-                  ? "Здесь вы можете смотреть расписание, оставить отзыв и поддержать Центр."
-                  : "Загрузите документы, чтобы администрация смогла привязать ребёнка к вашему аккаунту."}
-              </p>
+              <p className="dashboard__subtitle">{subtitle}</p>
             </div>
-
             <div className="dashboard__actions">
               <button onClick={() => navigate("/profile")}>Профиль</button>
-
               <button className="dashboard__logout" onClick={handleLogout}>
                 Выйти
               </button>
             </div>
           </section>
 
-          {!isAdmin ? (
+          {/* ── Admin layout: 3 blocks ── */}
+          {isAdmin && (
+            <>
+              <section className="dashboard__cards">
+                {adminCards.map((card) => (
+                  <article key={card.title} className="dashboard-card">
+                    <h2>{card.title}</h2>
+                    <p>{card.text}</p>
+                    <button onClick={() => navigate(card.path)}>
+                      {card.button}
+                    </button>
+                  </article>
+                ))}
+              </section>
+
+              {user?.teacher_id && <TeacherScheduleWidget user={user} />}
+
+              {!childrenLoading && hasChildren && <ChildScheduleWidget />}
+            </>
+          )}
+
+          {/* ── Teacher layout ── */}
+          {!isAdmin && isTeacher && (
             <section className="dashboard__main-grid">
-              {isTeacher ? (
-                <TodayScheduleWidget user={user} />
-              ) : childrenLoading ? (
+              <TeacherScheduleWidget user={user} />
+              <section className="dashboard__cards" />
+            </section>
+          )}
+
+          {/* ── User (parent) layout ── */}
+          {isUser && (
+            <section className="dashboard__main-grid">
+              {childrenLoading ? (
                 <section className="dashboard-documents">
                   <div className="dashboard-schedule__empty">Проверяем данные...</div>
                 </section>
               ) : hasChildren ? (
-                <TodayScheduleWidget user={user} />
+                <ChildScheduleWidget />
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
                   <QuestionnaireSection />
@@ -509,88 +549,24 @@ const Dashboard = ({ user, onLogout }) => {
               )}
 
               <section className="dashboard__cards">
-                {cards
-                  .filter((card) => card.show)
-                  .map((card) => (
-                    <article key={card.title} className="dashboard-card">
-                      <h2>{card.title}</h2>
-
-                      <p>{card.text}</p>
-
-                      <button
-                        disabled={card.disabled}
-                        onClick={() => {
-                          if (!card.disabled) navigate(card.path);
-                        }}
-                      >
-                        {card.button}
-                      </button>
-                    </article>
-                  ))}
-              </section>
-            </section>
-          ) : (
-            <section className="dashboard__cards">
-              {cards
-                .filter((card) => card.show)
-                .map((card) => (
+                {userCards.map((card) => (
                   <article key={card.title} className="dashboard-card">
                     <h2>{card.title}</h2>
-
                     <p>{card.text}</p>
-
-                    <button
-                      disabled={card.disabled}
-                      onClick={() => {
-                        if (!card.disabled) navigate(card.path);
-                      }}
-                    >
+                    <button onClick={() => navigate(card.path)}>
                       {card.button}
                     </button>
                   </article>
                 ))}
+              </section>
             </section>
           )}
 
+          {/* ── News ── */}
           <section className="dashboard-news">
             <NewsSection limit={3} />
           </section>
 
-          {/* <section className="dashboard-profile">
-            <div className="dashboard-profile__top">
-              <span className="section-badge">Профиль</span>
-
-              <h2>Информация о пользователе</h2>
-            </div>
-
-            <div className="dashboard-profile__grid">
-              <div className="dashboard-profile__item">
-                <span>ФИО</span>
-
-                <strong>
-                  {user?.last_name} {user?.first_name} {user?.middle_name}
-                </strong>
-              </div>
-
-              <div className="dashboard-profile__item">
-                <span>Email</span>
-
-                <strong>{user?.email}</strong>
-              </div>
-
-              <div className="dashboard-profile__item">
-                <span>Роль</span>
-
-                <strong>
-                  {isAdmin
-                    ? "Администратор"
-                    : isTeacher
-                    ? "Преподаватель"
-                    : "Пользователь"}
-                </strong>
-              </div>
-            </div>
-          </section> */}
         </div>
       </main>
 

@@ -737,11 +737,9 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 		"role":        user.Role,
 	}
 
-	if user.Role == models.RoleTeacher {
-		var teacher models.Teacher
-		if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
-			resp["teacher_id"] = teacher.ID
-		}
+	var teacher models.Teacher
+	if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
+		resp["teacher_id"] = teacher.ID
 	}
 
 	c.JSON(http.StatusOK, resp)

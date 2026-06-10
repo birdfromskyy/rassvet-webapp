@@ -791,11 +791,6 @@ func (h *TeacherHandler) LinkUserToTeacher(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		return
 	}
-	if user.Role != models.RoleTeacher {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь не является сотрудником"})
-		return
-	}
-
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, req.TeacherID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Преподаватель не найден"})
