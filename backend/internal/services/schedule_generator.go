@@ -4,6 +4,7 @@ import (
 	"backend/internal/models"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -41,13 +42,18 @@ func (g *ScheduleGenerator) loadSettings() {
 		var s struct{ Value string }
 		if err := g.db.Raw("SELECT value FROM site_settings WHERE key = ? LIMIT 1", key).Scan(&s).Error; err == nil && s.Value != "" {
 			if v, err := strconv.Atoi(s.Value); err == nil && v > 0 {
+				log.Printf("[GEN] loadSettings: key=%q db_value=%q → %d", key, s.Value, v)
 				return v
 			}
+			log.Printf("[GEN] loadSettings: key=%q db_value=%q invalid, using default=%d", key, s.Value, def)
+		} else {
+			log.Printf("[GEN] loadSettings: key=%q not found in DB, using default=%d", key, def)
 		}
 		return def
 	}
 	g.maxStudentGapMinutes = readInt("max_student_gap_minutes", MaxStudentGapMinutes)
 	g.teacherGapMinutes = readInt("teacher_gap_minutes", TeacherGapMinutes)
+	log.Printf("[GEN] loadSettings RESULT: maxStudentGap=%d teacherGap=%d", g.maxStudentGapMinutes, g.teacherGapMinutes)
 }
 
 type gapCombo struct {
@@ -81,17 +87,15 @@ func (g *ScheduleGenerator) buildGapCombinations() []gapCombo {
 }
 
 type GenerationContext struct {
-	Schedule                 models.Schedule
-	Assignments              []models.Assignment
-	Overrides                []models.AssignmentWeekOverride
-	TeacherAvailability      []models.TeacherAvailability
-	StudentAvailability      []models.StudentAvailability
-	RoomSubjects             []models.RoomSubject
-	TeacherRooms             []models.TeacherRoom
-	GroupLessons             []models.GroupLesson
-	GroupLessonEnrollments   []models.GroupLessonEnrollment
-	GroupLessonWeekOverrides []models.GroupLessonWeekOverride
-	ExistingSlots            []models.ScheduleSlot
+	Schedule                models.Schedule
+	Assignments             []models.Assignment
+	TeacherAvailability     []models.TeacherAvailability
+	StudentAvailability     []models.StudentAvailability
+	RoomSubjects            []models.RoomSubject
+	TeacherRooms            []models.TeacherRoom
+	GroupLessons            []models.GroupLesson
+	GroupLessonEnrollments  []models.GroupLessonEnrollment
+	ExistingSlots           []models.ScheduleSlot
 	StrictTeacherRoomMap     map[uint][]uint // teacherID -> []roomID (строгие)
 	PreferredTeacherRoomMap  map[uint][]uint // teacherID -> []roomID (предпочтительные)
 	StrictTeacherIDs         map[uint]bool   // teacherID -> true если есть хоть один строгий кабинет
@@ -114,40 +118,12 @@ type WeeklyTask struct {
 	AvailableWindowMinutes int // total intersection of teacher+student windows across all weekdays
 }
 
-type GroupWeeklyTask struct {
-	GroupLessonID        uint
-	TeacherID            uint
-	SubjectID            uint
-	GroupName            string
-	TeacherName          string
-	SubjectName          string
-	EnrolledStudentIDs   []uint
-	VisitsPerWeek        int
-	DurationMin          int
-	TaskIndex            int
-	HasStrictRoom        bool
-	IgnoreStudentWindows bool
-}
-
 type CandidateSlot struct {
 	AssignmentID uint
 	StudentID    uint
 	TeacherID    uint
 	SubjectID    uint
 	RoomID       uint
-
-	Weekday   int
-	StartTime string
-	EndTime   string
-
-	Score int
-}
-
-type GroupCandidateSlot struct {
-	GroupLessonID uint
-	TeacherID     uint
-	SubjectID     uint
-	RoomID        uint
 
 	Weekday   int
 	StartTime string
@@ -191,8 +167,6 @@ type ginScheduleResponse struct {
 type ScheduleStrategy struct {
 	Name            string
 	IndividualOrder string
-	GroupOrder      string
-	GroupsFirst     bool
 }
 
 type generationRunResult struct {
@@ -230,7 +204,9 @@ func (g *ScheduleGenerator) GenerateScheduleWithProgress(
 	progress ScheduleGenerationProgressFunc,
 ) (*ScheduleResponse, error) {
 	g.loadSettings()
-	reportGenerationProgress(progress, 1, "Подготовка расписания", "")
+	reportGenerationProgress(progress, 1,
+		fmt.Sprintf("Настройки: окно ученика %d мин, перерыв преподавателя %d мин", g.maxStudentGapMinutes, g.teacherGapMinutes),
+		"settings")
 	weekStartDate = normalizeDate(weekStartDate)
 	weekEndDate := weekStartDate.AddDate(0, 0, 5)
 
@@ -274,7 +250,10 @@ func (g *ScheduleGenerator) ResetAutoScheduleWithProgress(
 	generatedByUserID uint,
 	progress ScheduleGenerationProgressFunc,
 ) (*ScheduleResponse, error) {
-	reportGenerationProgress(progress, 1, "Подготовка расписания", "")
+	g.loadSettings()
+	reportGenerationProgress(progress, 1,
+		fmt.Sprintf("Настройки: окно ученика %d мин, перерыв преподавателя %d мин", g.maxStudentGapMinutes, g.teacherGapMinutes),
+		"settings")
 	var schedule models.Schedule
 	if err := g.db.First(&schedule, scheduleID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -322,11 +301,6 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 		return nil, fmt.Errorf("failed to load assignments: %w", err)
 	}
 
-	var overrides []models.AssignmentWeekOverride
-	if err := g.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&overrides).Error; err != nil {
-		return nil, fmt.Errorf("failed to load assignment week overrides: %w", err)
-	}
-
 	var teacherAvailability []models.TeacherAvailability
 	if err := g.db.Find(&teacherAvailability).Error; err != nil {
 		return nil, fmt.Errorf("failed to load teacher availability: %w", err)
@@ -365,11 +339,6 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 		return nil, fmt.Errorf("failed to load group lesson enrollments: %w", err)
 	}
 
-	var groupWeekOverrides []models.GroupLessonWeekOverride
-	if err := g.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&groupWeekOverrides).Error; err != nil {
-		return nil, fmt.Errorf("failed to load group lesson week overrides: %w", err)
-	}
-
 	var existingSlots []models.ScheduleSlot
 	if err := g.db.Where("schedule_id = ?", schedule.ID).Preload("GroupLesson").Find(&existingSlots).Error; err != nil {
 		return nil, fmt.Errorf("failed to load existing schedule slots: %w", err)
@@ -390,17 +359,15 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 	}
 
 	return &GenerationContext{
-		Schedule:                 schedule,
-		Assignments:              assignments,
-		Overrides:                overrides,
-		TeacherAvailability:      teacherAvailability,
-		StudentAvailability:      studentAvailability,
-		RoomSubjects:             roomSubjects,
-		TeacherRooms:             teacherRooms,
-		GroupLessons:             groupLessons,
-		GroupLessonEnrollments:   groupEnrollments,
-		GroupLessonWeekOverrides: groupWeekOverrides,
-		ExistingSlots:            existingSlots,
+		Schedule:               schedule,
+		Assignments:            assignments,
+		TeacherAvailability:    teacherAvailability,
+		StudentAvailability:    studentAvailability,
+		RoomSubjects:           roomSubjects,
+		TeacherRooms:           teacherRooms,
+		GroupLessons:           groupLessons,
+		GroupLessonEnrollments: groupEnrollments,
+		ExistingSlots:          existingSlots,
 		StrictTeacherRoomMap:     strictMap,
 		PreferredTeacherRoomMap:  preferredMap,
 		StrictTeacherIDs:         strictTeacherIDs,
@@ -413,6 +380,18 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 	combos := g.buildGapCombinations()
 	multiRun := len(combos) > 1
 	bestCombo := combos[len(combos)-1] // default: the user-configured max values
+	// Save user-configured max values — Phase 2 must always run with these,
+	// not with Phase 1's winning combo which may be more restrictive.
+	originalStudentGap := g.maxStudentGapMinutes
+	originalTeacherGap := g.teacherGapMinutes
+
+	log.Printf("[GEN] GenerateBestAutoSchedule START: scheduleID=%d originalStudentGap=%d originalTeacherGap=%d combos=%d multiRun=%v",
+		schedule.ID, originalStudentGap, originalTeacherGap, len(combos), multiRun)
+	for i, c := range combos {
+		log.Printf("[GEN]   combo[%d]: studentGap=%d teacherGap=%d", i, c.studentGap, c.teacherGap)
+	}
+
+	var bestPhase1Result *generationRunResult
 	if multiRun {
 		bestCount := -1
 		defaultStrategy := g.scheduleStrategies()[0]
@@ -430,71 +409,138 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 			if err != nil {
 				return err
 			}
-			if result.ScheduledCount > bestCount {
+			isBest := result.ScheduledCount > bestCount
+			log.Printf("[GEN] Phase1 combo[%d] studentGap=%d teacherGap=%d → scheduled=%d qualityScore=%d isBestSoFar=%v",
+				i, combo.studentGap, combo.teacherGap, result.ScheduledCount, result.QualityScore, isBest)
+			if isBest {
 				bestCount = result.ScheduledCount
 				bestCombo = combo
+				copyResult := result
+				bestPhase1Result = &copyResult
 			}
 			percent := 5 + (i+1)*40/len(combos)
 			reportGenerationProgress(progress, percent,
 				fmt.Sprintf("Поиск: окно %d/%d мин → %d занятий", combo.studentGap, combo.teacherGap, result.ScheduledCount), "scan")
 		}
-		g.maxStudentGapMinutes = bestCombo.studentGap
-		g.teacherGapMinutes = bestCombo.teacherGap
+		// Restore the user's configured max constraints for Phase 2.
+		// Phase 1 found a baseline result; Phase 2 must run with the full
+		// allowed gaps so it is not artificially restricted.
+		g.maxStudentGapMinutes = originalStudentGap
+		g.teacherGapMinutes = originalTeacherGap
+
+		phase1AutoSlotsCount := 0
+		if bestPhase1Result != nil {
+			phase1AutoSlotsCount = len(bestPhase1Result.AutoSlots)
+		}
+		log.Printf("[GEN] Phase1 DONE: bestCombo=(%d,%d) bestCount=%d phase1AutoSlots=%d; RESTORED gaps to studentGap=%d teacherGap=%d",
+			bestCombo.studentGap, bestCombo.teacherGap, bestCount, phase1AutoSlotsCount, g.maxStudentGapMinutes, g.teacherGapMinutes)
+		if bestPhase1Result != nil {
+			log.Printf("[GEN] Phase1 bestResult: strategy=%q scheduledCount=%d qualityScore=%d unplaced=%d autoSlots=%d",
+				bestPhase1Result.Strategy.Name, bestPhase1Result.ScheduledCount, bestPhase1Result.QualityScore,
+				len(bestPhase1Result.UnplacedTasks), len(bestPhase1Result.AutoSlots))
+		}
+
 		reportGenerationProgress(progress, 45,
-			fmt.Sprintf("Лучшее: окно %d/%d мин (%d занятий)", bestCombo.studentGap, bestCombo.teacherGap, bestCount), "scan")
+			fmt.Sprintf("Лучшее в поиске: окно %d/%d мин (%d занятий)", bestCombo.studentGap, bestCombo.teacherGap, bestCount), "scan")
 	}
 
-	// Phase 2: full multi-strategy run with the chosen gap combination.
+	// Phase 2: run ALL Phase 1 combos × all strategies to find the global optimum.
+	// This guarantees that (10,15) settings can't do worse than (10,10), because
+	// (10,10) is one of the Phase 1 combos and will be tested with every strategy.
 	strategies := g.scheduleStrategies()
-	var best *generationRunResult
+	best := bestPhase1Result
 	strategyCount := len(strategies)
 	if strategyCount > MaxScheduleStrategies {
 		strategyCount = MaxScheduleStrategies
+	}
+
+	// In single-combo mode there is nothing to iterate over — just use originalGap.
+	phase2Combos := []gapCombo{{originalStudentGap, originalTeacherGap}}
+	if multiRun {
+		phase2Combos = combos
+	}
+	totalRuns := len(phase2Combos) * strategyCount
+
+	log.Printf("[GEN] Phase2 START: phase2Combos=%d strategies=%d totalRuns=%d baseline=%v",
+		len(phase2Combos), strategyCount, totalRuns, bestPhase1Result != nil)
+	if best != nil {
+		log.Printf("[GEN] Phase2 baseline (Phase1 best): scheduled=%d qualityScore=%d", best.ScheduledCount, best.QualityScore)
 	}
 
 	phase2Start := 5
 	if multiRun {
 		phase2Start = 48
 	}
+	runIndex := 0
 
-	for index, strategy := range strategies {
-		if index >= MaxScheduleStrategies {
-			break
-		}
-		startPercent := phase2Start + index*(85-phase2Start)/strategyCount
-		finishPercent := phase2Start + (index+1)*(85-phase2Start)/strategyCount
-		reportGenerationProgress(progress, startPercent, fmt.Sprintf("Проверка стратегии %d из %d", index+1, strategyCount), strategy.Name)
-		if err := g.CleanupAutoSlots(schedule.ID); err != nil {
-			return err
-		}
+	for _, phase2Combo := range phase2Combos {
+		g.maxStudentGapMinutes = phase2Combo.studentGap
+		g.teacherGapMinutes = phase2Combo.teacherGap
 
-		ctx, err := g.LoadGenerationContext(*schedule)
-		if err != nil {
-			return err
-		}
+		for index, strategy := range strategies {
+			if index >= MaxScheduleStrategies {
+				break
+			}
+			runIndex++
+			startPercent := phase2Start + (runIndex-1)*(85-phase2Start)/totalRuns
+			finishPercent := phase2Start + runIndex*(85-phase2Start)/totalRuns
+			reportGenerationProgress(progress, startPercent,
+				fmt.Sprintf("Стратегия %q (окно %d/%d)", strategy.Name, phase2Combo.studentGap, phase2Combo.teacherGap),
+				strategy.Name)
+			if err := g.CleanupAutoSlots(schedule.ID); err != nil {
+				return err
+			}
 
-		result, err := g.RunGenerationStrategy(schedule.ID, ctx, strategy)
-		if err != nil {
-			return err
-		}
-		if best == nil || result.QualityScore > best.QualityScore {
-			copyResult := result
-			best = &copyResult
-		}
-		reportGenerationProgress(
-			progress,
-			finishPercent,
-			fmt.Sprintf("Стратегия %q: поставлено %d, не поставлено %d", strategy.Name, result.ScheduledCount, len(result.UnplacedTasks)),
-			strategy.Name,
-		)
-		if len(result.UnplacedTasks) <= EarlyStopUnplacedLessons {
-			break
+			ctx, err := g.LoadGenerationContext(*schedule)
+			if err != nil {
+				return err
+			}
+
+			result, err := g.RunGenerationStrategy(schedule.ID, ctx, strategy)
+			if err != nil {
+				return err
+			}
+			isNewBest := best == nil || result.QualityScore > best.QualityScore
+			if best != nil {
+				log.Printf("[GEN] Phase2 combo(%d,%d) strategy[%d]=%q scheduled=%d qs=%d | best: scheduled=%d qs=%d | isNewBest=%v",
+					phase2Combo.studentGap, phase2Combo.teacherGap,
+					index, strategy.Name, result.ScheduledCount, result.QualityScore,
+					best.ScheduledCount, best.QualityScore, isNewBest)
+			} else {
+				log.Printf("[GEN] Phase2 combo(%d,%d) strategy[%d]=%q scheduled=%d qs=%d | no baseline → isNewBest=true",
+					phase2Combo.studentGap, phase2Combo.teacherGap,
+					index, strategy.Name, result.ScheduledCount, result.QualityScore)
+			}
+			if isNewBest {
+				copyResult := result
+				best = &copyResult
+			}
+			reportGenerationProgress(
+				progress,
+				finishPercent,
+				fmt.Sprintf("Стратегия %q (окно %d/%d): %d занятий", strategy.Name, phase2Combo.studentGap, phase2Combo.teacherGap, result.ScheduledCount),
+				strategy.Name,
+			)
+			if len(result.UnplacedTasks) <= EarlyStopUnplacedLessons {
+				log.Printf("[GEN] Phase2 early stop at combo(%d,%d) strategy[%d]=%q (unplaced=%d ≤ %d)",
+					phase2Combo.studentGap, phase2Combo.teacherGap,
+					index, strategy.Name, len(result.UnplacedTasks), EarlyStopUnplacedLessons)
+				break
+			}
 		}
 	}
+
+	// Restore user-configured original gaps.
+	g.maxStudentGapMinutes = originalStudentGap
+	g.teacherGapMinutes = originalTeacherGap
 
 	if best == nil {
+		log.Printf("[GEN] best is nil after all phases — nothing to restore")
 		return nil
 	}
+
+	log.Printf("[GEN] FINAL best: strategy=%q scheduledCount=%d qualityScore=%d unplaced=%d autoSlots=%d",
+		best.Strategy.Name, best.ScheduledCount, best.QualityScore, len(best.UnplacedTasks), len(best.AutoSlots))
 
 	reportGenerationProgress(progress, 88, "Восстановление лучшего варианта", best.Strategy.Name)
 	if err := g.CleanupAutoSlots(schedule.ID); err != nil {
@@ -506,6 +552,7 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 	if err := g.RestoreAutoSlots(best.AutoSlots); err != nil {
 		return err
 	}
+	log.Printf("[GEN] RestoreAutoSlots done: restored %d slots", len(best.AutoSlots))
 
 	reportGenerationProgress(progress, 94, "Формирование списка непроставленных занятий", best.Strategy.Name)
 	ctx, err := g.LoadGenerationContext(*schedule)
@@ -526,7 +573,7 @@ func (g *ScheduleGenerator) RunGenerationStrategy(
 	ctx *GenerationContext,
 	strategy ScheduleStrategy,
 ) (generationRunResult, error) {
-	tasks := g.BuildWeeklyTasks(ctx.Assignments, ctx.Overrides, ctx.Schedule.WeekStartDate, ctx)
+	tasks := g.BuildWeeklyTasks(ctx.Assignments, ctx)
 	g.SortTasksByStrategy(tasks, strategy.IndividualOrder)
 
 	unplacedTasks, err := g.runIndividualTaskPipeline(scheduleID, tasks, ctx)
@@ -550,38 +597,22 @@ func (g *ScheduleGenerator) runIndividualTaskPipeline(
 	tasks []WeeklyTask,
 	ctx *GenerationContext,
 ) ([]WeeklyTask, error) {
-	unplacedTasks, err := g.PlaceWeeklyTasks(scheduleID, tasks, ctx, true)
+	unplacedTasks, err := g.PlaceWeeklyTasks(scheduleID, tasks, ctx)
 	if err != nil {
 		return nil, err
 	}
-	repairedTasks, err := g.PlaceWeeklyTasks(scheduleID, unplacedTasks, ctx, false)
-	if err != nil {
-		return nil, err
-	}
-	return g.RepairWeeklyTasksWithSwaps(scheduleID, repairedTasks, ctx)
-}
-
-func (g *ScheduleGenerator) runGroupTaskPipeline(
-	scheduleID uint,
-	tasks []GroupWeeklyTask,
-	ctx *GenerationContext,
-) ([]GroupWeeklyTask, error) {
-	unplacedGroupTasks, err := g.PlaceGroupWeeklyTasks(scheduleID, tasks, ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	return g.PlaceGroupWeeklyTasks(scheduleID, unplacedGroupTasks, ctx, false)
+	return g.RepairWeeklyTasksWithSwaps(scheduleID, unplacedTasks, ctx)
 }
 
 func (g *ScheduleGenerator) scheduleStrategies() []ScheduleStrategy {
 	return []ScheduleStrategy{
-		{Name: "default", IndividualOrder: "default", GroupOrder: "default"},
-		{Name: "teacher-blocks", IndividualOrder: "teacher_blocks", GroupOrder: "teacher_blocks"},
-		{Name: "no-availability-priority", IndividualOrder: "no_availability", GroupOrder: "default"},
-		{Name: "groups-first", IndividualOrder: "default", GroupOrder: "default", GroupsFirst: true},
-		{Name: "high-visits-first", IndividualOrder: "visits_first", GroupOrder: "visits_first"},
-		{Name: "long-duration-first", IndividualOrder: "duration_first", GroupOrder: "duration_first"},
-		{Name: "broad-availability-first", IndividualOrder: "broad_availability", GroupOrder: "default"},
+		{Name: "default", IndividualOrder: "default"},
+		{Name: "teacher-blocks", IndividualOrder: "teacher_blocks"},
+		{Name: "no-availability-priority", IndividualOrder: "no_availability"},
+		{Name: "groups-first", IndividualOrder: "default"},
+		{Name: "high-visits-first", IndividualOrder: "visits_first"},
+		{Name: "long-duration-first", IndividualOrder: "duration_first"},
+		{Name: "broad-availability-first", IndividualOrder: "broad_availability"},
 	}
 }
 
@@ -589,12 +620,11 @@ func (g *ScheduleGenerator) PlaceWeeklyTasks(
 	scheduleID uint,
 	tasks []WeeklyTask,
 	ctx *GenerationContext,
-	strictTeacherGap bool,
 ) ([]WeeklyTask, error) {
 	unplaced := make([]WeeklyTask, 0)
 
 	for _, task := range tasks {
-		candidates := g.GetCandidateSlots(task, ctx, strictTeacherGap)
+		candidates := g.GetCandidateSlots(task, ctx)
 		if len(candidates) == 0 {
 			unplaced = append(unplaced, task)
 			continue
@@ -602,32 +632,6 @@ func (g *ScheduleGenerator) PlaceWeeklyTasks(
 
 		bestCandidate := g.SelectBestCandidate(candidates)
 		slot, err := g.SaveGeneratedSlot(scheduleID, bestCandidate)
-		if err != nil {
-			return nil, err
-		}
-		ctx.ExistingSlots = append(ctx.ExistingSlots, *slot)
-	}
-
-	return unplaced, nil
-}
-
-func (g *ScheduleGenerator) PlaceGroupWeeklyTasks(
-	scheduleID uint,
-	tasks []GroupWeeklyTask,
-	ctx *GenerationContext,
-	strictTeacherGap bool,
-) ([]GroupWeeklyTask, error) {
-	unplaced := make([]GroupWeeklyTask, 0)
-
-	for _, task := range tasks {
-		candidates := g.GetGroupCandidateSlots(task, ctx, strictTeacherGap)
-		if len(candidates) == 0 {
-			unplaced = append(unplaced, task)
-			continue
-		}
-
-		bestCandidate := g.SelectBestGroupCandidate(candidates)
-		slot, err := g.SaveGeneratedGroupSlot(scheduleID, bestCandidate)
 		if err != nil {
 			return nil, err
 		}
@@ -682,7 +686,7 @@ func (g *ScheduleGenerator) tryRepairWeeklyTaskWithSwap(
 		attemptTasks = append(attemptTasks, task)
 		attemptTasks = append(attemptTasks, removedTasks...)
 
-		unplaced, err := g.PlaceWeeklyTasks(scheduleID, attemptTasks, ctx, false)
+		unplaced, err := g.PlaceWeeklyTasks(scheduleID, attemptTasks, ctx)
 		if err != nil {
 			return false, err
 		}
@@ -751,7 +755,7 @@ func (g *ScheduleGenerator) weeklyTaskFromAssignmentID(assignmentID uint, ctx *G
 		if assignment.ID != assignmentID {
 			continue
 		}
-		_, durationMin, status := g.ResolveAssignmentParams(assignment, ctx.Overrides, ctx.Schedule.WeekStartDate)
+		_, durationMin, status := g.ResolveAssignmentParams(assignment)
 		if status != models.AssignmentStatusActive {
 			return WeeklyTask{}, false
 		}
@@ -860,44 +864,18 @@ func containsWeeklyTask(tasks []WeeklyTask, needle WeeklyTask) bool {
 	return false
 }
 
-func (g *ScheduleGenerator) ResolveAssignmentParams(
-	assignment models.Assignment,
-	overrides []models.AssignmentWeekOverride,
-	weekStartDate time.Time,
-) (int, int, string) {
-	visitsPerWeek := assignment.VisitsPerWeek
-	durationMin := assignment.DurationMin
-	status := assignment.Status
-
-	for _, override := range overrides {
-		if override.AssignmentID != assignment.ID {
-			continue
-		}
-		if !sameDate(override.WeekStartDate, weekStartDate) {
-			continue
-		}
-
-		visitsPerWeek = override.PlannedVisits
-		if override.DurationMin != nil {
-			durationMin = *override.DurationMin
-		}
-		status = override.Status
-		break
-	}
-
-	return visitsPerWeek, durationMin, status
+func (g *ScheduleGenerator) ResolveAssignmentParams(assignment models.Assignment) (int, int, string) {
+	return assignment.VisitsPerWeek, assignment.DurationMin, assignment.Status
 }
 
 func (g *ScheduleGenerator) BuildWeeklyTasks(
 	assignments []models.Assignment,
-	overrides []models.AssignmentWeekOverride,
-	weekStartDate time.Time,
 	ctx *GenerationContext,
 ) []WeeklyTask {
 	var tasks []WeeklyTask
 
 	for _, assignment := range assignments {
-		visitsPerWeek, durationMin, status := g.ResolveAssignmentParams(assignment, overrides, weekStartDate)
+		visitsPerWeek, durationMin, status := g.ResolveAssignmentParams(assignment)
 
 		if status != models.AssignmentStatusActive {
 			continue
@@ -946,10 +924,6 @@ func (g *ScheduleGenerator) ExpandTasks(
 	}
 
 	return tasks
-}
-
-func (g *ScheduleGenerator) SortTasksByPriority(tasks []WeeklyTask) {
-	g.SortTasksByStrategy(tasks, "default")
 }
 
 func (g *ScheduleGenerator) SortTasksByStrategy(tasks []WeeklyTask, strategy string) {
@@ -1022,7 +996,7 @@ func (g *ScheduleGenerator) SortTasksByStrategy(tasks []WeeklyTask, strategy str
 	})
 }
 
-func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationContext, strictTeacherGap bool) []CandidateSlot {
+func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationContext) []CandidateSlot {
 	var candidates []CandidateSlot
 
 	// Определяем допустимые кабинеты с учётом привязки преподавателя
@@ -1081,7 +1055,7 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 					if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
 						continue
 					}
-					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
+					if !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 						continue
 					}
 
@@ -1207,307 +1181,6 @@ func (g *ScheduleGenerator) SelectBestCandidate(candidates []CandidateSlot) Cand
 
 // ========== ГРУППОВЫЕ ЗАНЯТИЯ ==========
 
-func (g *ScheduleGenerator) BuildGroupWeeklyTasks(
-	groupLessons []models.GroupLesson,
-	weekOverrides []models.GroupLessonWeekOverride,
-	enrollments []models.GroupLessonEnrollment,
-	weekStartDate time.Time,
-	ctx *GenerationContext,
-) []GroupWeeklyTask {
-	var tasks []GroupWeeklyTask
-
-	for _, lesson := range groupLessons {
-		teacherID, visitsPerWeek, durationMin, status := g.resolveGroupLessonParams(lesson, weekOverrides, weekStartDate)
-
-		if status != models.GroupLessonStatusActive {
-			continue
-		}
-		if teacherID == 0 {
-			continue // нет преподавателя — пропускаем
-		}
-		visitsPerWeek -= g.countExistingGroupSlots(lesson.ID, ctx.ExistingSlots)
-		if visitsPerWeek <= 0 {
-			continue
-		}
-
-		// Собираем активных учеников этой группы
-		var studentIDs []uint
-		for _, e := range enrollments {
-			if e.GroupLessonID == lesson.ID {
-				studentIDs = append(studentIDs, e.StudentID)
-			}
-		}
-
-		if len(studentIDs) == 0 {
-			continue
-		}
-
-		hasStrictRoom := ctx.StrictTeacherIDs[teacherID]
-		subjectID := uint(0)
-		subjectName := ""
-		if lesson.SubjectID != nil {
-			subjectID = *lesson.SubjectID
-		}
-		if lesson.Subject != nil {
-			subjectName = lesson.Subject.Name
-		}
-
-		for i := 0; i < visitsPerWeek; i++ {
-			tasks = append(tasks, GroupWeeklyTask{
-				GroupLessonID:        lesson.ID,
-				TeacherID:            teacherID,
-				SubjectID:            subjectID,
-				GroupName:            lesson.Name,
-				TeacherName:          g.getTeacherName(teacherID, ctx),
-				SubjectName:          subjectName,
-				EnrolledStudentIDs:   studentIDs,
-				VisitsPerWeek:        visitsPerWeek,
-				DurationMin:          durationMin,
-				TaskIndex:            i + 1,
-				HasStrictRoom:        hasStrictRoom,
-				IgnoreStudentWindows: lesson.IgnoreStudentWindows,
-			})
-		}
-	}
-
-	return tasks
-}
-
-func (g *ScheduleGenerator) resolveGroupLessonParams(
-	lesson models.GroupLesson,
-	overrides []models.GroupLessonWeekOverride,
-	weekStartDate time.Time,
-) (uint, int, int, string) {
-	teacherID := uint(0)
-	if lesson.DefaultTeacherID != nil {
-		teacherID = *lesson.DefaultTeacherID
-	}
-	visitsPerWeek := lesson.VisitsPerWeek
-	durationMin := lesson.DurationMin
-	status := lesson.Status
-
-	for _, override := range overrides {
-		if override.GroupLessonID != lesson.ID {
-			continue
-		}
-		if !sameDate(override.WeekStartDate, weekStartDate) {
-			continue
-		}
-
-		if override.TeacherID != nil {
-			teacherID = *override.TeacherID
-		}
-		if override.PlannedVisits != nil {
-			visitsPerWeek = *override.PlannedVisits
-		}
-		if override.DurationMin != nil {
-			durationMin = *override.DurationMin
-		}
-		status = override.Status
-		break
-	}
-
-	return teacherID, visitsPerWeek, durationMin, status
-}
-
-func (g *ScheduleGenerator) SortGroupTasksByPriority(tasks []GroupWeeklyTask) {
-	g.SortGroupTasksByStrategy(tasks, "default")
-}
-
-func (g *ScheduleGenerator) SortGroupTasksByStrategy(tasks []GroupWeeklyTask, strategy string) {
-	sort.SliceStable(tasks, func(i, j int) bool {
-		if tasks[i].HasStrictRoom != tasks[j].HasStrictRoom {
-			return tasks[i].HasStrictRoom
-		}
-
-		switch strategy {
-		case "visits_first":
-			if tasks[i].VisitsPerWeek != tasks[j].VisitsPerWeek {
-				return tasks[i].VisitsPerWeek > tasks[j].VisitsPerWeek
-			}
-		case "duration_first":
-			if tasks[i].DurationMin != tasks[j].DurationMin {
-				return tasks[i].DurationMin > tasks[j].DurationMin
-			}
-		case "teacher_blocks":
-			if tasks[i].TeacherName != tasks[j].TeacherName {
-				return tasks[i].TeacherName < tasks[j].TeacherName
-			}
-		}
-
-		if tasks[i].VisitsPerWeek != tasks[j].VisitsPerWeek {
-			return tasks[i].VisitsPerWeek > tasks[j].VisitsPerWeek
-		}
-		if tasks[i].DurationMin != tasks[j].DurationMin {
-			return tasks[i].DurationMin > tasks[j].DurationMin
-		}
-		return tasks[i].GroupName < tasks[j].GroupName
-	})
-}
-
-func (g *ScheduleGenerator) GetGroupCandidateSlots(task GroupWeeklyTask, ctx *GenerationContext, strictTeacherGap bool) []GroupCandidateSlot {
-	var candidates []GroupCandidateSlot
-
-	allowedRoomIDs := g.resolveAllowedRoomsForTeacher(task.TeacherID, task.SubjectID, ctx)
-	if len(allowedRoomIDs) == 0 {
-		return candidates
-	}
-
-	for weekday := 1; weekday <= 7; weekday++ {
-		teacherWindows := g.filterTeacherAvailability(task.TeacherID, weekday, ctx.TeacherAvailability)
-		if len(teacherWindows) == 0 {
-			continue
-		}
-
-		// Пересечение доступности учеников (пропускается если игнорируем окна детей)
-		type timeWindow = [2]string
-		var outerWindows []timeWindow
-		if task.IgnoreStudentWindows {
-			for _, tw := range teacherWindows {
-				outerWindows = append(outerWindows, timeWindow{tw.StartTime, tw.EndTime})
-			}
-		} else {
-			studentIntersection := g.getStudentsAvailabilityIntersection(task.EnrolledStudentIDs, weekday, ctx.StudentAvailability)
-			if len(studentIntersection) == 0 {
-				continue
-			}
-			for _, tw := range teacherWindows {
-				for _, sw := range studentIntersection {
-					iStart, iEnd, ok := intersectWindows(tw.StartTime, tw.EndTime, sw[0], sw[1])
-					if !ok {
-						continue
-					}
-					outerWindows = append(outerWindows, timeWindow{iStart, iEnd})
-				}
-			}
-		}
-
-		for _, win := range outerWindows {
-			startMinute := hhmmToMinutes(win[0])
-			endMinute := hhmmToMinutes(win[1])
-
-			if startMinute < 0 || endMinute < 0 {
-				continue
-			}
-
-			for slotStart := startMinute; slotStart+task.DurationMin <= endMinute; slotStart += 5 {
-				slotEnd := slotStart + task.DurationMin
-				startHHMM := minutesToHHMM(slotStart)
-				endHHMM := minutesToHHMM(slotEnd)
-
-				bufferedStart, bufferedEnd := g.validator.ApplyBreakBuffer(startHHMM, endHHMM, DefaultBreakMinutes)
-
-				if !g.validator.IsTeacherAvailable(task.TeacherID, weekday, startHHMM, endHHMM, ctx.TeacherAvailability) {
-					continue
-				}
-
-				if !task.IgnoreStudentWindows {
-					// Проверяем доступность каждого ученика
-					allStudentsAvailable := true
-					for _, studentID := range task.EnrolledStudentIDs {
-						if !g.validator.IsStudentAvailable(studentID, weekday, startHHMM, endHHMM, ctx.StudentAvailability) {
-							allStudentsAvailable = false
-							break
-						}
-					}
-					if !allStudentsAvailable {
-						continue
-					}
-				}
-
-				if g.validator.ViolatesSameDayRuleForGroup(task.GroupLessonID, weekday, ctx.ExistingSlots) {
-					continue
-				}
-
-				if !task.IgnoreStudentWindows {
-					largeStudentGap := false
-					for _, studentID := range task.EnrolledStudentIDs {
-						if g.createsLargeStudentGap(studentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
-							largeStudentGap = true
-							break
-						}
-					}
-					if largeStudentGap {
-						continue
-					}
-				}
-
-					if strictTeacherGap && !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
-						continue
-					}
-
-					if g.validator.HasTeacherConflict(task.TeacherID, weekday, bufferedStart, bufferedEnd, ctx.ExistingSlots) {
-						continue
-					}
-
-					// Проверяем конфликты каждого ученика
-					anyStudentConflict := false
-					for _, studentID := range task.EnrolledStudentIDs {
-						if g.validator.HasStudentConflict(studentID, weekday, bufferedStart, bufferedEnd, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
-							anyStudentConflict = true
-							break
-						}
-					}
-					if anyStudentConflict {
-						continue
-					}
-
-					for _, roomID := range allowedRoomIDs {
-						if !g.validator.IsRoomAllowedForSubject(roomID, task.SubjectID, ctx.RoomSubjects) {
-							continue
-						}
-						if g.validator.HasRoomConflict(roomID, weekday, bufferedStart, bufferedEnd, ctx.ExistingSlots) {
-							continue
-						}
-
-						candidate := GroupCandidateSlot{
-							GroupLessonID: task.GroupLessonID,
-							TeacherID:     task.TeacherID,
-							SubjectID:     task.SubjectID,
-							RoomID:        roomID,
-							Weekday:       weekday,
-							StartTime:     startHHMM,
-							EndTime:       endHHMM,
-						}
-						candidate.Score = g.ScoreGroupCandidate(candidate, task, ctx)
-						candidates = append(candidates, candidate)
-					}
-				}
-			}
-		}
-
-	return candidates
-}
-
-func (g *ScheduleGenerator) ScoreGroupCandidate(candidate GroupCandidateSlot, task GroupWeeklyTask, ctx *GenerationContext) int {
-	score := 0
-
-	// Уплотнение: бонус за примыкание к занятиям преподавателя
-	for _, slot := range ctx.ExistingSlots {
-		if slot.TeacherID == candidate.TeacherID && slot.Weekday == candidate.Weekday {
-			gap := gapMinutes(slot.EndTime, candidate.StartTime)
-			reverseGap := gapMinutes(candidate.EndTime, slot.StartTime)
-			tMax := g.teacherGapMinutes
-			if tMax < DefaultBreakMinutes {
-				tMax = DefaultBreakMinutes
-			}
-			if (gap >= DefaultBreakMinutes && gap <= tMax) || (reverseGap >= DefaultBreakMinutes && reverseGap <= tMax) {
-				score += 120
-			} else {
-				score -= 80
-			}
-			break
-		}
-	}
-
-	startMin := hhmmToMinutes(candidate.StartTime)
-	if startMin >= 0 {
-		score += (24*60 - startMin) / 30
-	}
-
-	return score
-}
-
 func (g *ScheduleGenerator) countExistingAssignmentSlots(assignmentID uint, slots []models.ScheduleSlot) int {
 	count := 0
 	for _, slot := range slots {
@@ -1515,19 +1188,6 @@ func (g *ScheduleGenerator) countExistingAssignmentSlots(assignmentID uint, slot
 			continue
 		}
 		if slot.AssignmentID != nil && *slot.AssignmentID == assignmentID {
-			count++
-		}
-	}
-	return count
-}
-
-func (g *ScheduleGenerator) countExistingGroupSlots(groupLessonID uint, slots []models.ScheduleSlot) int {
-	count := 0
-	for _, slot := range slots {
-		if slot.Status == models.ScheduleSlotStatusCancelled {
-			continue
-		}
-		if slot.SlotType == models.SlotTypeGroup && slot.GroupLessonID != nil && *slot.GroupLessonID == groupLessonID {
 			count++
 		}
 	}
@@ -1809,68 +1469,7 @@ func (g *ScheduleGenerator) createsLargeStudentGap(
 	return false
 }
 
-func (g *ScheduleGenerator) SelectBestGroupCandidate(candidates []GroupCandidateSlot) GroupCandidateSlot {
-	sort.SliceStable(candidates, func(i, j int) bool {
-		if candidates[i].Score != candidates[j].Score {
-			return candidates[i].Score > candidates[j].Score
-		}
-		if candidates[i].Weekday != candidates[j].Weekday {
-			return candidates[i].Weekday < candidates[j].Weekday
-		}
-		if candidates[i].StartTime != candidates[j].StartTime {
-			return candidates[i].StartTime < candidates[j].StartTime
-		}
-		return candidates[i].RoomID < candidates[j].RoomID
-	})
-
-	return candidates[0]
-}
-
 // getStudentsAvailabilityIntersection возвращает общие окна для всех учеников группы в данный день.
-func (g *ScheduleGenerator) getStudentsAvailabilityIntersection(
-	studentIDs []uint,
-	weekday int,
-	availability []models.StudentAvailability,
-) [][2]string {
-	if len(studentIDs) == 0 {
-		return nil
-	}
-
-	// Берём окна первого ученика как базу
-	var windows [][2]string
-	for _, a := range availability {
-		if a.StudentID == studentIDs[0] && a.Weekday == weekday {
-			windows = append(windows, [2]string{a.StartTime, a.EndTime})
-		}
-	}
-
-	// Пересекаем с окнами каждого следующего ученика
-	for _, studentID := range studentIDs[1:] {
-		var studentWindows [][2]string
-		for _, a := range availability {
-			if a.StudentID == studentID && a.Weekday == weekday {
-				studentWindows = append(studentWindows, [2]string{a.StartTime, a.EndTime})
-			}
-		}
-
-		var intersected [][2]string
-		for _, w := range windows {
-			for _, sw := range studentWindows {
-				start, end, ok := intersectWindows(w[0], w[1], sw[0], sw[1])
-				if ok {
-					intersected = append(intersected, [2]string{start, end})
-				}
-			}
-		}
-		windows = intersected
-
-		if len(windows) == 0 {
-			return nil
-		}
-	}
-
-	return windows
-}
 
 func (g *ScheduleGenerator) resolveAllowedRoomsForTeacher(teacherID uint, subjectID uint, ctx *GenerationContext) []uint {
 	allSubjectRooms := g.getAllowedRoomIDs(subjectID, ctx.RoomSubjects)
@@ -1913,15 +1512,6 @@ func (g *ScheduleGenerator) resolveAllowedRoomsForTeacher(teacherID uint, subjec
 	}
 
 	return allSubjectRooms
-}
-
-func (g *ScheduleGenerator) getTeacherName(teacherID uint, ctx *GenerationContext) string {
-	for _, a := range ctx.Assignments {
-		if a.TeacherID == teacherID {
-			return a.Teacher.FullName
-		}
-	}
-	return ""
 }
 
 // ========== СОХРАНЕНИЕ ==========
@@ -2017,42 +1607,6 @@ func (g *ScheduleGenerator) SaveGeneratedSlot(scheduleID uint, candidate Candida
 	return slot, nil
 }
 
-func (g *ScheduleGenerator) SaveGeneratedGroupSlot(scheduleID uint, candidate GroupCandidateSlot) (*models.ScheduleSlot, error) {
-	groupLessonID := candidate.GroupLessonID
-	subjectID := candidate.SubjectID
-	roomID := candidate.RoomID
-
-	slot := &models.ScheduleSlot{
-		ScheduleID:    scheduleID,
-		SlotType:      models.SlotTypeGroup,
-		GroupLessonID: &groupLessonID,
-		TeacherID:     candidate.TeacherID,
-		SubjectID:     &subjectID,
-		RoomID:        &roomID,
-		Weekday:       candidate.Weekday,
-		StartTime:     candidate.StartTime,
-		EndTime:       candidate.EndTime,
-		Origin:        models.ScheduleSlotOriginAuto,
-		Status:        models.ScheduleSlotStatusScheduled,
-	}
-
-	if err := g.db.Create(slot).Error; err != nil {
-		return nil, fmt.Errorf("failed to save generated group slot: %w", err)
-	}
-
-	var enrollments []models.GroupLessonEnrollment
-	if err := g.db.Where("group_lesson_id = ?", groupLessonID).Find(&enrollments).Error; err == nil {
-		for _, e := range enrollments {
-			g.db.Create(&models.GroupLessonAttendance{
-				ScheduleSlotID: slot.ID,
-				StudentID:      e.StudentID,
-			})
-		}
-	}
-
-	return slot, nil
-}
-
 func (g *ScheduleGenerator) SaveGenerationIssue(scheduleID uint, task WeeklyTask, reasonCode string, message string) error {
 	assignmentID := task.AssignmentID
 	studentID := task.StudentID
@@ -2076,35 +1630,10 @@ func (g *ScheduleGenerator) SaveGenerationIssue(scheduleID uint, task WeeklyTask
 	return nil
 }
 
-func (g *ScheduleGenerator) SaveGroupGenerationIssue(scheduleID uint, task GroupWeeklyTask, reasonCode string, message string) error {
-	groupLessonID := task.GroupLessonID
-	teacherID := task.TeacherID
-
-	issue := models.ScheduleGenerationIssue{
-		ScheduleID:    scheduleID,
-		GroupLessonID: &groupLessonID,
-		ReasonCode:    reasonCode,
-		Message:       message,
-	}
-	if teacherID != 0 {
-		issue.TeacherID = &teacherID
-	}
-	if task.SubjectID != 0 {
-		subjectID := task.SubjectID
-		issue.SubjectID = &subjectID
-	}
-
-	if err := g.db.Create(&issue).Error; err != nil {
-		return fmt.Errorf("failed to save group generation issue: %w", err)
-	}
-
-	return nil
-}
-
-func (g *ScheduleGenerator) CountRequestedVisits(assignments []models.Assignment, overrides []models.AssignmentWeekOverride, weekStartDate time.Time) int {
+func (g *ScheduleGenerator) CountRequestedVisits(assignments []models.Assignment) int {
 	total := 0
 	for _, assignment := range assignments {
-		visits, _, status := g.ResolveAssignmentParams(assignment, overrides, weekStartDate)
+		visits, _, status := g.ResolveAssignmentParams(assignment)
 		if status != models.AssignmentStatusActive {
 			continue
 		}
@@ -2156,8 +1685,6 @@ func (g *ScheduleGenerator) buildScheduleResponse(scheduleID uint) (*ScheduleRes
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
-		Preload("Exclusions").
-		Preload("Exclusions.Student").
 		Where("schedule_id = ?", schedule.ID).
 		Order("weekday ASC, start_time ASC, id ASC").
 		Find(&slots).Error; err != nil {
@@ -2178,16 +1705,15 @@ func (g *ScheduleGenerator) buildScheduleResponse(scheduleID uint) (*ScheduleRes
 	}
 
 	var assignments []models.Assignment
-	if err := g.db.Where("status = ?", models.AssignmentStatusActive).Find(&assignments).Error; err != nil {
+	if err := g.db.
+		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
+		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
+		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Find(&assignments).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch assignments for stats: %w", err)
 	}
 
-	var overrides []models.AssignmentWeekOverride
-	if err := g.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&overrides).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch overrides for stats: %w", err)
-	}
-
-	totalRequested := g.CountRequestedVisits(assignments, overrides, schedule.WeekStartDate)
+	totalRequested := g.CountRequestedVisits(assignments)
 
 	return &ScheduleResponse{
 		Schedule: ginScheduleResponse{
@@ -2362,68 +1888,6 @@ func (g *ScheduleGenerator) DiagnoseNoCandidates(task WeeklyTask, ctx *Generatio
 	}
 
 	return "Все возможные временные слоты заняты конфликтующими занятиями (преподаватель, ученик или кабинет недоступны)"
-}
-
-func (g *ScheduleGenerator) DiagnoseNoGroupCandidates(task GroupWeeklyTask, ctx *GenerationContext) string {
-	allSubjectRooms := g.getAllowedRoomIDs(task.SubjectID, ctx.RoomSubjects)
-	if len(allSubjectRooms) == 0 {
-		return fmt.Sprintf("Нет кабинетов для предмета «%s» — добавьте кабинет с поддержкой этого предмета", task.SubjectName)
-	}
-	if _, ok := ctx.StrictTeacherRoomMap[task.TeacherID]; ok {
-		if len(g.resolveAllowedRoomsForTeacher(task.TeacherID, task.SubjectID, ctx)) == 0 {
-			return fmt.Sprintf("Кабинеты строгой привязки преподавателя «%s» не настроены для предмета «%s»", task.TeacherName, task.SubjectName)
-		}
-	}
-
-	teacherDays := g.teacherAvailableDays(task.TeacherID, ctx)
-	if len(teacherDays) == 0 {
-		return fmt.Sprintf("У преподавателя «%s» не задано рабочее время ни на один день недели", task.TeacherName)
-	}
-
-	for _, studentID := range task.EnrolledStudentIDs {
-		if len(g.studentAvailableDays(studentID, ctx)) == 0 {
-			name := fmt.Sprintf("ID:%d", studentID)
-			for _, a := range ctx.Assignments {
-				if a.StudentID == studentID {
-					name = a.Student.FullName
-					break
-				}
-			}
-			return fmt.Sprintf("Ученик «%s» из группы не имеет указанной доступности ни на один день", name)
-		}
-	}
-
-	hasGroupIntersection := false
-	for wd := 1; wd <= 7; wd++ {
-		teacherWindows := g.filterTeacherAvailability(task.TeacherID, wd, ctx.TeacherAvailability)
-		if len(teacherWindows) == 0 {
-			continue
-		}
-		studentIntersection := g.getStudentsAvailabilityIntersection(task.EnrolledStudentIDs, wd, ctx.StudentAvailability)
-		if len(studentIntersection) == 0 {
-			continue
-		}
-		for _, tw := range teacherWindows {
-			for _, si := range studentIntersection {
-				if _, _, ok := intersectWindows(tw.StartTime, tw.EndTime, si[0], si[1]); ok {
-					hasGroupIntersection = true
-					break
-				}
-			}
-			if hasGroupIntersection {
-				break
-			}
-		}
-		if hasGroupIntersection {
-			break
-		}
-	}
-
-	if !hasGroupIntersection {
-		return fmt.Sprintf("Нет общего времени для всех учеников группы и преподавателя «%s» ни в один день недели — проверьте доступность каждого ученика", task.TeacherName)
-	}
-
-	return "Все возможные временные слоты заняты конфликтующими занятиями (преподаватель, кто-то из учеников группы или кабинет недоступны)"
 }
 
 // timeHHMMToMinutes converts "HH:MM" string to total minutes since midnight.
