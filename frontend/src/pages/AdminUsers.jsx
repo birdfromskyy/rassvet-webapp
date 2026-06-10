@@ -553,9 +553,9 @@ const AdminUsers = () => {
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {u.role === "superadmin" ? (
+                        {(isAdmin(u.role) || u.role === "superadmin") && !isSuperAdmin() ? (
                           <Typography variant="caption" color="text.disabled">—</Typography>
-                        ) : isSuperAdmin() || !isAdmin(u.role) ? (
+                        ) : (
                           <>
                             <Tooltip title="Редактировать пользователя">
                               <IconButton size="small" onClick={() => openEditDialog(u)}>
@@ -569,26 +569,28 @@ const AdminUsers = () => {
                                 </Badge>
                               </IconButton>
                             </Tooltip>
-                            {u.role === "teacher" && (
-                              <Tooltip title="Привязать преподавателя">
+                            {u.role !== "user" && (
+                              <Tooltip title="Привязать сотрудника">
                                 <IconButton size="small" color="secondary" onClick={() => openTeacherDialog(u)}>
                                   <TeacherLinkIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                             )}
-                            <Tooltip title="Удалить персональные данные">
-                              <IconButton size="small" color="error" onClick={() => setDeleteDataDialog({ open: true, user: u })}>
-                                <DeleteDataIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Удалить пользователя полностью">
-                              <IconButton size="small" color="error" onClick={() => setDeleteUserDialog({ open: true, user: u })}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
+                            {u.role !== "superadmin" && (
+                              <>
+                                <Tooltip title="Удалить персональные данные">
+                                  <IconButton size="small" color="error" onClick={() => setDeleteDataDialog({ open: true, user: u })}>
+                                    <DeleteDataIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Удалить пользователя полностью">
+                                  <IconButton size="small" color="error" onClick={() => setDeleteUserDialog({ open: true, user: u })}>
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
                           </>
-                        ) : (
-                          <Typography variant="caption" color="text.disabled">—</Typography>
                         )}
                       </TableCell>
                     </TableRow>
