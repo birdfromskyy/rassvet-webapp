@@ -24,5 +24,4 @@ type GroupLesson struct {
 	Subject        *Subject                  `json:"subject,omitempty" gorm:"foreignKey:SubjectID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	DefaultTeacher *Teacher                  `json:"default_teacher,omitempty" gorm:"foreignKey:DefaultTeacherID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	Enrollments    []GroupLessonEnrollment   `json:"enrollments,omitempty" gorm:"foreignKey:GroupLessonID"`
-	WeekOverrides  []GroupLessonWeekOverride `json:"week_overrides,omitempty" gorm:"foreignKey:GroupLessonID"`
 }

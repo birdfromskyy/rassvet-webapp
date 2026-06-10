@@ -42,6 +42,5 @@ type ScheduleSlot struct {
 	Teacher     Teacher                `json:"teacher,omitempty" gorm:"foreignKey:TeacherID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Subject     *Subject               `json:"subject,omitempty" gorm:"foreignKey:SubjectID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	Room        *Room                  `json:"room,omitempty" gorm:"foreignKey:RoomID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
-	Exclusions           []ScheduleSlotExclusion  `json:"exclusions,omitempty" gorm:"foreignKey:ScheduleSlotID"`
-	GroupLessonAttendance []GroupLessonAttendance  `json:"group_lesson_attendance,omitempty" gorm:"foreignKey:ScheduleSlotID"`
+GroupLessonAttendance []GroupLessonAttendance  `json:"group_lesson_attendance,omitempty" gorm:"foreignKey:ScheduleSlotID"`
 }

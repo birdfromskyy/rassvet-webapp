@@ -22,7 +22,6 @@ type Assignment struct {
 	Student       Student                   `json:"student,omitempty" gorm:"foreignKey:StudentID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Teacher       Teacher                   `json:"teacher,omitempty" gorm:"foreignKey:TeacherID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Subject       Subject                   `json:"subject,omitempty" gorm:"foreignKey:SubjectID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	WeekOverrides []AssignmentWeekOverride  `json:"week_overrides,omitempty" gorm:"foreignKey:AssignmentID"`
-	ScheduleSlots []ScheduleSlot            `json:"schedule_slots,omitempty" gorm:"foreignKey:AssignmentID"`
+ScheduleSlots []ScheduleSlot            `json:"schedule_slots,omitempty" gorm:"foreignKey:AssignmentID"`
 	Issues        []ScheduleGenerationIssue `json:"issues,omitempty" gorm:"foreignKey:AssignmentID"`
 }

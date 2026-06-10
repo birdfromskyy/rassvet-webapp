@@ -42,15 +42,6 @@ type UpdateGroupLessonRequest struct {
 	IgnoreStudentWindows *bool   `json:"ignore_student_windows"`
 }
 
-type CreateGroupLessonWeekOverrideRequest struct {
-	WeekStartDate string  `json:"week_start_date" binding:"required"`
-	TeacherID     *uint   `json:"teacher_id"`
-	PlannedVisits *int    `json:"planned_visits"`
-	DurationMin   *int    `json:"duration_min"`
-	Status        string  `json:"status"`
-	Notes         *string `json:"notes"`
-}
-
 func (h *GroupLessonHandler) GetGroupLessons(c *gin.Context) {
 	var lessons []models.GroupLesson
 
@@ -317,92 +308,4 @@ func (h *GroupLessonHandler) RemoveEnrollment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Ученик удалён из группы"})
 }
 
-// ========== WEEK OVERRIDES ==========
 
-func (h *GroupLessonHandler) GetWeekOverrides(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный id группы"})
-		return
-	}
-
-	var overrides []models.GroupLessonWeekOverride
-	if err := h.db.Preload("Teacher").Where("group_lesson_id = ?", id).Order("week_start_date ASC").Find(&overrides).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить переопределения"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"overrides": overrides})
-}
-
-func (h *GroupLessonHandler) CreateWeekOverride(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный id группы"})
-		return
-	}
-
-	var req CreateGroupLessonWeekOverrideRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	weekDate, err := parseDate(req.WeekStartDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Дата начала недели должна быть в формате YYYY-MM-DD"})
-		return
-	}
-
-	status := strings.TrimSpace(req.Status)
-	if status == "" {
-		status = models.GroupLessonStatusActive
-	}
-
-	override := models.GroupLessonWeekOverride{
-		GroupLessonID: uint(id),
-		WeekStartDate: weekDate,
-		TeacherID:     req.TeacherID,
-		PlannedVisits: req.PlannedVisits,
-		DurationMin:   req.DurationMin,
-		Status:        status,
-		Notes:         req.Notes,
-	}
-
-	if err := h.db.Create(&override).Error; err != nil {
-		if strings.Contains(err.Error(), "23505") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Переопределение на эту неделю уже существует"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать переопределение"})
-		return
-	}
-
-	c.JSON(http.StatusCreated, gin.H{"message": "Переопределение создано", "override": override})
-}
-
-func (h *GroupLessonHandler) DeleteWeekOverride(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный id группы"})
-		return
-	}
-
-	overrideID, err := strconv.Atoi(c.Param("overrideId"))
-	if err != nil || overrideID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный id переопределения"})
-		return
-	}
-
-	result := h.db.Where("id = ? AND group_lesson_id = ?", overrideID, id).Delete(&models.GroupLessonWeekOverride{})
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить переопределение"})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Переопределение не найдено"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Переопределение удалено"})
-}

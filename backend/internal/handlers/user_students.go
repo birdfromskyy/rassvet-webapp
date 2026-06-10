@@ -466,16 +466,7 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 				}
 			}
 			if enrolled {
-				excluded := false
-				for _, ex := range slot.Exclusions {
-					if ex.StudentID == uint(studentID) {
-						excluded = true
-						break
-					}
-				}
-				if !excluded {
-					filteredSlots = append(filteredSlots, slot)
-				}
+				filteredSlots = append(filteredSlots, slot)
 			}
 		}
 	}
@@ -595,16 +586,7 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 			if !enrolled {
 				continue
 			}
-			excluded := false
-			for _, ex := range slot.Exclusions {
-				if ex.StudentID == studentID {
-					excluded = true
-					break
-				}
-			}
-			if !excluded {
-				filtered = append(filtered, slot)
-			}
+			filtered = append(filtered, slot)
 		}
 		slots = filtered
 	}

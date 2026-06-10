@@ -257,10 +257,6 @@ func main() {
 			admin.POST("/assignments", assignmentHandler.CreateAssignment)
 			admin.PUT("/assignments/:id", assignmentHandler.UpdateAssignment)
 			admin.DELETE("/assignments/:id", assignmentHandler.DeleteAssignment)
-			admin.GET("/assignment-week-overrides", assignmentHandler.GetAssignmentWeekOverrides)
-			admin.POST("/assignments/:id/weekly-override", assignmentHandler.CreateAssignmentWeekOverride)
-			admin.PUT("/assignments/:id/weekly-override/:overrideId", assignmentHandler.UpdateAssignmentWeekOverride)
-			admin.DELETE("/assignments/:id/weekly-override/:overrideId", assignmentHandler.DeleteAssignmentWeekOverride)
 
 			// Schedules
 			admin.GET("/schedules", scheduleHandler.GetScheduleByWeek)
@@ -278,8 +274,6 @@ func main() {
 			admin.PATCH("/schedules/:id/slots/:slotId/pin", scheduleHandler.PinScheduleSlot)
 			admin.PATCH("/schedules/:id/slots/:slotId/unpin", scheduleHandler.UnpinScheduleSlot)
 			admin.DELETE("/schedules/:id/slots/:slotId", scheduleHandler.DeleteScheduleSlot)
-			admin.POST("/schedules/:id/slots/:slotId/exclusions", scheduleHandler.AddSlotExclusion)
-			admin.DELETE("/schedules/:id/slots/:slotId/exclusions/:studentId", scheduleHandler.RemoveSlotExclusion)
 			admin.GET("/schedules/:id/slots/:slotId/attendance", scheduleHandler.GetSlotAttendance)
 			admin.POST("/schedules/:id/slots/:slotId/attendance", scheduleHandler.AddSlotStudent)
 			admin.PATCH("/schedules/:id/slots/:slotId/attendance/:studentId", scheduleHandler.UpdateAttendance)
@@ -298,9 +292,6 @@ func main() {
 			admin.GET("/group-lessons/:id/enrollments", groupLessonHandler.GetEnrollments)
 			admin.POST("/group-lessons/:id/enrollments", groupLessonHandler.AddEnrollment)
 			admin.DELETE("/group-lessons/:id/enrollments/:studentId", groupLessonHandler.RemoveEnrollment)
-			admin.GET("/group-lessons/:id/week-overrides", groupLessonHandler.GetWeekOverrides)
-			admin.POST("/group-lessons/:id/week-overrides", groupLessonHandler.CreateWeekOverride)
-			admin.DELETE("/group-lessons/:id/week-overrides/:overrideId", groupLessonHandler.DeleteWeekOverride)
 
 			// Reports
 			admin.GET("/reports/monthly", reportHandler.GetMonthlyReport)
