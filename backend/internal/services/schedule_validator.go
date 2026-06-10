@@ -277,18 +277,6 @@ func timesOverlap(startA, endA, startB, endB string) bool {
 	return startA < endB && startB < endA
 }
 
-func isImmediatelyAdjacent(endA, startB string) bool {
-	endAMin := hhmmToMinutes(endA)
-	startBMin := hhmmToMinutes(startB)
-
-	if endAMin < 0 || startBMin < 0 {
-		return false
-	}
-
-	diff := startBMin - endAMin
-	return diff >= 0 && diff <= 10
-}
-
 func gapMinutes(endA, startB string) int {
 	endAMin := hhmmToMinutes(endA)
 	startBMin := hhmmToMinutes(startB)

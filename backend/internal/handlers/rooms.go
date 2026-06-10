@@ -234,10 +234,6 @@ func (h *RoomHandler) DeleteRoom(c *gin.Context) {
 
 	if !room.IsActive {
 		err := h.db.Transaction(func(tx *gorm.DB) error {
-			slotIDs := tx.Model(&models.ScheduleSlot{}).Select("id").Where("room_id = ?", room.ID)
-			if err := tx.Where("schedule_slot_id IN (?)", slotIDs).Delete(&models.ScheduleSlotExclusion{}).Error; err != nil {
-				return err
-			}
 			if err := tx.Where("room_id = ?", room.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
 				return err
 			}

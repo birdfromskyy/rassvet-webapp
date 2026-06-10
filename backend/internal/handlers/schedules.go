@@ -583,7 +583,6 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
-		Preload("Exclusions").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
@@ -715,7 +714,6 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
-		Preload("Exclusions").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
@@ -775,7 +773,6 @@ func (h *ScheduleHandler) setScheduleSlotOrigin(c *gin.Context, origin string, a
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
-		Preload("Exclusions").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
@@ -813,8 +810,6 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 
 	// Delete attendance records first (cascade may not be applied in all DB states)
 	h.db.Where("schedule_slot_id = ?", slot.ID).Delete(&models.GroupLessonAttendance{})
-	h.db.Where("schedule_slot_id = ?", slot.ID).Delete(&models.ScheduleSlotExclusion{})
-
 	if err := h.db.Delete(&slot).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
 		return
@@ -922,7 +917,6 @@ func (h *ScheduleHandler) ClearManualSlots(c *gin.Context) {
 	}
 
 	if len(slotIDs) > 0 {
-		h.db.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.ScheduleSlotExclusion{})
 		h.db.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.GroupLessonAttendance{})
 		if err := h.db.Where("id IN ?", slotIDs).Delete(&models.ScheduleSlot{}).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
@@ -1021,7 +1015,9 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 			Origin:        models.ScheduleSlotOriginManual,
 			Status:        models.ScheduleSlotStatusScheduled,
 		}
-		h.db.Create(&newSlot)
+		if h.db.Create(&newSlot).Error == nil && newSlot.SlotType == models.SlotTypeGroup && newSlot.GroupLessonID != nil {
+			h.populateGroupAttendance(newSlot.ID, *newSlot.GroupLessonID)
+		}
 	}
 
 	h.respondWithSchedule(c, &schedule)
@@ -1038,8 +1034,6 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
-		Preload("Exclusions").
-		Preload("Exclusions.Student").
 		Preload("GroupLessonAttendance").
 		Preload("GroupLessonAttendance.Student").
 		Where("schedule_id = ?", schedule.ID).
@@ -1091,7 +1085,7 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 			conflictErrors++
 		}
 	}
-	unplaced := (indRequested + grpRequested) - (indScheduled + grpScheduled)
+	unplaced := len(issues)
 
 	c.JSON(http.StatusOK, gin.H{
 		"schedule": gin.H{
@@ -1110,7 +1104,7 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 			"total_requested":  indRequested + grpRequested,
 			"ind_requested":    indRequested,
 			"grp_requested":    grpRequested,
-			"scheduled":        indScheduled + grpScheduled,
+			"scheduled":        indScheduled,
 			"ind_scheduled":    indScheduled,
 			"grp_scheduled":    grpScheduled,
 			"unplaced":         unplaced,
@@ -1124,14 +1118,6 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 	individual := 0
 	group := 0
 
-	assignmentOverrides := map[uint]models.AssignmentWeekOverride{}
-	var overrides []models.AssignmentWeekOverride
-	if err := h.db.Where("week_start_date = ?", schedule.WeekStartDate).Find(&overrides).Error; err == nil {
-		for _, o := range overrides {
-			assignmentOverrides[o.AssignmentID] = o
-		}
-	}
-
 	var assignments []models.Assignment
 	if err := h.db.
 		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
@@ -1139,13 +1125,6 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 		Where("assignments.status = ?", models.AssignmentStatusActive).
 		Find(&assignments).Error; err == nil {
 		for _, a := range assignments {
-			if override, ok := assignmentOverrides[a.ID]; ok {
-				if override.Status == models.AssignmentStatusPaused {
-					continue
-				}
-				individual += override.PlannedVisits
-				continue
-			}
 			individual += a.VisitsPerWeek
 		}
 	}
@@ -1347,102 +1326,6 @@ func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherI
 	}
 
 	return nil
-}
-
-func (h *ScheduleHandler) AddSlotExclusion(c *gin.Context) {
-	scheduleID, err := strconv.Atoi(c.Param("id"))
-	if err != nil || scheduleID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID расписания"})
-		return
-	}
-
-	slotID, err := strconv.Atoi(c.Param("slotId"))
-	if err != nil || slotID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
-		return
-	}
-
-	var req struct {
-		StudentID uint `json:"student_id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	var slot models.ScheduleSlot
-	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).First(&slot).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Слот расписания не найден"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
-		return
-	}
-
-	if slot.SlotType != models.SlotTypeGroup {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Исключение возможно только для групповых слотов"})
-		return
-	}
-
-	exclusion := models.ScheduleSlotExclusion{
-		ScheduleSlotID: slot.ID,
-		StudentID:      req.StudentID,
-	}
-
-	if err := h.db.Create(&exclusion).Error; err != nil {
-		if strings.Contains(err.Error(), "23505") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Ученик уже исключён из этого занятия"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать запись"})
-		return
-	}
-
-	h.db.Preload("Student").First(&exclusion, exclusion.ID)
-	c.JSON(http.StatusCreated, gin.H{"message": "Ученик исключён из занятия", "exclusion": exclusion})
-}
-
-func (h *ScheduleHandler) RemoveSlotExclusion(c *gin.Context) {
-	scheduleID, err := strconv.Atoi(c.Param("id"))
-	if err != nil || scheduleID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID расписания"})
-		return
-	}
-
-	slotID, err := strconv.Atoi(c.Param("slotId"))
-	if err != nil || slotID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
-		return
-	}
-
-	studentID, err := strconv.Atoi(c.Param("studentId"))
-	if err != nil || studentID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
-		return
-	}
-
-	var slot models.ScheduleSlot
-	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).First(&slot).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Слот расписания не найден"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
-		return
-	}
-
-	result := h.db.Where("schedule_slot_id = ? AND student_id = ?", slot.ID, studentID).Delete(&models.ScheduleSlotExclusion{})
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Запись не найдена"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Исключение снято"})
 }
 
 func (h *ScheduleHandler) populateGroupAttendance(slotID, groupLessonID uint) {

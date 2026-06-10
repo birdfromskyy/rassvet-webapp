@@ -308,10 +308,6 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 		}
 
 		err := h.db.Transaction(func(tx *gorm.DB) error {
-			slotIDs := tx.Model(&models.ScheduleSlot{}).Select("id").Where("student_id = ?", student.ID)
-			if err := tx.Where("schedule_slot_id IN (?) OR student_id = ?", slotIDs, student.ID).Delete(&models.ScheduleSlotExclusion{}).Error; err != nil {
-				return err
-			}
 			if err := tx.Where("student_id = ?", student.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
 				return err
 			}
@@ -325,10 +321,6 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 				return err
 			}
 			if err := tx.Where("student_id = ?", student.ID).Delete(&models.GroupLessonEnrollment{}).Error; err != nil {
-				return err
-			}
-			assignmentIDs := tx.Model(&models.Assignment{}).Select("id").Where("student_id = ?", student.ID)
-			if err := tx.Where("assignment_id IN (?)", assignmentIDs).Delete(&models.AssignmentWeekOverride{}).Error; err != nil {
 				return err
 			}
 			if err := tx.Where("student_id = ?", student.ID).Delete(&models.Assignment{}).Error; err != nil {

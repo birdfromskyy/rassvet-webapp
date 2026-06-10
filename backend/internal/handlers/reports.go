@@ -95,7 +95,6 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		Preload("GroupLesson.Enrollments.Student").
 		Preload("GroupLessonAttendance").
 		Preload("GroupLessonAttendance.Student").
-		Preload("Exclusions").
 		Where("schedules.status = ?", models.ScheduleStatusApproved).
 		Where("schedule_slots.status <> ?", models.ScheduleSlotStatusCancelled).
 		Where("schedules.week_start_date < ? AND schedules.week_end_date >= ?", queryEnd, startDate)
@@ -320,19 +319,12 @@ func slotReportStudents(slot models.ScheduleSlot) []models.Student {
 			}
 			return students
 		}
-		// Fall back to group enrollments minus exclusions
+		// Fall back to group enrollments
 		if slot.GroupLesson == nil {
 			return nil
 		}
-		excluded := map[uint]bool{}
-		for _, exclusion := range slot.Exclusions {
-			excluded[exclusion.StudentID] = true
-		}
 		students := make([]models.Student, 0, len(slot.GroupLesson.Enrollments))
 		for _, enrollment := range slot.GroupLesson.Enrollments {
-			if excluded[enrollment.StudentID] {
-				continue
-			}
 			student := enrollment.Student
 			if student.ID == 0 {
 				student.ID = enrollment.StudentID

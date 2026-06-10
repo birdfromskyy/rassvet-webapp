@@ -273,27 +273,16 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		}
 
 		err := h.db.Transaction(func(tx *gorm.DB) error {
-			slotIDs := tx.Model(&models.ScheduleSlot{}).Select("id").Where("subject_id = ?", subject.ID)
-			if err := tx.Where("schedule_slot_id IN (?)", slotIDs).Delete(&models.ScheduleSlotExclusion{}).Error; err != nil {
-				return err
-			}
 			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
 				return err
 			}
 			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
 				return err
 			}
-			assignmentIDs := tx.Model(&models.Assignment{}).Select("id").Where("subject_id = ?", subject.ID)
-			if err := tx.Where("assignment_id IN (?)", assignmentIDs).Delete(&models.AssignmentWeekOverride{}).Error; err != nil {
-				return err
-			}
 			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.Assignment{}).Error; err != nil {
 				return err
 			}
 			groupIDs := tx.Model(&models.GroupLesson{}).Select("id").Where("subject_id = ?", subject.ID)
-			if err := tx.Where("group_lesson_id IN (?)", groupIDs).Delete(&models.GroupLessonWeekOverride{}).Error; err != nil {
-				return err
-			}
 			if err := tx.Where("group_lesson_id IN (?)", groupIDs).Delete(&models.GroupLessonEnrollment{}).Error; err != nil {
 				return err
 			}
