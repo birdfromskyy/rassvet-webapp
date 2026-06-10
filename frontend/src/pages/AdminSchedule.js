@@ -106,6 +106,7 @@ const EMPTY_SLOT_FORM = {
 	slot_type: 'individual',
 	assignment_id: '',
 	group_lesson_id: '',
+	teacher_id: '',
 	room_id: '',
 	room_name: '',
 	weekday: 1,
