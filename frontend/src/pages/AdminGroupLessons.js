@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
 	Alert,
+	Autocomplete,
 	Box,
 	Button,
 	Chip,
@@ -69,7 +70,6 @@ const AdminGroupLessons = () => {
 	const [enrollOpen, setEnrollOpen] = useState(false)
 	const [enrollGroup, setEnrollGroup] = useState(null)
 	const [addStudentId, setAddStudentId] = useState('')
-	const [enrollSearch, setEnrollSearch] = useState('')
 	const [deleteConfirm, setDeleteConfirm] = useState(null)
 
 	const load = useCallback(async () => {
@@ -204,7 +204,6 @@ const AdminGroupLessons = () => {
 	const enrolledIds = enrollGroup?.enrollments?.map(e => e.student_id) || []
 	const availableStudents = students
 		.filter(s => !enrolledIds.includes(s.id))
-		.filter(s => s.full_name.toLowerCase().includes(enrollSearch.toLowerCase()))
 		.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))
 
 	if (loading) return <Box display='flex' justifyContent='center' mt={6}><CircularProgress /></Box>
@@ -358,7 +357,7 @@ const AdminGroupLessons = () => {
 				</DialogActions>
 			</Dialog>
 
-			<Dialog open={enrollOpen} onClose={() => { setEnrollOpen(false); setEnrollSearch('') }} maxWidth='sm' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
+			<Dialog open={enrollOpen} onClose={() => { setEnrollOpen(false); setAddStudentId('') }} maxWidth='sm' fullWidth PaperProps={{ className: 'admin-module-dialog' }}>
 				<DialogTitle className='admin-module-dialog__title'>
 					Состав группы: {enrollGroup?.name}
 					<Typography variant='caption' display='block' color='text.secondary'>
@@ -367,24 +366,17 @@ const AdminGroupLessons = () => {
 				</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='subtitle2' gutterBottom>Добавить ученика</Typography>
-					<TextField
-						size='small'
-						fullWidth
-						placeholder='Поиск ученика...'
-						value={enrollSearch}
-						onChange={e => { setEnrollSearch(e.target.value); setAddStudentId('') }}
-						sx={{ mb: 1 }}
-					/>
 					<Box display='flex' gap={1} mb={2}>
-						<FormControl fullWidth size='small'>
-							<InputLabel>Ученик</InputLabel>
-							<Select value={addStudentId} label='Ученик' onChange={e => setAddStudentId(e.target.value)}>
-								{availableStudents.map(s => (
-									<MenuItem key={s.id} value={s.id}>{s.full_name}</MenuItem>
-								))}
-							</Select>
-						</FormControl>
-						<Button variant='contained' onClick={handleAddStudent} disabled={!addStudentId}>Добавить</Button>
+						<Autocomplete
+							size='small'
+							fullWidth
+							options={availableStudents}
+							getOptionLabel={s => s.full_name}
+							value={availableStudents.find(s => s.id === addStudentId) || null}
+							onChange={(_, v) => setAddStudentId(v?.id || '')}
+							renderInput={params => <TextField {...params} placeholder='Поиск ученика...' />}
+						/>
+						<Button variant='contained' onClick={handleAddStudent} disabled={!addStudentId} sx={{ whiteSpace: 'nowrap' }}>Добавить</Button>
 					</Box>
 					<Divider sx={{ mb: 1 }} />
 					<Typography variant='subtitle2' gutterBottom>
