@@ -9,7 +9,7 @@ function About() {
           <path d="M0,0H1440V42C1320,62 1210,72 1080,58C930,42 820,12 680,28C520,46 420,88 250,78C145,72 70,48 0,58Z" />
         </svg>
       </div>
-      <div className="container about__inner">
+      <div className="page-container about__inner">
         <div className="about__illustration">
           <img src={illustration} alt="Иллюстрация о центре" />
         </div>
@@ -39,7 +39,7 @@ function About() {
             </li>
           </ul>
 
-          <a href="/mission" className="about__btn">
+          <a href="/mission" className="btn btn--primary">
             Подробнее о центре
           </a>
         </div>

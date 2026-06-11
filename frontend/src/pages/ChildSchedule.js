@@ -84,7 +84,7 @@ const ChildSchedule = ({ user }) => {
       <Header />
 
       <main className="schedule">
-        <div className="schedule__container container">
+        <div className="schedule__container page-container">
 
           <div className="schedule__hero">
             <span className="section-badge">Личный кабинет</span>

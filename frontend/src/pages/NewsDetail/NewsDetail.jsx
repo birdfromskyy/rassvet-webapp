@@ -190,7 +190,7 @@ const NewsDetail = () => {
   if (loading) {
     return (
       <main className="news-detail-page">
-        <div className="news-detail__container">
+        <div className="page-container">
           <div className="news-detail__state">
             <h2>Загрузка статьи...</h2>
           </div>

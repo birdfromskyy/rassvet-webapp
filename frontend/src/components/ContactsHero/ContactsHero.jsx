@@ -4,7 +4,7 @@ import contactsImg from "../../assets/contacts-hero.png";
 function ContactsHero() {
   return (
     <section className="contactsHero">
-      <div className="container contactsHero__inner">
+      <div className="page-container contactsHero__inner">
 
         <div className="contactsHero__content">
           <span className="section-badge">Контакты</span>

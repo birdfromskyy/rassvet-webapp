@@ -94,7 +94,7 @@ export default function AdminPrivacyPolicy() {
 
   return (
     <main className="admin-module">
-      <div className="admin-module__container">
+      <div className="admin-module__container page-container">
 
         <section className="admin-module__hero">
           <div>

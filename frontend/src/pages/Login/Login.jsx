@@ -59,7 +59,7 @@ const Login = ({ onLogin }) => {
 
   return (
     <section className="login-page">
-      <div className="container">
+      <div className="page-container">
         <div className="login-page__wrapper">
           <div className="login-card">
             <div className="login-card__top">

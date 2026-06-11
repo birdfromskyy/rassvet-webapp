@@ -10,7 +10,7 @@ export default function Hero() {
   const videoRef = useRef(null);
   return (
     <section className="hero">
-      <div className="container hero__inner">
+      <div className="page-container hero__inner">
         <div className="hero__content">
           <div className="section-badge">Мы рядом. Мы помогаем</div>
 

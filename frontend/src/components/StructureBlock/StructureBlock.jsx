@@ -14,7 +14,7 @@ function StructureBlock() {
 
   return (
     <section className="structure">
-      <div className="container">
+      <div className="page-container">
         <div className="structure__image-wrap">
           <img
             src={imgSrc}

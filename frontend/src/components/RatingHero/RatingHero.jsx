@@ -4,7 +4,7 @@ import ratingImg from "../../assets/online-review.png";
 function RatingHero() {
   return (
     <section className="ratingHero">
-      <div className="container ratingHero__inner">
+      <div className="page-container ratingHero__inner">
         <div className="ratingHero__content">
           <span className="section-badge">Документы</span>
 

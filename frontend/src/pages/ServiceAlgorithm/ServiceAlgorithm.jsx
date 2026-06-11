@@ -98,7 +98,7 @@ function ServiceAlgorithm() {
 
       <main className="serviceAlgorithm">
         <section className="serviceAlgorithm__hero">
-          <div className="container serviceAlgorithm__hero-inner">
+          <div className="page-container serviceAlgorithm__hero-inner">
             <div>
               <span className="section-badge">Получение услуг</span>
               <h1>Алгоритм получения услуг</h1>
@@ -111,7 +111,7 @@ function ServiceAlgorithm() {
         </section>
 
         <section className="serviceAlgorithm__steps">
-          <div className="container">
+          <div className="page-container">
             <div className="serviceAlgorithm__grid">
 
               {/* 01 */}

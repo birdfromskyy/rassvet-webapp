@@ -26,7 +26,7 @@ function ServicesList() {
 
   return (
     <section className="servicesList">
-      <div className="container">
+      <div className="page-container">
         <div className="servicesList__grid">
           {sections.map((section) => (
             <div className="serviceCard" key={section.id}>

@@ -4,7 +4,7 @@ import historyImg from "../../assets/history.png";
 function HistoryHero() {
   return (
     <section className="history-hero">
-      <div className="container history-hero__inner">
+      <div className="page-container history-hero__inner">
         <div className="history-hero__content">
           <span className="section-badge">История и достижения</span>
 

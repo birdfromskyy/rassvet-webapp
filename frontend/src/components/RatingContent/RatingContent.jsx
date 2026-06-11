@@ -14,7 +14,7 @@ function RatingContent() {
 
   return (
     <section className="rating-content">
-      <div className="container rating-content__inner">
+      <div className="page-container rating-content__inner">
 
         <div className="rating-content__grid">
           {files.map((file) => (

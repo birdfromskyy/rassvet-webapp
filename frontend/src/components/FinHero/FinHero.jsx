@@ -3,7 +3,7 @@ import "./FinHero.scss";
 function FinHero() {
   return (
     <section className="fin-hero">
-      <div className="container fin-hero__inner">
+      <div className="page-container fin-hero__inner">
         <div className="fin-hero__content">
           <span className="section-badge">О центре</span>
 

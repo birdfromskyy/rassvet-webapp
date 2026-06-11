@@ -65,7 +65,7 @@ const ForgotPassword = () => {
 
   return (
     <section className="forgot-page">
-      <div className="container">
+      <div className="page-container">
         <div className="forgot-page__wrapper">
           <div className="forgot-card">
             <div className="forgot-card__top">

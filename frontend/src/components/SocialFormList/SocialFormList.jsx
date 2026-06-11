@@ -14,7 +14,7 @@ const forms = [
 function SocialFormList() {
   return (
     <section className="socialForm">
-      <div className="container">
+      <div className="page-container">
         <div className="socialForm__grid">
           {forms.map((item) => (
             <article className="socialFormCard" key={item.title}>

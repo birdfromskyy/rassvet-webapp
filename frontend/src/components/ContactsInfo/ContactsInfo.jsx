@@ -40,7 +40,7 @@ function ContactsInfo() {
 
   return (
     <section className="contacts">
-      <div className="container">
+      <div className="page-container">
         <div className="contacts__grid">
 
           <div className="contactCard">

@@ -485,7 +485,7 @@ const Dashboard = ({ user, onLogout }) => {
       <Header />
 
       <main className="dashboard">
-        <div className="dashboard__container container">
+        <div className=" page-container">
 
           {/* ── Hero ── */}
           <section className="dashboard__hero">

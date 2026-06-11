@@ -78,7 +78,7 @@ const News = () => {
       <Header />
       <main className="news-page">
         <section className="news">
-          <div className="news__container container">
+          <div className="page-container">
             <div className="news__hero">
               <div>
                 <span className="section-badge">Новости центра</span>
@@ -119,7 +119,7 @@ const News = () => {
                 )}
               </div>
 
-              <button type="submit" className="news__search-btn">
+              <button type="submit" className="btn btn--secondary">
                 Искать
               </button>
             </form>

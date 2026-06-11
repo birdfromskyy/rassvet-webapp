@@ -4,7 +4,7 @@ import employeesImg from "../../assets/employees.png";
 function EmployeesHero() {
   return (
     <section className="employees-hero">
-      <div className="container employees-hero__inner">
+      <div className="page-container employees-hero__inner">
         <div className="employees-hero__content">
           <span className="section-badge">Сотрудники</span>
 

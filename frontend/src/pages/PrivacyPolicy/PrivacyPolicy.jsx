@@ -49,7 +49,7 @@ const PrivacyPolicy = () => {
     <>
       <Header />
       <main className="privacy-page">
-        <div className="container">
+        <div className="page-container">
           <div className="privacy-page__content">
 
             <h1>Политика обработки персональных данных</h1>

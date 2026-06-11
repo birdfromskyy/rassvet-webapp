@@ -23,7 +23,7 @@ function ServicesDescriptionList() {
 
   return (
     <section className="servicesDesc">
-      <div className="container">
+      <div className="page-container">
 
         {ourServices.length > 0 && (
           <div className="servicesDesc__ourServices">

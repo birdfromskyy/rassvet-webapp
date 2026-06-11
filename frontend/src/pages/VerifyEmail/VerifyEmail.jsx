@@ -17,7 +17,7 @@ const VerifyEmail = () => {
   const autoSentRef = useRef(false)
 
   useEffect(() => {
-    document.title = 'РАСсвет | Подтверждение email'
+    document.title = 'Подтверждение email'
   }, [])
 
   useEffect(() => {

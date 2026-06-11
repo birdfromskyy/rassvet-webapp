@@ -39,7 +39,7 @@ function Awards() {
 
       <main className="awards">
         <section className="awards__hero">
-          <div className="container">
+          <div className="page-container">
             <span className="section-badge">Наши награды</span>
             <h1>Достижения и благодарности Центра</h1>
             <p>
@@ -50,7 +50,7 @@ function Awards() {
         </section>
 
         <section className="awards__section">
-          <div className="container">
+          <div className="page-container">
             {loading ? (
               <p style={{ textAlign: "center", color: "#94a3b8" }}>Загрузка...</p>
             ) : awards.length === 0 ? (

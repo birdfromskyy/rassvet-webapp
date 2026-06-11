@@ -4,7 +4,7 @@ import servicesImg from "../../assets/services-description.png";
 function ServicesDescriptionHero() {
   return (
     <section className="servicesDescHero">
-      <div className="container servicesDescHero__inner">
+      <div className="page-container servicesDescHero__inner">
         <div className="servicesDescHero__content">
           <span className="section-badge">Услуги Центра</span>
 

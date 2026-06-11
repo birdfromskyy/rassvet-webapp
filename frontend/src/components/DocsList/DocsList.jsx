@@ -11,7 +11,7 @@ function DocsList() {
 
   return (
     <section className="docs-list">
-      <div className="container docs-list__inner">
+      <div className="page-container docs-list__inner">
         <div className="docs-list__heading">
           <h2 className="docs-list__title">Документы центра</h2>
         </div>
