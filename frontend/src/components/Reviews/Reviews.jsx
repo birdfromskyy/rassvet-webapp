@@ -29,7 +29,7 @@ function Reviews() {
         </svg>
       </div>
 
-      <div className="container reviews__inner">
+      <div className="page-container reviews__inner">
         <h2 className="reviews__title">Отзывы родителей</h2>
 
         {visible.length > 0 ? (

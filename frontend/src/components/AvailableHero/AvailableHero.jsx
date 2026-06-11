@@ -4,7 +4,7 @@ import availableImg from "../../assets/available-hero.png";
 function AvailableHero() {
   return (
     <section className="availableHero">
-      <div className="container availableHero__inner">
+      <div className="page-container availableHero__inner">
         <div className="availableHero__content">
           <span className="section-badge">Свободные места</span>
 

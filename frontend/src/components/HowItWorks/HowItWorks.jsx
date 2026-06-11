@@ -21,7 +21,7 @@ const steps = [
 export default function HowItWorks() {
   return (
     <section className="how-it-works">
-      <div className="container how-it-works__inner">
+      <div className="page-container how-it-works__inner">
         <div className="how-it-works__heading">
           <span className="how-it-works__label">Первый шаг</span>
           <h2 className="how-it-works__title">Как попасть в центр</h2>

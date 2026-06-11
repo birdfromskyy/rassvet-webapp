@@ -58,7 +58,7 @@ function Stories() {
 
   return (
     <section className="stories">
-      <div className="container">
+      <div className="page-container">
         <div className="stories__row">
           {visible.map((story) => {
             const index = stories.indexOf(story);

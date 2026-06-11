@@ -16,7 +16,7 @@ function AvailableStats() {
 
   return (
     <section className="availableStats">
-      <div className="container">
+      <div className="page-container">
 
         <div className="availableStats__grid">
 

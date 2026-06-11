@@ -17,7 +17,7 @@ function EmployeesList() {
 
   return (
     <section className="employees-list">
-      <div className="container employees-list__inner">
+      <div className="page-container employees-list__inner">
         <div className="employees-list__heading">
           <h2 className="employees-list__title">Специалисты центра</h2>
         </div>

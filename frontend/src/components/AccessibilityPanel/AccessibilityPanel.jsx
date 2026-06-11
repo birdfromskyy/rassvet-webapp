@@ -3,27 +3,29 @@ import "./AccessibilityPanel.scss";
 
 function AccessibilityPanel() {
   const [enabled, setEnabled] = useState(
-    localStorage.getItem("accessibility") === "on"
+    localStorage.getItem("accessibility") === "on",
   );
+  
+  const [isHidden, setIsHidden] = useState(false);
 
   const [theme, setTheme] = useState(
-    localStorage.getItem("accessibilityTheme") || "light"
+    localStorage.getItem("accessibilityTheme") || "light",
   );
 
   const [fontSize, setFontSize] = useState(
-    localStorage.getItem("accessibilityFont") || "medium"
+    localStorage.getItem("accessibilityFont") || "medium",
   );
 
   const [spacing, setSpacing] = useState(
-    localStorage.getItem("accessibilitySpacing") || "normal"
+    localStorage.getItem("accessibilitySpacing") || "normal",
   );
 
   const [images, setImages] = useState(
-    localStorage.getItem("accessibilityImages") !== "off"
+    localStorage.getItem("accessibilityImages") !== "off",
   );
 
   const [sound, setSound] = useState(
-    localStorage.getItem("accessibilitySound") === "on"
+    localStorage.getItem("accessibilitySound") === "on",
   );
 
   useEffect(() => {
@@ -62,9 +64,8 @@ function AccessibilityPanel() {
       ) {
         return;
       }
-
       const readableElement = target.closest(
-        "h1, h2, h3, h4, h5, h6, p, a, button, label, li, span, strong, input, textarea, select"
+        "h1, h2, h3, h4, h5, h6, p, a, button, label, li, span, strong, input, textarea, select",
       );
 
       if (!readableElement) return;
@@ -111,11 +112,31 @@ function AccessibilityPanel() {
     };
   }, [enabled, sound]);
 
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      if (currentScrollY <= 10) {
+        setIsHidden(false);
+      } else if (currentScrollY > lastScrollY) {
+        setIsHidden(true);
+      } else {
+        setIsHidden(false);
+      }
+
+      lastScrollY = currentScrollY;
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
   if (!enabled) return null;
 
   return (
-    <div className="accessibility-panel">
-      <div className="accessibility-panel__inner">
+<div className={`accessibility-panel ${isHidden ? "accessibility-panel--hidden" : ""}`}>      <div className="accessibility-panel__inner">
         <strong>Версия для слабовидящих</strong>
 
         <div className="accessibility-panel__group">

@@ -367,3 +367,15 @@
     padding: 16px 0 0;
   }
 }
+
+@media (max-width: 900px) {
+  .about__content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .about__btn {
+    align-self: center;
+    margin: 8px auto 0;
+  }
+}

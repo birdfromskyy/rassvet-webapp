@@ -82,7 +82,7 @@ function AdminCMSPanel() {
 
   return (
     <main className="admin-cms">
-      <div className="admin-cms__container">
+      <div className="admin-cms__container page-container">
 
         <section className="admin-cms__hero">
           <div>

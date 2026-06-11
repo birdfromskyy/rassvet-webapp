@@ -4,7 +4,7 @@ import docsImg from "../../assets/docs.png";
 function DocsHero() {
   return (
     <section className="docs-hero">
-      <div className="container docs-hero__inner">
+      <div className="page-container docs-hero__inner">
         <div className="docs-hero__content">
           <span className="section-badge">Документы</span>
 

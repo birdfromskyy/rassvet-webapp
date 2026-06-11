@@ -4,7 +4,7 @@ function ServicesListHero() {
   return (
     <section className="servicesHero">
 
-      <div className="container">
+      <div className="page-container">
 
         <div className="servicesHero__wrapper">
 

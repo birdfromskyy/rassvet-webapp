@@ -123,7 +123,7 @@ const CreateReview = () => {
   if (checkingReview) {
     return (
       <main className="create-review-page">
-        <div className="create-review__container">
+        <div className="page-container">
           <div className="create-review__state">
             <h2>Проверяем ваш отзыв...</h2>
           </div>

@@ -154,3 +154,16 @@ body.accessibility-mode :focus {
     margin-left: 0;
   }
 }
+
+.accessibility-panel {
+  transition:
+    transform 0.25s ease,
+    opacity 0.25s ease;
+  will-change: transform;
+}
+
+.accessibility-panel--hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}

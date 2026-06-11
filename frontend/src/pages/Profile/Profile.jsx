@@ -493,7 +493,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
       <Header />
       <main className="profile-page">
         <section className="profile">
-          <div className="profile__container container">
+          <div className="page-container">
             <div className="profile__header">
               <div>
                 <span className="section-badge">Личный кабинет</span>

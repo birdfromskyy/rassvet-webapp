@@ -16,6 +16,7 @@ function Home() {
   return (
     <div className="page page--home">
       <Header />
+
       <Stories />
       <Hero />
       <About />

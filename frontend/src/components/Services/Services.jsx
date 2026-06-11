@@ -77,7 +77,7 @@ function Services() {
 
   return (
     <section className="services">
-      <div className="container services__inner">
+      <div className="page-container services__inner">
         <div className="services__heading">
           <h2 className="services__title">Наши услуги</h2>
         </div>
@@ -127,7 +127,7 @@ function Services() {
       </div>
       <div className="btn-actions">
 
-      <a href="/services-description" className="hero__btn hero__btn--primary">
+      <a href="/services-description" className="btn btn--secondary">
         Подробнее об услугах
       </a>
       </div>

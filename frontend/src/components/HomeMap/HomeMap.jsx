@@ -11,7 +11,7 @@ function HomeMap() {
           />
         </svg>
       </div>
-      <div className="container">
+      <div className="page-container">
         <div className="home-map__head">
           <span className="section-badge">Как нас найти</span>
           <h2>Адрес Центра</h2>

@@ -33,7 +33,7 @@ const Reviews = ({ user }) => {
   if (loading) {
     return (
       <main className="reviews-page">
-        <div className="reviews-page__container">
+        <div className="page-container">
           <div className="reviews-page__state">
             <h2>Загрузка отзывов...</h2>
           </div>

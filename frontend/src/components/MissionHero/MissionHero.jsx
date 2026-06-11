@@ -19,7 +19,7 @@ function MissionHero() {
         <span className="circle circle--blue"></span>
         <span className="circle circle--light"></span>
       </div>
-      <div className="container mission-hero__inner">
+      <div className="page-container mission-hero__inner">
         <div className="mission-hero__content">
           <span className="section-badge">Миссия центра</span>
 

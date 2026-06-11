@@ -109,6 +109,14 @@ function Header() {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen]);
+
   const filteredPages = searchPages.filter((page) =>
     page.title.toLowerCase().includes(searchValue.toLowerCase().trim()),
   );
@@ -455,7 +463,7 @@ function Header() {
                 setIsMenuOpen((prev) => !prev);
                 setOpenDropdown(null);
               }}
-              aria-label="Открыть меню"
+              aria-label={isMenuOpen ? "Закрыть меню" : "Открыть меню"}
             >
               {isMenuOpen ? <FiX /> : <FiMenu />}
             </button>

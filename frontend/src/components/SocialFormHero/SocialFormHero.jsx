@@ -4,7 +4,7 @@ import socialFormImg from "../../assets/social-form-hero.png";
 function SocialFormHero() {
   return (
     <section className="socialFormHero">
-      <div className="container socialFormHero__inner">
+      <div className="page-container socialFormHero__inner">
         <div className="socialFormHero__content">
           <span className="section-badge">Формы обслуживания</span>
 

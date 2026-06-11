@@ -15,7 +15,7 @@ function HistoryTimeline() {
 
   return (
     <section className="history-timeline">
-      <div className="container history-timeline__inner">
+      <div className="page-container history-timeline__inner">
         <div className="history-timeline__heading">
           <h2 className="history-timeline__title">Достижения по годам</h2>
         </div>

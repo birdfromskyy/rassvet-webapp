@@ -14,7 +14,7 @@ function RulesList() {
 
   return (
     <section className="rules-list">
-      <div className="container rules-list__inner">
+      <div className="page-container rules-list__inner">
 
         <div className="rules-list__grid">
           {rules.map((file) => (

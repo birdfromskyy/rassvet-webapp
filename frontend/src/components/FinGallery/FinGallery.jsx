@@ -73,7 +73,7 @@ function FinGallery() {
         </div>
       )}
       <section className="fin-gallery">
-        <div className="container">
+        <div className="page-container">
         {introZones.length > 0 && (
           <div className="fin-gallery__intro">
             {introZones.map((zone) => {

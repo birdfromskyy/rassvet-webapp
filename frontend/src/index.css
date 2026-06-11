@@ -124,3 +124,47 @@ body {
     transition: none;
   }
 }
+
+.page-container {
+  width: min(94%, 1440px);
+  margin: 0 auto;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 50px;
+  padding: 0 28px;
+
+  border-radius: 999px;
+  border: 2px solid transparent;
+
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* Синий фон + белый текст */
+.btn--primary {
+  background: #074462;
+  color: #fff;
+  border-color: #074462;
+
+  &:hover {
+    background: #0b5f88;
+    border-color: #0b5f88;
+  }
+}
+
+/* Жёлтый фон + чёрный текст */
+.btn--secondary {
+  background: #ffe96a;
+  color: #1c1c1c;
+  border-color: #ffe96a;
+
+}

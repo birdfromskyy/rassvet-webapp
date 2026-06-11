@@ -115,7 +115,7 @@ const ConsultationRequest = ({ user }) => {
       <Header />
 
       <main className="consultation">
-        <div className="container consultation__container">
+        <div className="page-container consultation__container">
           <section className="consultation__hero">
             <span className="section-badge">Первичная консультация</span>
             <h1>Заявка на консультацию</h1>

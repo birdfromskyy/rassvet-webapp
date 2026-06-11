@@ -120,7 +120,7 @@ const Register = () => {
 
   return (
     <section className="register-page">
-      <div className="container">
+      <div className="page-container">
         <div className="register-page__wrapper">
 
           <div className="register-card">

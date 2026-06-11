@@ -4,7 +4,7 @@ import "./RulesHero.scss";
 function RulesHero() {
   return (
     <section className="rulesHero">
-      <div className="container rulesHero__inner">
+      <div className="page-container rulesHero__inner">
         <div className="rulesHero__content">
           <span className="section-badge">Документы</span>
 

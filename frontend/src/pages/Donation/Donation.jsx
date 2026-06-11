@@ -75,7 +75,7 @@ export default function Donation() {
       <Header />
 
       <main className="donation">
-        <div className="container donation__container">
+        <div className="page-container donation__container">
           <section className="donation__hero">
             <div className="donation__hero-content">
               <span className="section-badge">Поддержать центр</span>
