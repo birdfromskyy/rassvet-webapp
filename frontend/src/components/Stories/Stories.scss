@@ -87,6 +87,7 @@
   }
 }
 
+.story-preview__cover,
 .story-preview__iframe,
 .story-preview__vid {
   position: absolute;
@@ -95,7 +96,35 @@
   height: 100%;
   border: none;
   object-fit: cover;
-  pointer-events: none; // clicks pass through to the button via the overlay
+  pointer-events: none;
+}
+
+.story-preview__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background 0.2s ease;
+  pointer-events: none;
+
+  span {
+    font-size: 20px;
+    color: #fff;
+    margin-left: 3px; // visual centering of ▶
+  }
+
+  .story-preview:hover & {
+    transform: translate(-50%, -50%) scale(1.15);
+    background: rgba(7, 68, 98, 0.82);
+  }
 }
 
 /* Transparent layer that sits above the embed and captures clicks for the button */
@@ -179,6 +208,15 @@
     &.is-active {
       background: #ffffff;
     }
+  }
+}
+
+.stories-modal__iframe {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+
+  &--loaded {
+    opacity: 1;
   }
 }
 

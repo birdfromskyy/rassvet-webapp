@@ -19,6 +19,7 @@ func SecurityHeaders() gin.HandlerFunc {
 				"font-src 'self' data: https:; "+
 				"media-src 'self' https:; "+
 				"connect-src 'self'; "+
+				"frame-src https://vk.com https://*.vk.com; "+
 				"frame-ancestors 'none'")
 		c.Next()
 	}

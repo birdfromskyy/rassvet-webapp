@@ -3,13 +3,12 @@ import shortsService from "../../services/shortsService";
 import "./Stories.scss";
 
 // Convert any supported VK URL to an embed URL
-const toVkEmbed = (url, autoplay = false) => {
+const toVkEmbed = (url) => {
   if (!url) return null;
-  const auto = autoplay ? "&autoplay=1" : "";
   const videoMatch = url.match(/video-?(\d+)_(\d+)/);
-  if (videoMatch) return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2${auto}`;
+  if (videoMatch) return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2`;
   const clipMatch = url.match(/clip-?(\d+)_(\d+)/);
-  if (clipMatch) return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2${auto}`;
+  if (clipMatch) return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2`;
   if (url.includes("vk.com") || url.includes("vkvideo")) return url;
   return null;
 };
@@ -22,6 +21,7 @@ function Stories() {
   const [stories, setStories] = useState([]);
   const [activeIndex, setActiveIndex] = useState(null);
   const [page, setPage] = useState(0);
+  const [modalLoaded, setModalLoaded] = useState(false);
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +33,9 @@ function Stories() {
   const closeStory = () => setActiveIndex(null);
   const nextStory = () => setActiveIndex(prev => prev === stories.length - 1 ? 0 : prev + 1);
   const prevStory = () => setActiveIndex(prev => prev === 0 ? stories.length - 1 : prev - 1);
+
+  // Reset loaded state each time modal switches to a different story
+  useEffect(() => { setModalLoaded(false); }, [activeIndex]);
 
   // Autoplay mp4 when modal opens / switches
   useEffect(() => {
@@ -62,7 +65,6 @@ function Stories() {
         <div className="stories__row">
           {visible.map((story) => {
             const index = stories.indexOf(story);
-            const embedUrl = toVkEmbed(story.video_url);
             return (
               <button
                 className="story-preview"
@@ -71,26 +73,46 @@ function Stories() {
                 onClick={() => setActiveIndex(index)}
               >
                 <div className="story-preview__frame">
-                  {embedUrl ? (
+                  {story.cover_url ? (
+                    // Facade: cover image available — no iframe needed
+                    <>
+                      <img
+                        className="story-preview__cover"
+                        src={story.cover_url}
+                        alt={story.title}
+                        loading="lazy"
+                      />
+                      <div className="story-preview__play" aria-hidden="true">
+                        <span>▶</span>
+                      </div>
+                    </>
+                  ) : isVk(story.video_url) ? (
+                    // No cover — let VK iframe render its own thumbnail
                     <iframe
-                      src={embedUrl}
+                      src={toVkEmbed(story.video_url)}
                       className="story-preview__iframe"
                       frameBorder="0"
-                      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                      allow="encrypted-media"
                       tabIndex={-1}
                       title={story.title}
                     />
                   ) : story.video_url ? (
-                    <video
-                      className="story-preview__vid"
-                      src={story.video_url}
-                      muted loop autoPlay playsInline
-                      tabIndex={-1}
-                    />
+                    <>
+                      <video
+                        className="story-preview__vid"
+                        src={story.video_url}
+                        muted playsInline
+                        tabIndex={-1}
+                      />
+                      <div className="story-preview__play" aria-hidden="true">
+                        <span>▶</span>
+                      </div>
+                    </>
                   ) : (
-                    <div className="story-preview__empty">▶</div>
+                    <div className="story-preview__play" aria-hidden="true">
+                      <span>▶</span>
+                    </div>
                   )}
-                  {/* Transparent overlay so clicks always reach the button */}
                   <div className="story-preview__overlay" aria-hidden="true" />
                 </div>
                 <span className="story-preview__title">{story.title}</span>
@@ -146,12 +168,13 @@ function Stories() {
             {isVk(activeStory.video_url) ? (
               <iframe
                 key={activeStory.id}
-                src={toVkEmbed(activeStory.video_url, true)}
-                className="stories-modal__iframe"
+                src={toVkEmbed(activeStory.video_url)}
+                className={`stories-modal__iframe${modalLoaded ? " stories-modal__iframe--loaded" : ""}`}
                 frameBorder="0"
                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                 allowFullScreen
                 title={activeStory.title}
+                onLoad={() => setModalLoaded(true)}
               />
             ) : (
               <>
