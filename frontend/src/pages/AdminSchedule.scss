@@ -56,13 +56,24 @@
 .admin-schedule-week-nav__label--current {
   color: #074462;
   font-weight: 800;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  padding: 10px 28px;
+  border-radius: 16px;
+  border: 2px solid #1976d2;
+  box-shadow: 0 2px 16px rgba(25, 118, 210, 0.2), 0 0 0 5px rgba(25, 118, 210, 0.08);
 }
 
 .admin-schedule-week-nav__badge {
-  font-size: 13px;
-  font-weight: 500;
-  color: #1f678f;
-  margin-left: 8px;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: #1976d2;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-left: 10px;
+  vertical-align: middle;
+  letter-spacing: 0.4px;
 }
 
 .admin-schedule-week-nav__btn {

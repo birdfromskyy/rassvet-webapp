@@ -466,6 +466,8 @@ const AdminSchedule = () => {
 		const doIt = () => doResetAuto()
 		if (isPastWeek) {
 			openPastWeekConfirm('Удалить авто-слоты прошедшей недели и перегенерировать? Ручные слоты сохранятся.', doIt)
+		} else if (isCurrentWeek) {
+			openPastWeekConfirm('Удалить авто-слоты текущей недели и перегенерировать? Ручные слоты сохранятся.', doIt)
 		} else {
 			doIt()
 		}
@@ -485,6 +487,8 @@ const AdminSchedule = () => {
 		const doIt = () => doClearAuto()
 		if (isPastWeek) {
 			openPastWeekConfirm('Удалить все авто-слоты прошедшей недели? Ручные слоты сохранятся. Перегенерации не будет.', doIt)
+		} else if (isCurrentWeek) {
+			openPastWeekConfirm('Удалить все авто-слоты текущей недели? Ручные слоты сохранятся. Перегенерации не будет.', doIt)
 		} else {
 			doIt()
 		}
@@ -1320,9 +1324,9 @@ const AdminSchedule = () => {
 								startIcon={<ClearIcon />}
 								onClick={clearAuto}
 								disabled={generating}
-								color={isPastWeek ? 'warning' : 'error'}
+								color={(isPastWeek || isCurrentWeek) ? 'warning' : 'error'}
 							>
-								{isPastWeek ? '⚠ Очистить авто' : 'Очистить авто'}
+								{(isPastWeek || isCurrentWeek) ? '⚠ Очистить авто' : 'Очистить авто'}
 							</Button>
 							<Button
 								size='small'
