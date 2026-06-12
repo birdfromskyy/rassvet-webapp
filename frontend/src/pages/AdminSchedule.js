@@ -1309,7 +1309,7 @@ const AdminSchedule = () => {
 								onClick={copyManualFromPrevWeek}
 								disabled={generating}
 							>
-								Скопировать ручные
+								Вставить ручные занятия с прошлой недели
 							</Button>
 
 							<Divider orientation='vertical' flexItem sx={{ mx: 0.5 }} />
