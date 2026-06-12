@@ -509,10 +509,10 @@ const Dashboard = ({ user, onLogout }) => {
             <>
               <section className="dashboard__cards">
                 {adminCards.map((card) => (
-                  <article key={card.title} className="dashboard-card">
+                  <article key={card.title} className="dashboard-card" onClick={() => navigate(card.path)} style={{ cursor: 'pointer' }}>
                     <h2>{card.title}</h2>
                     <p>{card.text}</p>
-                    <button onClick={() => navigate(card.path)}>
+                    <button onClick={e => { e.stopPropagation(); navigate(card.path) }}>
                       {card.button}
                     </button>
                   </article>

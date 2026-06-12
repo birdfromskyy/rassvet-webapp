@@ -111,7 +111,7 @@ const AdminSchedulePanel = () => {
 					{filtered.map(m => {
 						const Icon = m.icon
 						return (
-							<article className="admin-cms-card" key={m.path}>
+							<article className="admin-cms-card" key={m.path} onClick={() => navigate(m.path)} style={{ cursor: 'pointer' }}>
 								<div className="admin-cms-card__icon">
 									<Icon />
 								</div>
@@ -119,7 +119,7 @@ const AdminSchedulePanel = () => {
 									<h2>{m.title}</h2>
 									<p>{m.description}</p>
 								</div>
-								<button type="button" onClick={() => navigate(m.path)}>
+								<button type="button" onClick={e => { e.stopPropagation(); navigate(m.path) }}>
 									Открыть
 								</button>
 							</article>

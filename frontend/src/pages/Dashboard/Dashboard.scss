@@ -93,6 +93,12 @@
 
 .dashboard-card {
   padding: 28px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 44px rgba(7, 68, 98, 0.18);
+  }
 }
 
 .dashboard__main-grid .dashboard-card {
