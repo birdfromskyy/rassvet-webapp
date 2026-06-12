@@ -172,29 +172,6 @@ func (v *ScheduleValidator) ViolatesSameDayRule(
 	return false
 }
 
-func (v *ScheduleValidator) ViolatesSameDayRuleForGroup(
-	groupLessonID uint,
-	weekday int,
-	existingSlots []models.ScheduleSlot,
-) bool {
-	for _, slot := range existingSlots {
-		if slot.SlotType != models.SlotTypeGroup {
-			continue
-		}
-		if slot.GroupLessonID == nil || *slot.GroupLessonID != groupLessonID {
-			continue
-		}
-		if slot.Weekday != weekday {
-			continue
-		}
-		if slot.Status == models.ScheduleSlotStatusCancelled {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
 func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 	studentID uint,
 	subjectID uint,

@@ -19,7 +19,7 @@ const MaxStudentGapMinutes = 30
 const TeacherGapMinutes = 10
 const MaxRepairSwapSlots = 4
 const EarlyStopUnplacedLessons = 5
-const MaxScheduleStrategies = 5
+const MaxScheduleStrategies = 7
 
 type ScheduleGenerator struct {
 	db                   *gorm.DB
@@ -86,6 +86,10 @@ func (g *ScheduleGenerator) buildGapCombinations() []gapCombo {
 	return combos
 }
 
+type teacherStudentKey struct {
+	TeacherID, StudentID uint
+}
+
 type GenerationContext struct {
 	Schedule                models.Schedule
 	Assignments             []models.Assignment
@@ -96,9 +100,10 @@ type GenerationContext struct {
 	GroupLessons            []models.GroupLesson
 	GroupLessonEnrollments  []models.GroupLessonEnrollment
 	ExistingSlots           []models.ScheduleSlot
-	StrictTeacherRoomMap     map[uint][]uint // teacherID -> []roomID (строгие)
-	PreferredTeacherRoomMap  map[uint][]uint // teacherID -> []roomID (предпочтительные)
-	StrictTeacherIDs         map[uint]bool   // teacherID -> true если есть хоть один строгий кабинет
+	StrictTeacherRoomMap    map[uint][]uint       // teacherID -> []roomID (строгие)
+	PreferredTeacherRoomMap map[uint][]uint       // teacherID -> []roomID (предпочтительные)
+	StrictTeacherIDs        map[uint]bool         // teacherID -> true если есть хоть один строгий кабинет
+	WindowMinutesCache      map[teacherStudentKey]int // кэш пересечений окон teacher+student
 }
 
 type WeeklyTask struct {
@@ -359,18 +364,19 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 	}
 
 	return &GenerationContext{
-		Schedule:               schedule,
-		Assignments:            assignments,
-		TeacherAvailability:    teacherAvailability,
-		StudentAvailability:    studentAvailability,
-		RoomSubjects:           roomSubjects,
-		TeacherRooms:           teacherRooms,
-		GroupLessons:           groupLessons,
-		GroupLessonEnrollments: groupEnrollments,
-		ExistingSlots:          existingSlots,
-		StrictTeacherRoomMap:     strictMap,
-		PreferredTeacherRoomMap:  preferredMap,
-		StrictTeacherIDs:         strictTeacherIDs,
+		Schedule:                schedule,
+		Assignments:             assignments,
+		TeacherAvailability:     teacherAvailability,
+		StudentAvailability:     studentAvailability,
+		RoomSubjects:            roomSubjects,
+		TeacherRooms:            teacherRooms,
+		GroupLessons:            groupLessons,
+		GroupLessonEnrollments:  groupEnrollments,
+		ExistingSlots:           existingSlots,
+		StrictTeacherRoomMap:    strictMap,
+		PreferredTeacherRoomMap: preferredMap,
+		StrictTeacherIDs:        strictTeacherIDs,
+		WindowMinutesCache:      make(map[teacherStudentKey]int),
 	}, nil
 }
 
@@ -521,8 +527,8 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 				fmt.Sprintf("Стратегия %q (окно %d/%d): %d занятий", strategy.Name, phase2Combo.studentGap, phase2Combo.teacherGap, result.ScheduledCount),
 				strategy.Name,
 			)
-			if len(result.UnplacedTasks) <= EarlyStopUnplacedLessons {
-				log.Printf("[GEN] Phase2 early stop at combo(%d,%d) strategy[%d]=%q (unplaced=%d ≤ %d)",
+			if isNewBest && len(result.UnplacedTasks) <= EarlyStopUnplacedLessons {
+				log.Printf("[GEN] Phase2 early stop at combo(%d,%d) strategy[%d]=%q (unplaced=%d ≤ %d, isNewBest=true)",
 					phase2Combo.studentGap, phase2Combo.teacherGap,
 					index, strategy.Name, len(result.UnplacedTasks), EarlyStopUnplacedLessons)
 				break
@@ -554,11 +560,19 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 	}
 	log.Printf("[GEN] RestoreAutoSlots done: restored %d slots", len(best.AutoSlots))
 
-	reportGenerationProgress(progress, 94, "Формирование списка непроставленных занятий", best.Strategy.Name)
+	reportGenerationProgress(progress, 91, "Финальный ремонт нераспределённых занятий", best.Strategy.Name)
 	ctx, err := g.LoadGenerationContext(*schedule)
 	if err != nil {
 		return err
 	}
+	var repairErr error
+	best.UnplacedTasks, repairErr = g.RepairWeeklyTasksWithSwaps(schedule.ID, best.UnplacedTasks, ctx)
+	if repairErr != nil {
+		return repairErr
+	}
+	log.Printf("[GEN] Final repair done: remaining unplaced=%d", len(best.UnplacedTasks))
+
+	reportGenerationProgress(progress, 94, "Формирование списка непроставленных занятий", best.Strategy.Name)
 	for _, task := range best.UnplacedTasks {
 		if err := g.SaveGenerationIssue(schedule.ID, task, "NO_CANDIDATE", g.DiagnoseNoCandidates(task, ctx)); err != nil {
 			return err
@@ -609,7 +623,7 @@ func (g *ScheduleGenerator) scheduleStrategies() []ScheduleStrategy {
 		{Name: "default", IndividualOrder: "default"},
 		{Name: "teacher-blocks", IndividualOrder: "teacher_blocks"},
 		{Name: "no-availability-priority", IndividualOrder: "no_availability"},
-		{Name: "groups-first", IndividualOrder: "default"},
+		{Name: "student-blocks", IndividualOrder: "student_blocks"},
 		{Name: "high-visits-first", IndividualOrder: "visits_first"},
 		{Name: "long-duration-first", IndividualOrder: "duration_first"},
 		{Name: "broad-availability-first", IndividualOrder: "broad_availability"},
@@ -666,6 +680,10 @@ func (g *ScheduleGenerator) tryRepairWeeklyTaskWithSwap(
 	task WeeklyTask,
 	ctx *GenerationContext,
 ) (bool, error) {
+	bestWeekday := -1
+	bestScore := 0
+
+	// Explore all weekdays, track the one that produces the best quality score.
 	for weekday := 1; weekday <= 7; weekday++ {
 		removedSlots := g.collectRepairSwapSlots(task, weekday, ctx)
 		if len(removedSlots) == 0 {
@@ -693,10 +711,16 @@ func (g *ScheduleGenerator) tryRepairWeeklyTaskWithSwap(
 
 		placedCount := len(attemptTasks) - len(unplaced)
 		targetPlaced := !containsWeeklyTask(unplaced, task)
+
 		if targetPlaced && placedCount > len(removedSlots) {
-			return true, nil
+			score := g.scoreGeneratedSchedule(ctx, g.countScheduledSlots(ctx.ExistingSlots), len(unplaced))
+			if bestWeekday == -1 || score > bestScore {
+				bestScore = score
+				bestWeekday = weekday
+			}
 		}
 
+		// Undo this attempt and restore for the next weekday exploration.
 		createdSlots := g.collectNewestAutoSlots(scheduleID, placedCount)
 		if err := g.deleteSlotsForRepair(createdSlots); err != nil {
 			return false, err
@@ -707,7 +731,28 @@ func (g *ScheduleGenerator) tryRepairWeeklyTaskWithSwap(
 		}
 	}
 
-	return false, nil
+	if bestWeekday == -1 {
+		return false, nil
+	}
+
+	// Apply the best weekday's solution.
+	// After exploration, slots for bestWeekday are restored in ctx (possibly with new IDs).
+	removedSlots := g.collectRepairSwapSlots(task, bestWeekday, ctx)
+	removedTasks := g.weeklyTasksFromSlots(removedSlots, ctx)
+
+	if err := g.deleteSlotsForRepair(removedSlots); err != nil {
+		return false, err
+	}
+	g.removeSlotsFromContext(removedSlots, ctx)
+
+	attemptTasks := make([]WeeklyTask, 0, len(removedTasks)+1)
+	attemptTasks = append(attemptTasks, task)
+	attemptTasks = append(attemptTasks, removedTasks...)
+
+	if _, err := g.PlaceWeeklyTasks(scheduleID, attemptTasks, ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (g *ScheduleGenerator) collectRepairSwapSlots(task WeeklyTask, weekday int, ctx *GenerationContext) []models.ScheduleSlot {
@@ -960,6 +1005,13 @@ func (g *ScheduleGenerator) SortTasksByStrategy(tasks []WeeklyTask, strategy str
 		case "teacher_blocks":
 			if tasks[i].TeacherName != tasks[j].TeacherName {
 				return tasks[i].TeacherName < tasks[j].TeacherName
+			}
+			if tasks[i].AvailableWindowMinutes != tasks[j].AvailableWindowMinutes {
+				return tasks[i].AvailableWindowMinutes < tasks[j].AvailableWindowMinutes
+			}
+		case "student_blocks":
+			if tasks[i].StudentName != tasks[j].StudentName {
+				return tasks[i].StudentName < tasks[j].StudentName
 			}
 			if tasks[i].AvailableWindowMinutes != tasks[j].AvailableWindowMinutes {
 				return tasks[i].AvailableWindowMinutes < tasks[j].AvailableWindowMinutes
@@ -1757,12 +1809,6 @@ func normalizeDate(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 
-func sameDate(a, b time.Time) bool {
-	return a.Year() == b.Year() &&
-		a.Month() == b.Month() &&
-		a.Day() == b.Day()
-}
-
 func formatWeekdays(days []int) string {
 	names := map[int]string{1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"}
 	parts := make([]string, 0, len(days))
@@ -1856,7 +1902,12 @@ func timeHHMMToMinutes(t string) int {
 
 // computeAvailableWindowMinutes returns the total minutes that a student and teacher
 // share across all weekdays — the broader this window, the more scheduling flexibility exists.
+// Results are cached in ctx.WindowMinutesCache since availability data doesn't change during generation.
 func (g *ScheduleGenerator) computeAvailableWindowMinutes(teacherID, studentID uint, ctx *GenerationContext) int {
+	key := teacherStudentKey{teacherID, studentID}
+	if v, ok := ctx.WindowMinutesCache[key]; ok {
+		return v
+	}
 	total := 0
 	for weekday := 1; weekday <= 7; weekday++ {
 		teacherWindows := g.filterTeacherAvailability(teacherID, weekday, ctx.TeacherAvailability)
@@ -1870,5 +1921,6 @@ func (g *ScheduleGenerator) computeAvailableWindowMinutes(teacherID, studentID u
 			}
 		}
 	}
+	ctx.WindowMinutesCache[key] = total
 	return total
 }

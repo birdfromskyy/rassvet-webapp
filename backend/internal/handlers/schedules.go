@@ -1250,55 +1250,8 @@ func hasAnyStudentIntersection(left []uint, right []uint) bool {
 	return false
 }
 
-func applyManualBreakBuffer(startTime string, endTime string, breakMin int) (string, string) {
-	if breakMin <= 0 {
-		return startTime, endTime
-	}
-	start := manualHHMMToMinutes(startTime)
-	end := manualHHMMToMinutes(endTime)
-	if start < 0 || end < 0 {
-		return startTime, endTime
-	}
-	start -= breakMin
-	if start < 0 {
-		start = 0
-	}
-	end += breakMin
-	if end > 23*60+59 {
-		end = 23*60 + 59
-	}
-	return manualMinutesToHHMM(start), manualMinutesToHHMM(end)
-}
-
 func manualTimesOverlap(startA, endA, startB, endB string) bool {
 	return startA < endB && startB < endA
-}
-
-func manualHHMMToMinutes(value string) int {
-	if len(value) != 5 || value[2] != ':' {
-		return -1
-	}
-	hour, err := strconv.Atoi(value[:2])
-	if err != nil {
-		return -1
-	}
-	minute, err := strconv.Atoi(value[3:])
-	if err != nil {
-		return -1
-	}
-	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
-		return -1
-	}
-	return hour*60 + minute
-}
-
-func manualMinutesToHHMM(value int) string {
-	if value < 0 {
-		value = 0
-	}
-	hour := value / 60
-	minute := value % 60
-	return fmt.Sprintf("%02d:%02d", hour, minute)
 }
 
 func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherID uint) error {
