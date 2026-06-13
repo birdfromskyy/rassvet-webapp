@@ -444,7 +444,6 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 		Preload("Assignment").
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
-		Preload("Exclusions").
 		Where("schedule_id = ? AND status != ?", schedule.ID, models.ScheduleSlotStatusCancelled).
 		Order("weekday ASC, start_time ASC").
 		Find(&allSlots).Error; err != nil {
@@ -554,7 +553,6 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
-		Preload("Exclusions").
 		Where("schedule_id = ? AND status != ?", schedule.ID, models.ScheduleSlotStatusCancelled)
 
 	if teacherID != 0 {
