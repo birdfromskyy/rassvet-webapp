@@ -400,22 +400,20 @@ const Dashboard = ({ user, onLogout }) => {
   const isTeacher = isTeacherRole(user?.role); // role === 'teacher', not admin
   const isUser    = !isAdmin && !isTeacher;
 
-  // For admin and user roles: check if they have children linked
   const [hasChildren, setHasChildren] = useState(false);
-  const [childrenLoading, setChildrenLoading] = useState(!isTeacher);
+  const [childrenLoading, setChildrenLoading] = useState(true);
 
   useEffect(() => {
     document.title = "Личный кабинет";
   }, []);
 
   useEffect(() => {
-    if (isTeacher) return; // pure teacher role: no children check
     scheduleService
       .getMyChildren()
       .then((data) => setHasChildren(data.length > 0))
       .catch(() => setHasChildren(false))
       .finally(() => setChildrenLoading(false));
-  }, [isTeacher]);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -528,7 +526,10 @@ const Dashboard = ({ user, onLogout }) => {
           {/* ── Teacher layout ── */}
           {!isAdmin && isTeacher && (
             <section className="dashboard__main-grid">
-              <TeacherScheduleWidget user={user} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                <TeacherScheduleWidget user={user} />
+                {!childrenLoading && hasChildren && <ChildScheduleWidget />}
+              </div>
               <section className="dashboard__cards" />
             </section>
           )}
