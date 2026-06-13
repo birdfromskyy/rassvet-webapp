@@ -119,6 +119,36 @@
   }
 }
 
+.register-form__input-wrap {
+  position: relative;
+
+  input {
+    width: 100%;
+    padding-right: 52px;
+    box-sizing: border-box;
+  }
+}
+
+.register-form__eye {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: rgba(7, 68, 98, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #074462;
+  }
+}
+
 .register-form__error {
   margin-top: 8px;
   font-size: 13px;
