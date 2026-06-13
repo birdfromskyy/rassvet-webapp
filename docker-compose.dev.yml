@@ -1,5 +1,5 @@
-# Development overrides — exposes ports for local access.
-# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Development overrides — exposes ports and overrides production env values.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 services:
   postgres:
     ports:
@@ -8,6 +8,11 @@ services:
   backend:
     ports:
       - '8080:8080'
+    environment:
+      - GIN_MODE=debug
+      - IS_PRODUCTION=false
+      - FRONTEND_URL=http://localhost:3000
+      - REDIS_PASSWORD=
 
   frontend:
     ports:

@@ -514,13 +514,6 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 			return
 		}
 		teacherID = uint(parsed)
-	} else if role == string(models.RoleTeacher) {
-		// Auto-resolve teacher from linked user account
-		uid := extractUserID(c)
-		var linked models.Teacher
-		if err := h.db.Where("user_id = ?", uid).First(&linked).Error; err == nil {
-			teacherID = linked.ID
-		}
 	}
 
 	var studentID uint

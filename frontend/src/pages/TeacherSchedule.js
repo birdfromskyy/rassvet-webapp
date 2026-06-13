@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Autocomplete, CircularProgress, TextField } from '@mui/material'
 import { toast } from 'react-toastify'
 import Header from '../components/Header/Header'
@@ -58,49 +58,48 @@ const TeacherSchedule = ({ user }) => {
   const [optionsLoading, setOptionsLoading] = useState(true)
 
   useEffect(() => {
-    const studentIdFromUrl = new URLSearchParams(window.location.search).get('studentId')
+    const params = new URLSearchParams(window.location.search)
+    const teacherIdFromUrl = Number(params.get('teacherId')) || 0
+    const studentIdFromUrl = Number(params.get('studentId')) || 0
     scheduleService.getTeacherScheduleOptions()
       .then(data => {
         const loadedTeachers = data.teachers || []
         const loadedStudents = data.students || []
         setTeachers(loadedTeachers)
         setStudents(loadedStudents)
-        if (user?.teacher_id) {
-          const ownTeacher = loadedTeachers.find(t => t.id === user.teacher_id)
-          if (ownTeacher) setTeacher(ownTeacher)
+        // URL param > user's linked teacher (only when not filtering by student)
+        const resolvedTeacherId = teacherIdFromUrl || (studentIdFromUrl ? 0 : (user?.teacher_id || 0))
+        if (resolvedTeacherId) {
+          const t = loadedTeachers.find(t => t.id === resolvedTeacherId)
+          if (t) setTeacher(t)
         }
         if (studentIdFromUrl) {
-          const targetStudent = loadedStudents.find(s => s.id === Number(studentIdFromUrl))
-          if (targetStudent) setStudent(targetStudent)
+          const s = loadedStudents.find(s => s.id === studentIdFromUrl)
+          if (s) setStudent(s)
         }
       })
       .catch(() => toast.error('Ошибка загрузки фильтров расписания'))
       .finally(() => setOptionsLoading(false))
-  }, [user])
-
-  const weekStartISO = formatDateISO(weekStart)
-
-  const loadSchedule = useCallback(async () => {
-    setLoading(true)
-    setScheduleData(null)
-    try {
-      const data = await scheduleService.getTeacherPublishedSchedule(weekStartISO, {
-        teacher_id: teacher?.id || '',
-        student_id: student?.id || '',
-      })
-      setScheduleData(data)
-    } catch (e) {
-      if (e.response?.status !== 404) {
-        toast.error(e.response?.data?.error || 'Ошибка загрузки расписания')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [weekStartISO, teacher, student])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!optionsLoading) loadSchedule()
-  }, [loadSchedule, optionsLoading])
+    if (optionsLoading) return
+    let cancelled = false
+    setLoading(true)
+    setScheduleData(null)
+    scheduleService.getTeacherPublishedSchedule(formatDateISO(weekStart), {
+      teacher_id: teacher?.id || '',
+      student_id: student?.id || '',
+    })
+      .then(data => { if (!cancelled) setScheduleData(data) })
+      .catch(e => {
+        if (!cancelled && e.response?.status !== 404) {
+          toast.error(e.response?.data?.error || 'Ошибка загрузки расписания')
+        }
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [weekStart, teacher, student, optionsLoading])
 
   const slotsByDay = useMemo(() => {
     const grouped = {}
@@ -129,18 +128,12 @@ const TeacherSchedule = ({ user }) => {
             <p className="schedule__subtitle">Просмотр еженедельного расписания по преподавателям и ученикам</p>
           </div>
 
-          {!optionsLoading && !user?.teacher_id && (
-            <div className="schedule__empty">
-              <h2 className="schedule__day-title" style={{ margin: 0 }}>Аккаунт не привязан</h2>
-              <p>Ваш аккаунт ещё не привязан к конкретному преподавателю. Обратитесь к администратору.</p>
-            </div>
-          )}
-
           <div className="schedule__filters">
             <Autocomplete
               options={[ALL_TEACHERS, ...teachers]}
               value={teacher}
               getOptionLabel={option => option?.full_name || ''}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
               onChange={(_, value) => setTeacher(value || ALL_TEACHERS)}
               renderInput={params => (
                 <TextField {...params} label="Преподаватель" size="small"
@@ -152,6 +145,7 @@ const TeacherSchedule = ({ user }) => {
               options={[ALL_STUDENTS, ...students]}
               value={student}
               getOptionLabel={option => option?.full_name || ''}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
               onChange={(_, value) => setStudent(value || ALL_STUDENTS)}
               renderInput={params => (
                 <TextField {...params} label="Ученик" size="small"

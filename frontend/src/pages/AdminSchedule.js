@@ -40,6 +40,7 @@ import {
 	Checkbox,
 	FormControlLabel,
 	Autocomplete,
+	Popper,
 } from '@mui/material'
 import {
 	ArrowBack as BackIcon,
@@ -68,6 +69,11 @@ import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
 import api from '../services/api'
 import './AdminSchedule.scss'
+
+// Makes Autocomplete dropdown at least as wide as input (same behavior as Select)
+const WidePopper = ({ style, ...props }) => (
+	<Popper {...props} style={{ ...style, width: 'auto', minWidth: style?.width ?? 0 }} />
+)
 
 const WEEKDAY_NAMES = {
 	1: 'Понедельник',
@@ -1144,9 +1150,10 @@ const AdminSchedule = () => {
 			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId)) continue
 			if (filterRoomId && slot.room_id !== Number(filterRoomId)) continue
 			if (filterFundingType) {
-				if (slot.slot_type === 'group') {
-					// group slots are not filtered by funding type
+				if (filterFundingType === 'group') {
+					if (slot.slot_type !== 'group') continue
 				} else {
+					if (slot.slot_type === 'group') continue
 					if (slot.assignment?.funding_type !== filterFundingType) continue
 				}
 			}
@@ -1408,42 +1415,34 @@ const AdminSchedule = () => {
 				{/* Slot filters */}
 				{schedule && (
 					<Box sx={{ p: 2, mb: 2, border: '1px solid rgba(7,68,98,0.14)', borderRadius: '16px', background: 'rgba(244,223,0,0.05)' }}>
-						<Grid container spacing={2} alignItems='center'>
-							<Grid item xs={12} sm={3}>
-								<FormControl fullWidth size='small'>
-									<InputLabel>Ученик</InputLabel>
-									<Select
-										value={filterStudentId}
-										label='Ученик'
-										onChange={e => setFilterStudentId(e.target.value)}
-									>
-										<MenuItem value=''>Все ученики</MenuItem>
-										{students.map(s => (
-											<MenuItem key={s.id} value={s.id}>
-												{s.full_name}
-											</MenuItem>
-										))}
-									</Select>
-								</FormControl>
-							</Grid>
-							<Grid item xs={12} sm={3}>
-								<FormControl fullWidth size='small'>
-									<InputLabel>Преподаватель</InputLabel>
-									<Select
-										value={filterTeacherId}
-										label='Преподаватель'
-										onChange={e => setFilterTeacherId(e.target.value)}
-									>
-										<MenuItem value=''>Все преподаватели</MenuItem>
-										{teachers.map(t => (
-											<MenuItem key={t.id} value={t.id}>
-												{t.full_name}
-											</MenuItem>
-										))}
-									</Select>
-								</FormControl>
-							</Grid>
-							<Grid item xs={12} sm={3}>
+						<Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+							<Box sx={{ flex: '1 1 180px', minWidth: 160 }}>
+								<Autocomplete
+									size='small'
+									fullWidth
+									slots={{ popper: WidePopper }}
+									options={[...students].sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
+									value={students.find(s => s.id === Number(filterStudentId)) || null}
+									getOptionLabel={opt => opt.full_name}
+									isOptionEqualToValue={(opt, val) => opt.id === val.id}
+									onChange={(_, val) => setFilterStudentId(val ? String(val.id) : '')}
+									renderInput={params => <TextField {...params} label='Ученик' fullWidth />}
+								/>
+							</Box>
+							<Box sx={{ flex: '1 1 180px', minWidth: 160 }}>
+								<Autocomplete
+									size='small'
+									fullWidth
+									slots={{ popper: WidePopper }}
+									options={[...teachers].sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
+									value={teachers.find(t => t.id === Number(filterTeacherId)) || null}
+									getOptionLabel={opt => opt.full_name}
+									isOptionEqualToValue={(opt, val) => opt.id === val.id}
+									onChange={(_, val) => setFilterTeacherId(val ? String(val.id) : '')}
+									renderInput={params => <TextField {...params} label='Преподаватель' fullWidth />}
+								/>
+							</Box>
+							<Box sx={{ flex: '0 1 160px', minWidth: 140 }}>
 								<FormControl fullWidth size='small'>
 									<InputLabel>Кабинет</InputLabel>
 									<Select
@@ -1459,22 +1458,23 @@ const AdminSchedule = () => {
 										))}
 									</Select>
 								</FormControl>
-							</Grid>
-							<Grid item xs={12} sm={3}>
+							</Box>
+							<Box sx={{ flex: '0 1 210px', minWidth: 190 }}>
 								<FormControl fullWidth size='small'>
-									<InputLabel>Финансирование</InputLabel>
+									<InputLabel>Вид занятия</InputLabel>
 									<Select
 										value={filterFundingType}
-										label='Финансирование'
+										label='Вид занятия'
 										onChange={e => setFilterFundingType(e.target.value)}
 									>
 										<MenuItem value=''>Все</MenuItem>
-										<MenuItem value='paid'>Платники</MenuItem>
-										<MenuItem value='budget'>Бюджетники</MenuItem>
+										<MenuItem value='paid'>Платники (индив.)</MenuItem>
+										<MenuItem value='budget'>Бюджетники (индив.)</MenuItem>
+										<MenuItem value='group'>Групповые занятия</MenuItem>
 									</Select>
 								</FormControl>
-							</Grid>
-							<Grid item xs={12} sm={3}>
+							</Box>
+							<Box sx={{ flexShrink: 0 }}>
 								<Button
 									size='small'
 									onClick={() => {
@@ -1487,8 +1487,8 @@ const AdminSchedule = () => {
 								>
 									Сбросить фильтры
 								</Button>
-							</Grid>
-						</Grid>
+							</Box>
+						</Box>
 
 						{/* Color legend */}
 						<Box display='flex' gap={2} mt={1.5} flexWrap='wrap'>
