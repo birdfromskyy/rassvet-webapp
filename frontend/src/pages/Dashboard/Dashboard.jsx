@@ -108,7 +108,7 @@ const TeacherScheduleWidget = ({ user }) => {
           <span className="section-badge">Сегодня</span>
           <h2>Ваше расписание</h2>
         </div>
-        <button onClick={() => navigate("/my-schedule")}>
+        <button onClick={() => navigate("/teacher/schedule")}>
           Посмотреть всё расписание
         </button>
       </div>

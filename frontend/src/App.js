@@ -176,7 +176,7 @@ function App() {
           <Route
             path="/my-schedule"
             element={
-              user?.role === "teacher" ? (
+              user?.teacher_id ? (
                 <TeacherSchedule user={user} />
               ) : (
                 <ChildSchedule user={user} />
