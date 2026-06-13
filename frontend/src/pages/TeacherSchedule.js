@@ -30,6 +30,12 @@ const formatWeekLabel = weekStart => {
   return `${weekStart.toLocaleDateString('ru-RU', opts)} — ${weekEnd.toLocaleDateString('ru-RU', { ...opts, year: 'numeric' })}`
 }
 
+const getDayDate = (weekStart, weekday) => {
+  const d = new Date(weekStart)
+  d.setDate(d.getDate() + weekday - 1)
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+}
+
 const getSlotSubject = slot => slot.subject?.name || slot.group_lesson?.name || '—'
 const getSlotStudent = slot => {
   if (slot.slot_type !== 'group') return slot.student?.full_name || '—'
@@ -52,14 +58,20 @@ const TeacherSchedule = ({ user }) => {
   const [optionsLoading, setOptionsLoading] = useState(true)
 
   useEffect(() => {
+    const studentIdFromUrl = new URLSearchParams(window.location.search).get('studentId')
     scheduleService.getTeacherScheduleOptions()
       .then(data => {
         const loadedTeachers = data.teachers || []
+        const loadedStudents = data.students || []
         setTeachers(loadedTeachers)
-        setStudents(data.students || [])
+        setStudents(loadedStudents)
         if (user?.teacher_id) {
           const ownTeacher = loadedTeachers.find(t => t.id === user.teacher_id)
           if (ownTeacher) setTeacher(ownTeacher)
+        }
+        if (studentIdFromUrl) {
+          const targetStudent = loadedStudents.find(s => s.id === Number(studentIdFromUrl))
+          if (targetStudent) setStudent(targetStudent)
         }
       })
       .catch(() => toast.error('Ошибка загрузки фильтров расписания'))
@@ -192,7 +204,7 @@ const TeacherSchedule = ({ user }) => {
             if (!daySlots.length) return null
             return (
               <div key={day} className="schedule__day">
-                <h2 className="schedule__day-title">{WEEKDAY_NAMES[day]}</h2>
+                <h2 className="schedule__day-title">{WEEKDAY_NAMES[day]}<span className="schedule__day-date">, {getDayDate(weekStart, day)}</span></h2>
                 <div className="schedule__slots">
                   {daySlots.map(slot => (
                     <div

@@ -195,7 +195,7 @@ const ChildScheduleWidget = () => {
           <span className="section-badge">Сегодня</span>
           <h2>Расписание ребёнка</h2>
         </div>
-        <button onClick={() => navigate("/my-schedule")}>
+        <button onClick={() => navigate(`/my-schedule${activeChild ? `?studentId=${activeChild.student_id}` : ''}`)}>
           Посмотреть всё расписание
         </button>
       </div>

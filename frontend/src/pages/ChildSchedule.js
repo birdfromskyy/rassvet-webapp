@@ -29,6 +29,12 @@ const formatWeekLabel = weekStart => {
   return `${weekStart.toLocaleDateString('ru-RU', opts)} — ${weekEnd.toLocaleDateString('ru-RU', { ...opts, year: 'numeric' })}`
 }
 
+const getDayDate = (weekStart, weekday) => {
+  const d = new Date(weekStart)
+  d.setDate(d.getDate() + weekday - 1)
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+}
+
 const ChildSchedule = ({ user }) => {
   const [children, setChildren] = useState([])
   const [activeIndex, setActiveIndex] = useState(0)
@@ -38,10 +44,16 @@ const ChildSchedule = ({ user }) => {
   const [childrenLoading, setChildrenLoading] = useState(true)
 
   useEffect(() => {
+    const studentIdFromUrl = new URLSearchParams(window.location.search).get('studentId')
     scheduleService.getMyChildren()
       .then(data => {
         setChildren(data)
-        setActiveIndex(0)
+        if (studentIdFromUrl) {
+          const idx = data.findIndex(c => String(c.student_id) === studentIdFromUrl)
+          setActiveIndex(idx >= 0 ? idx : 0)
+        } else {
+          setActiveIndex(0)
+        }
       })
       .catch(() => toast.error('Ошибка загрузки данных'))
       .finally(() => setChildrenLoading(false))
@@ -179,7 +191,7 @@ const ChildSchedule = ({ user }) => {
                 if (!daySlots.length) return null
                 return (
                   <div key={day} className="schedule__day">
-                    <h2 className="schedule__day-title">{WEEKDAY_NAMES[day]}</h2>
+                    <h2 className="schedule__day-title">{WEEKDAY_NAMES[day]}<span className="schedule__day-date">, {getDayDate(weekStart, day)}</span></h2>
                     <div className="schedule__slots">
                       {daySlots.map(slot => (
                         <div
