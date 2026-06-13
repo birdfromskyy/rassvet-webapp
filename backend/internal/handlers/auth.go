@@ -632,7 +632,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 
 		var existingUser models.User
 		if err := h.db.Where("email = ? AND id != ?", pending.Email, pending.UserID).First(&existingUser).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Email уже занят другим пользователем"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Попробуйте ввести другую почту"})
 			return
 		}
 
@@ -929,7 +929,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	if req.Email != "" && req.Email != user.Email {
 		var existingUser models.User
 		if err := h.db.Where("email = ? AND id != ?", req.Email, userID).First(&existingUser).Error; err == nil {
-			c.JSON(http.StatusConflict, gin.H{"error": "Email уже занят другим пользователем"})
+			c.JSON(http.StatusConflict, gin.H{"error": "Попробуйте ввести другую почту"})
 			return
 		}
 		emailChanged = true
@@ -1059,8 +1059,8 @@ func (h *AuthHandler) DeleteMyAccount(c *gin.Context) {
 	// Delete notifications
 	h.db.Unscoped().Where("user_id = ?", uid).Delete(&models.Notification{})
 
-	// Soft-delete the user
-	h.db.Delete(&models.User{}, uid)
+	// Hard-delete the user so the email can be reused immediately.
+	h.db.Unscoped().Delete(&models.User{}, uid)
 
 	// Blacklist the current access token + clear both cookies + delete refresh token.
 	if cookie, err := c.Cookie("token"); err == nil && cookie != "" {

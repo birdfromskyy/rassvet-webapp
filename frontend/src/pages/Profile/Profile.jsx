@@ -229,7 +229,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
       onUpdateUser(response.user)
       toast.success('Профиль обновлен')
     } catch (error) {
-      if (error.response?.status === 409) setErrors({ email: 'Email уже используется' })
+      if (error.response?.status === 409) setErrors({ email: 'Попробуйте ввести другую почту' })
       else toast.error(error.response?.data?.error || 'Ошибка обновления профиля')
     } finally {
       setLoading(false)
