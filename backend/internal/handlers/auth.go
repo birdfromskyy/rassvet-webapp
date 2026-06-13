@@ -381,11 +381,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"role":        user.Role,
 		"is_verified": user.IsVerified,
 	}
-	if user.Role == models.RoleTeacher {
-		var teacher models.Teacher
-		if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
-			userResp["teacher_id"] = teacher.ID
-		}
+	var teacher models.Teacher
+	if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
+		userResp["teacher_id"] = teacher.ID
 	}
 	c.JSON(http.StatusOK, gin.H{"user": userResp})
 }
