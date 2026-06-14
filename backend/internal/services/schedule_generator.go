@@ -213,7 +213,7 @@ func (g *ScheduleGenerator) GenerateScheduleWithProgress(
 		fmt.Sprintf("Настройки: окно ученика %d мин, перерыв преподавателя %d мин", g.maxStudentGapMinutes, g.teacherGapMinutes),
 		"settings")
 	weekStartDate = normalizeDate(weekStartDate)
-	weekEndDate := weekStartDate.AddDate(0, 0, 5)
+	weekEndDate := weekStartDate.AddDate(0, 0, 6)
 
 	schedule, err := g.getOrCreateDraftSchedule(weekStartDate, weekEndDate, generatedByUserID)
 	if err != nil {
