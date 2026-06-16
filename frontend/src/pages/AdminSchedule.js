@@ -218,7 +218,7 @@ const AdminSchedule = () => {
 	const [addGroupStudentId, setAddGroupStudentId] = useState('')
 
 	// Conflict warning dialog
-	const [conflictDialog, setConflictDialog] = useState({ open: false, conflicts: [], deleteConflicts: true })
+	const [conflictDialog, setConflictDialog] = useState({ open: false, conflicts: [], warnings: [], deleteConflicts: true })
 	const pendingSlotAction = useRef(null)
 
 	// Approve-blocking conflict dialog
@@ -877,7 +877,7 @@ const AdminSchedule = () => {
 			)
 			if (conflicts.length > 0) {
 				pendingSlotAction.current = doCreateSlot
-				setConflictDialog({ open: true, conflicts, deleteConflicts: true })
+				setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
 				return
 			}
 			await doCreateSlot()
@@ -897,9 +897,12 @@ const AdminSchedule = () => {
 			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
 			Number(slotForm.room_id), assignment.teacher_id, [assignment.student_id],
 		)
-		if (conflicts.length > 0) {
+		const warnings = checkAvailabilityWarnings(
+			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time, assignment,
+		)
+		if (conflicts.length > 0 || warnings.length > 0) {
 			pendingSlotAction.current = doCreateSlot
-			setConflictDialog({ open: true, conflicts, deleteConflicts: true })
+			setConflictDialog({ open: true, conflicts, warnings, deleteConflicts: conflicts.length > 0 })
 			return
 		}
 		await doCreateSlot()
@@ -953,7 +956,7 @@ const AdminSchedule = () => {
 		)
 		if (conflicts.length > 0) {
 			pendingSlotAction.current = doSaveEditSlot
-			setConflictDialog({ open: true, conflicts, deleteConflicts: true })
+			setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
 			return
 		}
 		await doSaveEditSlot()
@@ -1104,6 +1107,40 @@ const AdminSchedule = () => {
 		})
 	}
 
+	// Mirrors backend ScheduleValidator.IsTeacherAvailable / IsStudentAvailable —
+	// HH:MM strings compare lexicographically the same as time, so plain string compare is safe.
+	const isWithinAvailabilityWindow = (weekday, startTime, endTime, availability) => {
+		for (const w of availability || []) {
+			if (w.weekday !== weekday) continue
+			if (startTime >= w.start_time && endTime <= w.end_time) return true
+		}
+		return false
+	}
+
+	// Formats the windows defined for a given weekday, e.g. "09:00–12:00, 14:00–17:00", or a fallback if none.
+	const describeWindowsForDay = (weekday, availability) => {
+		const windows = (availability || []).filter(w => w.weekday === weekday)
+		if (windows.length === 0) return 'нет указанных окон на этот день'
+		return windows.map(w => `${w.start_time}–${w.end_time}`).join(', ')
+	}
+
+	const checkAvailabilityWarnings = (weekday, startTime, endTime, assignment) => {
+		const warnings = []
+		if (assignment.teacher && !isWithinAvailabilityWindow(weekday, startTime, endTime, assignment.teacher.availability)) {
+			warnings.push(
+				`Преподаватель «${assignment.teacher.full_name || '—'}» недоступен в это время. ` +
+				`Доступность на ${WEEKDAY_NAMES[weekday] || weekday}: ${describeWindowsForDay(weekday, assignment.teacher.availability)}`
+			)
+		}
+		if (assignment.student && !isWithinAvailabilityWindow(weekday, startTime, endTime, assignment.student.availability)) {
+			warnings.push(
+				`Ученик «${assignment.student.full_name || '—'}» недоступен в это время. ` +
+				`Доступность на ${WEEKDAY_NAMES[weekday] || weekday}: ${describeWindowsForDay(weekday, assignment.student.availability)}`
+			)
+		}
+		return warnings
+	}
+
 	const describeConflictingSlot = s => {
 		const time = `${s.start_time}–${s.end_time}`
 		const day = WEEKDAY_NAMES[s.weekday] || s.weekday
@@ -1121,7 +1158,7 @@ const AdminSchedule = () => {
 					await scheduleService.deleteSlot(scheduleData.schedule.id, s.id)
 				}
 			}
-			setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })
+			setConflictDialog({ open: false, conflicts: [], warnings: [], deleteConflicts: true })
 			if (pendingSlotAction.current) {
 				await pendingSlotAction.current(force)
 				pendingSlotAction.current = null
@@ -1951,9 +1988,14 @@ const AdminSchedule = () => {
 										? `${a.student?.full_name || a.student_id} → ${a.teacher?.full_name || a.teacher_id} (${a.subject?.name || a.subject_id})`
 										: ''
 								}
-								onChange={(event, value) =>
-									setSlotForm({ ...slotForm, assignment_id: value?.id || '' })
-								}
+								onChange={(event, value) => {
+									const teacherRooms = value?.teacher?.rooms || []
+									setSlotForm({
+										...slotForm,
+										assignment_id: value?.id || '',
+										room_id: teacherRooms.length === 1 ? (teacherRooms[0].room_id || '') : slotForm.room_id,
+									})
+								}}
 								renderInput={params => (
 									<TextField {...params} label='Назначение' required />
 								)}
@@ -2371,39 +2413,57 @@ const AdminSchedule = () => {
 			{/* Conflict Warning Dialog */}
 			<Dialog
 				open={conflictDialog.open}
-				onClose={() => setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })}
+				onClose={() => setConflictDialog({ open: false, conflicts: [], warnings: [], deleteConflicts: true })}
 				maxWidth='sm'
 				fullWidth
 				PaperProps={{ className: 'admin-module-dialog' }}
 			>
 				<DialogTitle className='admin-module-dialog__title'>Конфликт занятий</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
-					<Typography variant='body2' gutterBottom>
-						Новое занятие пересекается со следующими занятиями:
-					</Typography>
-					<List dense>
-						{conflictDialog.conflicts.map(s => (
-							<ListItem key={s.id} disableGutters>
-								<ListItemText primary={describeConflictingSlot(s)} />
-							</ListItem>
-						))}
-					</List>
-					<FormControlLabel
-						control={
-							<Checkbox
-								checked={conflictDialog.deleteConflicts}
-								onChange={e =>
-									setConflictDialog(prev => ({ ...prev, deleteConflicts: e.target.checked }))
+					{conflictDialog.conflicts.length > 0 && (
+						<>
+							<Typography variant='body2' gutterBottom>
+								Новое занятие пересекается со следующими занятиями:
+							</Typography>
+							<List dense>
+								{conflictDialog.conflicts.map(s => (
+									<ListItem key={s.id} disableGutters>
+										<ListItemText primary={describeConflictingSlot(s)} />
+									</ListItem>
+								))}
+							</List>
+							<FormControlLabel
+								control={
+									<Checkbox
+										checked={conflictDialog.deleteConflicts}
+										onChange={e =>
+											setConflictDialog(prev => ({ ...prev, deleteConflicts: e.target.checked }))
+										}
+									/>
 								}
+								label='Удалить конфликтующее занятие'
 							/>
-						}
-						label='Удалить конфликтующее занятие'
-					/>
+						</>
+					)}
+					{(conflictDialog.warnings || []).length > 0 && (
+						<>
+							<Typography variant='body2' color='warning.main' gutterBottom sx={{ mt: conflictDialog.conflicts.length > 0 ? 2 : 0 }}>
+								Нарушение окна доступности:
+							</Typography>
+							<List dense>
+								{conflictDialog.warnings.map((w, i) => (
+									<ListItem key={i} disableGutters>
+										<ListItemText primary={w} />
+									</ListItem>
+								))}
+							</List>
+						</>
+					)}
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>
 					<Button
 						onClick={() =>
-							setConflictDialog({ open: false, conflicts: [], deleteConflicts: true })
+							setConflictDialog({ open: false, conflicts: [], warnings: [], deleteConflicts: true })
 						}
 					>
 						Отмена

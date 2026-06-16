@@ -39,13 +39,13 @@ const MODULE_TITLE = "Заявки на консультацию";
 const STATUS_META = {
   new: { label: "Новая", color: "warning" },
   contacted: { label: "Связались", color: "info" },
-  closed: { label: "Закрыта", color: "default" },
+  rejected: { label: "Отклонено", color: "error" },
 };
 
 const STATUS_OPTIONS = [
   { value: "new", label: "Новая" },
   { value: "contacted", label: "Связались" },
-  { value: "closed", label: "Закрыта" },
+  { value: "rejected", label: "Отклонено" },
 ];
 
 const CONTACT_LABELS = {
@@ -206,8 +206,8 @@ export default function AdminConsultations() {
   const contactedCount = list.filter(
     (request) => request.status === "contacted"
   ).length;
-  const closedCount = list.filter(
-    (request) => request.status === "closed"
+  const rejectedCount = list.filter(
+    (request) => request.status === "rejected"
   ).length;
 
   return (
@@ -254,8 +254,8 @@ export default function AdminConsultations() {
           </div>
 
           <div className="admin-users-stat">
-            <span>Закрытые</span>
-            <strong>{closedCount}</strong>
+            <span>Отклонённые</span>
+            <strong>{rejectedCount}</strong>
           </div>
         </div>
 
@@ -461,25 +461,13 @@ export default function AdminConsultations() {
                   contactDetail(dialog.item) &&
                   ` — ${contactDetail(dialog.item)}`}
               </Typography>
+
+              {dialog.item?.request_text && (
+                <Typography variant="caption" sx={{ whiteSpace: "pre-wrap" }}>
+                  <b>Обращение:</b> {dialog.item.request_text}
+                </Typography>
+              )}
             </div>
-
-            {dialog.item?.request_text && (
-              <div className="admin-request-card admin-request-card--light">
-                <Typography variant="caption" color="text.secondary">
-                  Обращение:
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  sx={{
-                    mt: 0.5,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {dialog.item.request_text}
-                </Typography>
-              </div>
-            )}
 
             <FormControl fullWidth>
               <InputLabel>Статус</InputLabel>

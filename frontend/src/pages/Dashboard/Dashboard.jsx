@@ -262,7 +262,7 @@ const Q_STATUS = {
     bg: "#fff1f2", border: "#fca5a5", color: "#991b1b",
     icon: "⚠️",
     title: "Требует уточнения",
-    body: null,
+    body: "Пожалуйста, загрузите исправленную анкету.",
   },
 };
 
@@ -364,9 +364,14 @@ const QuestionnaireSection = () => {
                 <span style={{ fontSize: 22, lineHeight: 1.3 }}>{statusCfg.icon}</span>
                 <div>
                   <strong style={{ display: "block", marginBottom: 4 }}>{statusCfg.title}</strong>
-                  <span style={{ fontSize: 14 }}>
-                    {status === "rejected" && q.admin_note ? q.admin_note : statusCfg.body}
-                  </span>
+                  {statusCfg.body && (
+                    <span style={{ fontSize: 14 }}>{statusCfg.body}</span>
+                  )}
+                  {q.admin_note && (
+                    <p style={{ fontSize: 14, margin: "8px 0 0" }}>
+                      Примечание администратора: {q.admin_note}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

@@ -13,6 +13,7 @@ import {
   FiRadio,
   FiBell,
   FiUser,
+  FiTrash2,
 } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
@@ -177,6 +178,19 @@ function Header() {
     }
     setBellOpen(false);
     if (n.link) navigate(n.link);
+  };
+
+  const handleDeleteOne = async (e, n) => {
+    e.stopPropagation();
+    await notificationService.deleteOne(n.id);
+    setNotifications((prev) => prev.filter((item) => item.id !== n.id));
+    if (!n.is_read) setUnreadCount((c) => Math.max(0, c - 1));
+  };
+
+  const handleDeleteAll = async () => {
+    await notificationService.deleteAll();
+    setNotifications([]);
+    setUnreadCount(0);
   };
 
   useEffect(() => {
@@ -412,23 +426,42 @@ function Header() {
                   <div className="header__bell-dropdown">
                     <div className="header__bell-header">
                       <span>Уведомления</span>
-                      {unreadCount > 0 && (
-                        <button type="button" onClick={handleMarkAllRead}>
-                          Прочитать все
-                        </button>
-                      )}
+                      <div className="header__bell-header-actions">
+                        {unreadCount > 0 && (
+                          <button type="button" onClick={handleMarkAllRead}>
+                            Прочитать все
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button type="button" onClick={handleDeleteAll}>
+                            Удалить все
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="header__bell-list">
                       {notifications.length === 0 ? (
                         <p className="header__bell-empty">Нет уведомлений</p>
                       ) : (
                         notifications.map((n) => (
-                          <button
+                          <div
                             key={n.id}
-                            type="button"
+                            role="button"
+                            tabIndex={0}
                             className={`header__bell-item${n.is_read ? "" : " header__bell-item--unread"}`}
                             onClick={() => handleNotifClick(n)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleNotifClick(n);
+                            }}
                           >
+                            <button
+                              type="button"
+                              className="header__bell-item-delete"
+                              aria-label="Удалить уведомление"
+                              onClick={(e) => handleDeleteOne(e, n)}
+                            >
+                              <FiTrash2 />
+                            </button>
                             <span className="header__bell-title">
                               {n.title}
                             </span>
@@ -447,7 +480,7 @@ function Header() {
                                 },
                               )}
                             </span>
-                          </button>
+                          </div>
                         ))
                       )}
                     </div>

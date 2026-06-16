@@ -67,7 +67,7 @@ const GROUPS = [
     title: "Настройки системы",
     modules: [
       { title: "Настройки сайта", description: "Глобальные данные, миссия, контакты, структура и видео.", icon: SettingsIcon, path: "/admin/cms/settings" },
-      { title: "Политика ПДн", description: "Политика обработки персональных данных (152-ФЗ). Без деплоя.", icon: PrivacyIcon, path: "/admin/cms/privacy" },
+      { title: "Политика ПДн", description: "Политика обработки персональных данных (152-ФЗ).", icon: PrivacyIcon, path: "/admin/cms/privacy" },
     ],
   },
 ];

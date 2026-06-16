@@ -268,7 +268,7 @@ function App() {
           </Route>
         </Route>
 
-<Route path="/consultation-request" element={<ConsultationRequest />} />
+        <Route path="/consultation-request" element={<ConsultationRequest user={user} />} />
         <Route path="/main" element={<Home />} />
         <Route path="/awards" element={<Awards />} />
         <Route path="/mission" element={<Mission />} />

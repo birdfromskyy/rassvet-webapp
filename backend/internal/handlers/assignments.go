@@ -64,7 +64,11 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 
 	query := h.db.
 		Preload("Student").
+		Preload("Student.Availability").
 		Preload("Teacher").
+		Preload("Teacher.Rooms").
+		Preload("Teacher.Rooms.Room").
+		Preload("Teacher.Availability").
 		Preload("Subject").
 		Order("id ASC")
 

@@ -25,6 +25,7 @@ import {
 	MenuItem,
 	Grid,
 	Autocomplete,
+	Popper,
 } from '@mui/material'
 import {
 	Add as AddIcon,
@@ -38,6 +39,11 @@ import {
 import Tooltip from '@mui/material/Tooltip'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
+
+// Makes Autocomplete dropdown at least as wide as input (same behavior as Select)
+const WidePopper = ({ style, ...props }) => (
+	<Popper {...props} style={{ ...style, width: 'auto', minWidth: style?.width ?? 0 }} />
+)
 
 const EMPTY_ASSIGNMENT = {
 	student_id: '',
@@ -235,31 +241,28 @@ const AdminAssignments = () => {
 						<Grid item xs={12} sm={12} md={6}>
 							<Autocomplete
 								size='small'
+								fullWidth
+								slots={{ popper: WidePopper }}
 								options={[...students].sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
 								getOptionLabel={s => s.full_name}
+								isOptionEqualToValue={(o, v) => o.id === v.id}
 								value={students.find(s => s.id === filters.student_id) || null}
 								onChange={(_, v) => setFilters({ ...filters, student_id: v?.id || '' })}
-								renderInput={params => <TextField {...params} label='Ученик' />}
+								renderInput={params => <TextField {...params} label='Ученик' fullWidth />}
 							/>
 						</Grid>
 						<Grid item xs={12} sm={6} md={3}>
-							<FormControl fullWidth size='small'>
-								<InputLabel>Преподаватель</InputLabel>
-								<Select
-									value={filters.teacher_id}
-									label='Преподаватель'
-									onChange={e =>
-										setFilters({ ...filters, teacher_id: e.target.value })
-									}
-								>
-									<MenuItem value=''>Все</MenuItem>
-									{teachers.map(t => (
-										<MenuItem key={t.id} value={t.id}>
-											{t.full_name}
-										</MenuItem>
-									))}
-								</Select>
-							</FormControl>
+							<Autocomplete
+								size='small'
+								fullWidth
+								slots={{ popper: WidePopper }}
+								options={[...teachers].sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))}
+								getOptionLabel={t => t.full_name}
+								isOptionEqualToValue={(o, v) => o.id === v.id}
+								value={teachers.find(t => t.id === filters.teacher_id) || null}
+								onChange={(_, v) => setFilters({ ...filters, teacher_id: v?.id || '' })}
+								renderInput={params => <TextField {...params} label='Преподаватель' fullWidth />}
+							/>
 						</Grid>
 						<Grid item xs={12} sm={6} md={3}>
 							<FormControl fullWidth size='small'>

@@ -86,3 +86,45 @@ func (h *NotificationHandler) MarkAllRead(c *gin.Context) {
 		Update("is_read", true)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
+
+// DELETE /api/notifications/:id
+// Hard delete. Notifications fanned out to admins/superadmins (same title/body/link,
+// one row per recipient) are removed for ALL recipients, not just the caller —
+// otherwise the same notification would keep reappearing for other admins.
+func (h *NotificationHandler) DeleteOne(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+
+	var n models.Notification
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&n).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Уведомление не найдено"})
+		return
+	}
+
+	h.db.Unscoped().
+		Where("title = ? AND body = ? AND link = ?", n.Title, n.Body, n.Link).
+		Delete(&models.Notification{})
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// DELETE /api/notifications
+// Hard delete of all notifications visible to the caller (same cross-recipient rule as DeleteOne).
+func (h *NotificationHandler) DeleteAll(c *gin.Context) {
+	userID := c.GetUint("userID")
+
+	var mine []models.Notification
+	h.db.Where("user_id = ?", userID).Find(&mine)
+
+	for _, n := range mine {
+		h.db.Unscoped().
+			Where("title = ? AND body = ? AND link = ?", n.Title, n.Body, n.Link).
+			Delete(&models.Notification{})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}

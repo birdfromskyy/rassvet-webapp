@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -65,6 +67,20 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 	if err := h.db.Create(&review).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать отзыв"})
 		return
+	}
+
+	// Notify admins that a new review is awaiting moderation
+	{
+		var user models.User
+		fullName := fmt.Sprintf("пользователь #%d", uid)
+		if h.db.First(&user, uid).Error == nil {
+			fullName = strings.TrimSpace(user.LastName + " " + user.FirstName)
+		}
+		CreateNotification(h.db, 0, "admin",
+			"Новый отзыв на модерации",
+			fmt.Sprintf("%s оставил(а) отзыв и ожидает проверки администратора.", fullName),
+			"/admin/reviews",
+		)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
