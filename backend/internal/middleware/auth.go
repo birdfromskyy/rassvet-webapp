@@ -44,6 +44,39 @@ func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuthMiddleware parses the JWT from cookie/header if present and sets
+// userID/role in context when valid, but never blocks the request. Used on public
+// endpoints (e.g. guest consultation form) that should still attach the caller
+// when they happen to be logged in, regardless of which endpoint the frontend hit.
+func OptionalAuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString, _ := c.Cookie("token")
+		if tokenString == "" {
+			tokenString = strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		}
+		if tokenString == "" {
+			c.Next()
+			return
+		}
+
+		claims, err := utils.ValidateToken(tokenString, jwtSecret)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		val, _ := rdb.Get(context.Background(), "blacklist:"+tokenString).Result()
+		if val == "1" {
+			c.Next()
+			return
+		}
+
+		c.Set("userID", claims.UserID)
+		c.Set("role", claims.Role)
+		c.Next()
+	}
+}
+
 // AdminMiddleware allows both "admin" and "superadmin".
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

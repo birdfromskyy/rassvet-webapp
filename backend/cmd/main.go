@@ -115,8 +115,10 @@ func main() {
 	r.POST("/api/reset-password", middleware.IPRateLimit(rdb, 10, 15*time.Minute), authHandler.ResetPassword)
 	r.POST("/api/refresh",        middleware.IPRateLimit(rdb, 30, 5*time.Minute),  authHandler.Refresh)
 
-	// Consultation request — public (rate limited: 3 per hour per IP for guests)
-	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), consultationHandler.Create)
+	// Consultation request — public (rate limited: 3 per hour per IP for guests).
+	// OptionalAuthMiddleware attaches user_id when the caller happens to be logged in,
+	// even though the frontend should normally use /consultations/auth in that case.
+	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), middleware.OptionalAuthMiddleware(cfg.JWTSecret, rdb), consultationHandler.Create)
 
 	// Public CMS: achievements, awards, vacancies
 	r.GET("/api/achievements", achievementHandler.GetPublic)
