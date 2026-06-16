@@ -378,10 +378,13 @@ func main() {
 		protected.GET("/notifications/unread-count", notificationHandler.GetUnreadCount)
 		protected.PUT("/notifications/read-all", notificationHandler.MarkAllRead)
 		protected.PUT("/notifications/:id/read", notificationHandler.MarkOneRead)
+		protected.DELETE("/notifications/:id", notificationHandler.DeleteOne)
+		protected.DELETE("/notifications", notificationHandler.DeleteAll)
 
 		// Consultation (auth user — attaches user_id)
 		protected.POST("/consultations/auth", consultationHandler.Create)
 		protected.GET("/consultations/mine", consultationHandler.GetMine)
+		protected.PUT("/consultations/mine/:id", consultationHandler.UpdateMine)
 
 		// Questionnaire (anketa)
 		protected.GET("/questionnaire", questionnaireHandler.GetMine)

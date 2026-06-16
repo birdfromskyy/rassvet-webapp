@@ -20,6 +20,6 @@ type ConsultationRequest struct {
 	ContactMethod string `gorm:"size:20;default:'phone'" json:"contact_method"` // phone|vk|max|email
 	ContactEmail string `gorm:"size:254" json:"contact_email"`
 	RequestText  string `gorm:"type:text" json:"request_text"`
-	Status       string `gorm:"size:20;default:'new'" json:"status"` // new|contacted|closed
+	Status       string `gorm:"size:20;default:'new'" json:"status"` // new|contacted|rejected
 	AdminNote     string `gorm:"type:text" json:"admin_note"`
 }

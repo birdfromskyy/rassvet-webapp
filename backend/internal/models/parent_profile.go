@@ -20,6 +20,7 @@ type ParentProfile struct {
 	Phone         string     `gorm:"size:20" json:"phone"`
 	PassportFiles string     `gorm:"type:text;default:'[]'" json:"passport_files"` // JSON []string of filenames
 	SnilsFiles    string     `gorm:"type:text;default:'[]'" json:"snils_files"`    // JSON []string of filenames
-	Status        string     `gorm:"size:20;default:'draft'" json:"status"`        // draft | pending | verified
+	Status        string     `gorm:"size:20;default:'draft'" json:"status"`        // draft | pending | approved | rejected
+	AdminNote     string     `gorm:"type:text" json:"admin_note"`
 	SubmittedAt   *time.Time `json:"submitted_at"`
 }

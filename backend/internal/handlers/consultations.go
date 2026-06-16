@@ -26,6 +26,12 @@ var allowedContactMethods = map[string]bool{
 	"email": true,
 }
 
+var allowedConsultationStatuses = map[string]bool{
+	"new":       true,
+	"contacted": true,
+	"rejected":  true,
+}
+
 // POST /api/consultations
 // Available to guests (no auth) and authenticated users.
 // Rate-limited via IPRateLimit middleware (3/day for guests, checked here for auth users).
@@ -102,6 +108,74 @@ func (h *ConsultationHandler) GetMine(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 }
 
+// PUT /api/consultations/mine/:id
+// Allows the authenticated owner to edit their own request, but only while it's
+// still "new" or has been "rejected". Editing resets status to "new" and re-notifies admins.
+func (h *ConsultationHandler) UpdateMine(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+
+	var req models.ConsultationRequest
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&req).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Заявка не найдена"})
+		return
+	}
+	if req.Status != "new" && req.Status != "rejected" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Редактирование доступно только для заявок со статусом «Новая» или «Отклонено»"})
+		return
+	}
+
+	var body struct {
+		ParentFio     string `json:"parent_fio"     binding:"required,max=300"`
+		Phone         string `json:"phone"          binding:"required,max=20"`
+		ChildFio      string `json:"child_fio"      binding:"required,max=300"`
+		ChildAge      string `json:"child_age"      binding:"required,max=50"`
+		ContactMethod string `json:"contact_method" binding:"required"`
+		ContactEmail  string `json:"contact_email"`
+		RequestText   string `json:"request_text"   binding:"max=2000"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Заполните все обязательные поля"})
+		return
+	}
+	if !phoneRe.MatchString(strings.TrimSpace(body.Phone)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Введите корректный номер телефона (+7 и 10 цифр)"})
+		return
+	}
+	if !allowedContactMethods[body.ContactMethod] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Недопустимый способ связи"})
+		return
+	}
+	if body.ContactMethod == "email" && strings.TrimSpace(body.ContactEmail) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите email для связи"})
+		return
+	}
+
+	req.ParentFio = strings.TrimSpace(body.ParentFio)
+	req.Phone = strings.TrimSpace(body.Phone)
+	req.ChildFio = strings.TrimSpace(body.ChildFio)
+	req.ChildAge = strings.TrimSpace(body.ChildAge)
+	req.ContactMethod = body.ContactMethod
+	req.ContactEmail = strings.TrimSpace(body.ContactEmail)
+	req.RequestText = strings.TrimSpace(body.RequestText)
+	req.Status = "new"
+	req.AdminNote = ""
+	h.db.Save(&req)
+
+	// Re-notify admins as if it were a new request
+	CreateNotification(h.db, 0, "admin",
+		"Заявка на консультацию обновлена",
+		"От: "+req.ParentFio+" | Ребёнок: "+req.ChildFio+" ("+req.ChildAge+")",
+		"/admin/consultations",
+	)
+
+	c.JSON(http.StatusOK, req)
+}
+
 // GET /api/admin/consultations
 func (h *ConsultationHandler) AdminList(c *gin.Context) {
 	var list []models.ConsultationRequest
@@ -110,7 +184,7 @@ func (h *ConsultationHandler) AdminList(c *gin.Context) {
 }
 
 // PUT /api/admin/consultations/:id
-// Body: { "status": "new"|"contacted"|"closed", "admin_note": "..." }
+// Body: { "status": "new"|"contacted"|"rejected", "admin_note": "..." }
 func (h *ConsultationHandler) AdminUpdate(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -123,6 +197,10 @@ func (h *ConsultationHandler) AdminUpdate(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if body.Status != "" && !allowedConsultationStatuses[body.Status] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть: new, contacted или rejected"})
 		return
 	}
 
@@ -146,9 +224,9 @@ func (h *ConsultationHandler) AdminUpdate(c *gin.Context) {
 		case "contacted":
 			title = "Мы связались с вами"
 			body_ = "Администрация рассмотрела вашу заявку на консультацию. Ожидайте звонка или сообщения."
-		case "closed":
-			title = "Заявка на консультацию закрыта"
-			body_ = "Ваша заявка на консультацию обработана и закрыта. Если остались вопросы — подайте новую заявку."
+		case "rejected":
+			title = "Заявка на консультацию отклонена"
+			body_ = "Ваша заявка на консультацию была отклонена администратором. Вы можете подать новую заявку с уточнёнными данными."
 		}
 		if title != "" {
 			if body.AdminNote != "" {

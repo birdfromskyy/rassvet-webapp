@@ -67,7 +67,6 @@ const formatPhone = (raw) => {
 const STATUS_META = {
   draft: { label: "Черновик", color: "default" },
   pending: { label: "На проверке", color: "warning" },
-  verified: { label: "Подтверждён", color: "success" },
   approved: { label: "Принято", color: "success" },
   rejected: { label: "Отклонено", color: "error" },
 };
@@ -80,8 +79,8 @@ const CHILD_STATUS_OPTIONS = [
 
 const PARENT_STATUS_OPTIONS = [
   { value: "pending", label: "На проверке" },
-  { value: "verified", label: "Подтверждён" },
-  { value: "draft", label: "Черновик" },
+  { value: "approved", label: "Принято" },
+  { value: "rejected", label: "Отклонено" },
 ];
 
 const StatusChip = ({ status }) => {
@@ -127,24 +126,27 @@ const StatusDialog = ({
   open,
   title,
   currentStatus,
+  currentNote,
   statusOptions,
   onClose,
   onSave,
 }) => {
   const [status, setStatus] = useState("");
+  const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setStatus(currentStatus || statusOptions[0]?.value || "");
+      setNote(currentNote || "");
     }
-  }, [open, currentStatus, statusOptions]);
+  }, [open, currentStatus, currentNote, statusOptions]);
 
   const handleSave = async () => {
     setSaving(true);
 
     try {
-      await onSave(status);
+      await onSave(status, note);
       toast.success("Статус обновлён");
       onClose();
     } catch {
@@ -179,6 +181,16 @@ const StatusDialog = ({
             ))}
           </Select>
         </FormControl>
+
+        <TextField
+          label="Примечание для родителя"
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          fullWidth
+          multiline
+          rows={3}
+          helperText="Причина отклонения или комментарий, родитель его видит"
+        />
       </DialogContent>
 
       <DialogActions className="admin-module-dialog__actions">
@@ -346,6 +358,7 @@ const AdminDocuments = () => {
     open: false,
     userId: null,
     status: "",
+    note: "",
   });
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
@@ -540,6 +553,7 @@ const AdminDocuments = () => {
                                 open: true,
                                 userId: userDoc.user_id,
                                 status: profile.status || "pending",
+                                note: profile.admin_note || "",
                               })
                             }
                           >
@@ -582,6 +596,15 @@ const AdminDocuments = () => {
                             </Button>
                           </Tooltip>
                         </Box>
+
+                        {profile.admin_note && (
+                          <Typography
+                            variant="body2"
+                            sx={{ mb: 1.5, color: "text.secondary" }}
+                          >
+                            Примечание: {profile.admin_note}
+                          </Typography>
+                        )}
 
                         <div className="admin-docs-files">
                           <div className="admin-docs-file-card">
@@ -740,10 +763,11 @@ const AdminDocuments = () => {
           open={parentDialog.open}
           title="Статус документов родителя"
           currentStatus={parentDialog.status}
+          currentNote={parentDialog.note}
           statusOptions={PARENT_STATUS_OPTIONS}
-          onClose={() => setParentDialog({ open: false, userId: null, status: "" })}
-          onSave={(status) =>
-            documentService.adminUpdateParentStatus(parentDialog.userId, status).then(load)
+          onClose={() => setParentDialog({ open: false, userId: null, status: "", note: "" })}
+          onSave={(status, note) =>
+            documentService.adminUpdateParentStatus(parentDialog.userId, status, note).then(load)
           }
         />
 

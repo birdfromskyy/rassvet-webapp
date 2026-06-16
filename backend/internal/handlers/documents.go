@@ -294,6 +294,7 @@ func (h *DocumentHandler) SaveParentDocs(c *gin.Context) {
 	hasFiles := len(finalPassport) > 0 || len(finalSnils) > 0
 	if hasFiles || phone != "" {
 		profile.Status = "pending"
+		profile.AdminNote = ""
 		now := time.Now()
 		profile.SubmittedAt = &now
 	}
@@ -472,11 +473,6 @@ func (h *DocumentHandler) UpdateChildDocs(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Заявка не найдена"})
 		return
 	}
-	if sub.Status != "rejected" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Редактирование доступно только для отклонённых заявок"})
-		return
-	}
-
 	childName := strings.TrimSpace(c.PostForm("child_name"))
 	if childName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Укажите имя ребёнка"})
@@ -526,6 +522,20 @@ func (h *DocumentHandler) UpdateChildDocs(c *gin.Context) {
 	sub.Status = "pending"
 	sub.AdminNote = ""
 	h.db.Save(&sub)
+
+	// Notify admins that the previously rejected child documents were updated and resubmitted
+	{
+		var user models.User
+		fullName := fmt.Sprintf("пользователь #%d", userID)
+		if h.db.First(&user, userID).Error == nil {
+			fullName = strings.TrimSpace(user.LastName + " " + user.FirstName)
+		}
+		CreateNotification(h.db, 0, "admin",
+			"Документы ребёнка обновлены после отклонения",
+			fmt.Sprintf("%s обновил(а) документы ребёнка «%s» и отправил(а) их на повторную проверку.", fullName, childName),
+			"/admin/documents",
+		)
+	}
 
 	c.JSON(http.StatusOK, gin.H{"submission": sub})
 }
@@ -853,7 +863,7 @@ func (h *DocumentHandler) AdminUpdateSubmissionStatus(c *gin.Context) {
 }
 
 // PUT /api/admin/documents/parent/:userId/status
-// Body: { "status": "draft"|"pending"|"verified" }
+// Body: { "status": "pending"|"approved"|"rejected", "admin_note": "..." }
 func (h *DocumentHandler) AdminUpdateParentStatus(c *gin.Context) {
 	userId, err := strconv.Atoi(c.Param("userId"))
 	if err != nil {
@@ -862,14 +872,15 @@ func (h *DocumentHandler) AdminUpdateParentStatus(c *gin.Context) {
 	}
 
 	var body struct {
-		Status string `json:"status"`
+		Status    string `json:"status"`
+		AdminNote string `json:"admin_note"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if body.Status != "draft" && body.Status != "pending" && body.Status != "verified" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть: draft, pending или verified"})
+	if body.Status != "pending" && body.Status != "approved" && body.Status != "rejected" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Статус должен быть: pending, approved или rejected"})
 		return
 	}
 
@@ -881,11 +892,24 @@ func (h *DocumentHandler) AdminUpdateParentStatus(c *gin.Context) {
 
 	prevStatus := profile.Status
 	profile.Status = body.Status
+	profile.AdminNote = body.AdminNote
 	h.db.Save(&profile)
 
-	if prevStatus != body.Status && body.Status == "verified" {
-		CreateNotification(h.db, profile.UserID, "", "Документы родителя подтверждены",
-			"Ваши личные документы (паспорт, СНИЛС) проверены и подтверждены администратором.", "/profile")
+	if prevStatus != body.Status {
+		switch body.Status {
+		case "approved":
+			notifBody := "Ваши личные документы (паспорт, СНИЛС) проверены и приняты администратором."
+			if body.AdminNote != "" {
+				notifBody += " Примечание: " + body.AdminNote
+			}
+			CreateNotification(h.db, profile.UserID, "", "Документы родителя приняты", notifBody, "/profile")
+		case "rejected":
+			notifBody := "Ваши личные документы (паспорт, СНИЛС) были отклонены администратором. Пожалуйста, загрузите документы повторно."
+			if body.AdminNote != "" {
+				notifBody += " Причина: " + body.AdminNote
+			}
+			CreateNotification(h.db, profile.UserID, "", "Документы родителя отклонены", notifBody, "/profile")
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"parent_profile": profile})

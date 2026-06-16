@@ -56,9 +56,21 @@ const parsePhoneInput = (display) => {
 const statusLabel = {
   draft:    { text: 'Черновик',    cls: 'status--draft' },
   pending:  { text: 'На проверке', cls: 'status--pending' },
-  verified: { text: 'Подтверждён', cls: 'status--approved' },
   approved: { text: 'Принято',     cls: 'status--approved' },
   rejected: { text: 'Отклонено',   cls: 'status--rejected' },
+}
+
+const consultationStatusLabel = {
+  new:       { text: 'Новая',     cls: 'status--pending' },
+  contacted: { text: 'Связались', cls: 'status--contacted' },
+  rejected:  { text: 'Отклонено', cls: 'status--rejected' },
+}
+
+const CONTACT_METHOD_LABELS = {
+  phone: 'Звонок',
+  vk:    'ВКонтакте',
+  max:   'MAX',
+  email: 'Email',
 }
 
 // ── FileDropZone ─────────────────────────────────────────────────────────────
@@ -240,6 +252,15 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
   const [consultations, setConsultations] = useState([])
   const [qData, setQData]               = useState(null)   // full questionnaire object
   const [qStatus, setQStatus]           = useState(null)   // status string
+
+  // Consultation edit form state (editable while status is "new" or "rejected")
+  const [editingConsultId, setEditingConsultId] = useState(null)
+  const [consultForm, setConsultForm] = useState({
+    parent_fio: '', phone: '', child_fio: '', child_age: '',
+    contact_method: 'phone', contact_email: '', request_text: '',
+  })
+  const [consultPhoneDisplay, setConsultPhoneDisplay] = useState('+7')
+  const [consultSaving, setConsultSaving] = useState(false)
 
   // ── Document state ────────────────────────────────────────────────────────
   const [docsLoading, setDocsLoading]         = useState(true)
@@ -460,6 +481,60 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
     }
   }
 
+  // ── Consultation request edit ─────────────────────────────────────────────
+  const openEditConsult = (c) => {
+    setEditingConsultId(c.id)
+    setConsultForm({
+      parent_fio: c.parent_fio || '',
+      phone: c.phone || '',
+      child_fio: c.child_fio || '',
+      child_age: c.child_age || '',
+      contact_method: c.contact_method || 'phone',
+      contact_email: c.contact_email || '',
+      request_text: c.request_text || '',
+    })
+    setConsultPhoneDisplay(c.phone ? formatPhone(c.phone) : '+7')
+  }
+
+  const cancelEditConsult = () => setEditingConsultId(null)
+
+  const handleConsultChange = (field) => (e) =>
+    setConsultForm(p => ({ ...p, [field]: e.target.value }))
+
+  const handleConsultPhoneChange = (e) => {
+    const all = e.target.value.replace(/\D/g, '')
+    const after7 = all.startsWith('7') ? all.slice(1) : all
+    const display = buildPhoneDisplay(after7.slice(0, 10))
+    setConsultPhoneDisplay(display)
+    setConsultForm(p => ({ ...p, phone: parsePhoneInput(display) }))
+  }
+
+  const handleUpdateConsult = async (e) => {
+    e.preventDefault()
+    if (!consultForm.parent_fio.trim()) { toast.error('Укажите ФИО родителя'); return }
+    if (!/^\+7\d{10}$/.test(consultForm.phone)) { toast.error('Введите корректный номер телефона'); return }
+    if (!consultForm.child_fio.trim()) { toast.error('Укажите ФИО ребёнка'); return }
+    if (!consultForm.child_age.trim()) { toast.error('Укажите возраст ребёнка'); return }
+    if (
+      (consultForm.contact_method === 'vk' || consultForm.contact_method === 'email') &&
+      !consultForm.contact_email.trim()
+    ) {
+      toast.error('Укажите контакт для связи')
+      return
+    }
+    setConsultSaving(true)
+    try {
+      await consultationService.updateMine(editingConsultId, consultForm)
+      toast.success('Заявка обновлена и отправлена на повторную проверку')
+      setEditingConsultId(null)
+      loadDocs()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Ошибка обновления заявки')
+    } finally {
+      setConsultSaving(false)
+    }
+  }
+
   const canAddChild = children.length < MAX_CHILDREN
 
   const handleDeleteParentProfile = async () => {
@@ -598,20 +673,137 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                   ) : (
                     <div className="consult-list">
                       {consultations.map(c => {
-                        const st = statusLabel[c.status] || { text: c.status, cls: '' }
+                        const st = consultationStatusLabel[c.status] || { text: c.status, cls: '' }
+                        const canEditConsult = c.status === 'new' || c.status === 'rejected'
+                        const isEditingConsult = editingConsultId === c.id
+
+                        if (isEditingConsult) {
+                          return (
+                            <form key={c.id} className="child-form child-form--edit" onSubmit={handleUpdateConsult}>
+                              <div className="profile__section">
+                                <div className="docs-section-head">
+                                  <h3>Редактирование заявки</h3>
+                                  <span className={`docs-status ${st.cls}`}>{st.text}</span>
+                                </div>
+                                {c.admin_note && (
+                                  <p className="child-card__note">
+                                    Примечание администратора: {c.admin_note}
+                                  </p>
+                                )}
+
+                                <div className="profile__grid profile__grid--two">
+                                  <label className="profile__field">
+                                    <span>ФИО родителя</span>
+                                    <input
+                                      value={consultForm.parent_fio}
+                                      onChange={handleConsultChange('parent_fio')}
+                                      maxLength={300}
+                                    />
+                                  </label>
+                                  <label className="profile__field">
+                                    <span>Телефон</span>
+                                    <input
+                                      value={consultPhoneDisplay}
+                                      onChange={handleConsultPhoneChange}
+                                      placeholder="+7 912 345 67 89"
+                                      maxLength={16}
+                                    />
+                                  </label>
+                                  <label className="profile__field">
+                                    <span>ФИО ребёнка</span>
+                                    <input
+                                      value={consultForm.child_fio}
+                                      onChange={handleConsultChange('child_fio')}
+                                      maxLength={300}
+                                    />
+                                  </label>
+                                  <label className="profile__field">
+                                    <span>Возраст ребёнка</span>
+                                    <input
+                                      value={consultForm.child_age}
+                                      onChange={handleConsultChange('child_age')}
+                                      maxLength={50}
+                                    />
+                                  </label>
+                                  <label className="profile__field">
+                                    <span>Способ связи</span>
+                                    <select
+                                      value={consultForm.contact_method}
+                                      onChange={handleConsultChange('contact_method')}
+                                      style={{ height: 54, borderRadius: 18, border: '2px solid rgba(7,68,98,0.18)', padding: '0 14px', fontSize: 16, color: '#074462' }}
+                                    >
+                                      {Object.entries(CONTACT_METHOD_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  {(consultForm.contact_method === 'vk' || consultForm.contact_method === 'email') && (
+                                    <label className="profile__field">
+                                      <span>{consultForm.contact_method === 'vk' ? 'VK ID / ссылка' : 'Email для связи'}</span>
+                                      <input
+                                        value={consultForm.contact_email}
+                                        onChange={handleConsultChange('contact_email')}
+                                        maxLength={254}
+                                      />
+                                    </label>
+                                  )}
+                                </div>
+
+                                <label className="profile__field" style={{ marginTop: 18 }}>
+                                  <span>Что вас беспокоит / какой запрос?</span>
+                                  <textarea
+                                    value={consultForm.request_text}
+                                    onChange={handleConsultChange('request_text')}
+                                    rows={3}
+                                    maxLength={2000}
+                                    style={{ resize: 'vertical', padding: '12px 16px', borderRadius: 14, border: '2px solid rgba(7,68,98,0.18)', fontSize: 15, fontFamily: 'inherit' }}
+                                  />
+                                </label>
+                              </div>
+
+                              <div className="profile__actions child-form__actions">
+                                <button
+                                  type="button"
+                                  className="profile__save profile__save--ghost"
+                                  onClick={cancelEditConsult}
+                                >
+                                  Отмена
+                                </button>
+                                <button type="submit" className="profile__save" disabled={consultSaving}>
+                                  {consultSaving ? 'Отправка...' : 'Отправить повторно'}
+                                </button>
+                              </div>
+                            </form>
+                          )
+                        }
+
                         return (
                           <div key={c.id} className="consult-card">
                             <div className="consult-card__header">
                               <span className="consult-card__child">{c.child_fio} ({c.child_age})</span>
-                              <span className={`docs-status ${st.cls}`}>{st.text === 'На проверке' ? 'Новая' : st.text === 'Подтверждён' ? 'Обработана' : st.text}</span>
+                              <span className={`docs-status ${st.cls}`}>{st.text}</span>
                             </div>
                             <p className="consult-card__meta">
-                              Связь: <strong>{c.contact_method}{c.contact_email ? ` (${c.contact_email})` : ''}</strong>
+                              Связь: <strong>
+                                {CONTACT_METHOD_LABELS[c.contact_method] || c.contact_method}
+                                {c.contact_email ? ` (${c.contact_email})` : ''}
+                              </strong>
                               {' · '}
                               {new Date(c.created_at).toLocaleDateString('ru-RU')}
                             </p>
                             {c.admin_note && (
                               <p className="consult-card__note">Примечание: {c.admin_note}</p>
+                            )}
+                            {canEditConsult && (
+                              <div className="child-card__actions">
+                                <button
+                                  type="button"
+                                  className="child-card__edit"
+                                  onClick={() => openEditConsult(c)}
+                                >
+                                  Редактировать
+                                </button>
+                              </div>
                             )}
                           </div>
                         )
@@ -652,8 +844,11 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                       {qData.admin_note && (
                         <p className="consult-card__note">Примечание администратора: {qData.admin_note}</p>
                       )}
-                      <Link to="/service-algorithm" className="profile__cta-btn profile__cta-btn--secondary">
-                        {qData.status === 'rejected' ? 'Загрузить новую анкету' : 'Открыть страницу анкеты'}
+                      <Link
+                        to={qData.status === 'rejected' ? '/service-algorithm' : '/dashboard'}
+                        className="profile__cta-btn profile__cta-btn--secondary"
+                      >
+                        {qData.status === 'rejected' ? 'Загрузить новую анкету' : 'Открыть статус анкеты'}
                       </Link>
                     </div>
                   )}
@@ -682,6 +877,9 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                         </span>
                       )}
                     </div>
+                    {parentProfile?.admin_note && (
+                      <p className="consult-card__note">Примечание администратора: {parentProfile.admin_note}</p>
+                    )}
                     <p className="docs-hint">
                       Загрузите паспорт и СНИЛС — администратор свяжется с вами по указанному номеру.
                       Допустимые форматы: {ALLOWED_EXT_STR}. Паспорт — до {MAX_PASSPORT_FILES} файлов, СНИЛС — {MAX_SNILS_PARENT_FILES} файл. До {MAX_FILE_MB} МБ каждый.
@@ -758,7 +956,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
                         {children.map(ch => {
                           const st = statusLabel[ch.status] || { text: ch.status, cls: '' }
                           const isEditing = editingChildId === ch.id
-                          const canEdit   = ch.status === 'rejected'
+                          const canEdit   = true
 
                           if (isEditing) {
                             return (

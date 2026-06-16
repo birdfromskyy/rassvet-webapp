@@ -94,9 +94,9 @@ const documentService = {
   adminDeleteParentProfile: (userId) =>
     api.delete(`/admin/documents/parent/${userId}`).then(r => r.data),
 
-  /** Update status of parent profile */
-  adminUpdateParentStatus: (userId, status) =>
-    api.put(`/admin/documents/parent/${userId}/status`, { status }).then(r => r.data),
+  /** Update status of parent profile (and optional admin note) */
+  adminUpdateParentStatus: (userId, status, adminNote = '') =>
+    api.put(`/admin/documents/parent/${userId}/status`, { status, admin_note: adminNote }).then(r => r.data),
 
   /** Erase all personal data (children docs + parent phone/files) for a user */
   adminDeletePersonalData: (userId) =>
