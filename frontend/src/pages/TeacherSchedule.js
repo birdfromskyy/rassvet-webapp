@@ -76,7 +76,16 @@ const TeacherSchedule = ({ user }) => {
         const resolvedTeacherId = teacherIdFromUrl || (studentIdFromUrl ? 0 : (user?.teacher_id || 0))
         if (resolvedTeacherId) {
           const t = loadedTeachers.find(t => t.id === resolvedTeacherId)
-          if (t) setTeacher(t)
+          if (t) {
+            setTeacher(t)
+          } else if (resolvedTeacherId === user?.teacher_id) {
+            // Own teacher record is temporarily inactive (e.g. on leave) — not in the
+            // active-only options list, but we still know who "you" are from the
+            // logged-in user, so build a usable filter value instead of silently
+            // falling back to "all teachers" (which would show everyone's schedule).
+            const ownName = [user?.last_name, user?.first_name, user?.middle_name].filter(Boolean).join(' ')
+            setTeacher({ id: resolvedTeacherId, full_name: ownName || 'Вы' })
+          }
         }
         if (studentIdFromUrl) {
           const s = loadedStudents.find(s => s.id === studentIdFromUrl)

@@ -312,16 +312,19 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var user models.User
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		log.Printf("[LOGIN] email=%s ip=%s success=false reason=user_not_found", req.Email, c.ClientIP())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный email или пароль"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		log.Printf("[LOGIN] email=%s ip=%s success=false reason=wrong_password", user.Email, c.ClientIP())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный email или пароль"})
 		return
 	}
 
 	if !user.IsVerified {
+		log.Printf("[LOGIN] email=%s ip=%s success=false reason=not_verified", user.Email, c.ClientIP())
 		ctx := context.Background()
 
 		cooldown, err := h.getVerificationCooldown(ctx, user.Email)
@@ -371,6 +374,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
+
+	log.Printf("[LOGIN] email=%s ip=%s success=true reason=ok", user.Email, c.ClientIP())
 
 	userResp := gin.H{
 		"id":          user.ID,

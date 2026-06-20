@@ -84,6 +84,9 @@ func main() {
 	// Vacancies handler
 	vacancyHandler := handlers.NewVacancyHandler(db)
 
+	// Client-side error reporting (log-only, no DB)
+	clientErrorHandler := handlers.NewClientErrorHandler()
+
 	// CMS handlers
 	cmsFileHandler := handlers.NewCmsFileHandler(db)
 	historyHandler := handlers.NewHistoryHandler(db)
@@ -119,6 +122,9 @@ func main() {
 	// OptionalAuthMiddleware attaches user_id when the caller happens to be logged in,
 	// even though the frontend should normally use /consultations/auth in that case.
 	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), middleware.OptionalAuthMiddleware(cfg.JWTSecret, rdb), consultationHandler.Create)
+
+	// Client-side JS error reports — public, rate limited (logged only, no DB write)
+	r.POST("/api/client-error", middleware.IPRateLimit(rdb, 20, 10*time.Minute), clientErrorHandler.Report)
 
 	// Public CMS: achievements, awards, vacancies
 	r.GET("/api/achievements", achievementHandler.GetPublic)
