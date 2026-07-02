@@ -23,6 +23,7 @@ const documentService = {
     ;(snilsFiles || []).forEach(f => form.append('snils_files', f))
     return api.post('/documents/parent', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
     }).then(r => r.data)
   },
 
@@ -38,6 +39,7 @@ const documentService = {
     ;(childSnilsFiles || []).forEach(f => form.append('child_snils_files', f))
     return api.post('/documents/children', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
     }).then(r => r.data)
   },
 
@@ -59,6 +61,7 @@ const documentService = {
     ;(childSnilsFiles || []).forEach(f => form.append('child_snils_files', f))
     return api.put(`/documents/children/${id}`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
     }).then(r => r.data)
   },
 

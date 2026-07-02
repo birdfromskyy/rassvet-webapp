@@ -7,6 +7,7 @@ const questionnaireService = {
     form.append('file', file)
     return api.post('/questionnaire', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
     }).then(r => r.data)
   },
   getFileUrl: () => {

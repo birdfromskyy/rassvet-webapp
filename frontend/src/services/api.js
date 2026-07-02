@@ -6,6 +6,7 @@ const api = axios.create({
 	baseURL: API_URL,
 	withCredentials: true,
 	headers: { 'Content-Type': 'application/json' },
+	timeout: 15000,
 })
 
 // Track whether a refresh is already in flight so concurrent 401s
@@ -59,12 +60,12 @@ api.interceptors.response.use(
 		try {
 			// First attempt
 			try {
-				await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true })
+				await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true, timeout: 5000 })
 			} catch (firstErr) {
 				// Retry once after a short delay — handles transient cookie/Redis hiccups
 				if (firstErr.response?.status === 401) {
 					await new Promise(r => setTimeout(r, 400))
-					await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true })
+					await axios.post(`${API_URL}/refresh`, {}, { withCredentials: true, timeout: 5000 })
 				} else {
 					throw firstErr
 				}
