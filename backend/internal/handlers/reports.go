@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -288,17 +289,10 @@ func slotDurationMinutes(slot models.ScheduleSlot) int {
 }
 
 func reportHours(durationMin int) float64 {
-	switch durationMin {
-	case 30:
-		return 0.5
-	case 50:
-		return 1
-	default:
-		if durationMin <= 0 {
-			return 0
-		}
-		return float64(durationMin) / 50
+	if durationMin <= 0 {
+		return 0
 	}
+	return math.Ceil(float64(durationMin)/30.0) * 0.5
 }
 
 func slotReportStudents(slot models.ScheduleSlot) []models.Student {
