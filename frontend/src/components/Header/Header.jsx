@@ -14,6 +14,8 @@ import {
   FiBell,
   FiUser,
   FiTrash2,
+  FiMessageCircle,
+  FiHeadphones,
 } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
@@ -42,9 +44,10 @@ const searchPages = [
   { title: "Наши награды", path: "/awards" },
   { title: "Первичная консультация", path: "/consultation-request" },
   { title: "Поддержать центр", path: "/donation" },
+  { title: "Техподдержка", path: "/support" },
 ];
 
-const dropdowns = [
+const buildDropdowns = (isLoggedIn) => [
   {
     id: "about",
     title: "О центре",
@@ -56,10 +59,7 @@ const dropdowns = [
       { title: "Наши награды", path: "/awards" },
       { title: "Документы", path: "/docs" },
       { title: "Сотрудники", path: "/employees" },
-      {
-        title: "Материально-техническое обеспечение",
-        path: "/fin-activities",
-      },
+      { title: "Материально-техническое обеспечение", path: "/fin-activities" },
       { title: "О правилах внутреннего распорядка", path: "/internal-rules" },
       { title: "Структура организации", path: "/structure" },
       { title: "Независимая оценка качества", path: "/rating" },
@@ -70,17 +70,10 @@ const dropdowns = [
     title: "Для клиентов",
     icon: <FiUser />,
     links: [
-      {
-        title: "Записаться на консультацию",
-        path: "/consultation-request",
-      },
       { title: "Отзывы", path: "/reviews" },
       { title: "Алгоритм получения услуг", path: "/service-algorithm" },
       { title: "Свободные места", path: "/available-places" },
-      {
-        title: "Форма социального обслуживания",
-        path: "/social-service-form",
-      },
+      { title: "Форма социального обслуживания", path: "/social-service-form" },
       { title: "Поддержать центр", path: "/donation" },
     ],
   },
@@ -91,6 +84,16 @@ const dropdowns = [
     links: [
       { title: "Перечень соц. услуг", path: "/services-list" },
       { title: "Описание услуг", path: "/services-description" },
+    ],
+  },
+  {
+    id: "contact",
+    title: "Связаться",
+    icon: <FiMessageCircle />,
+    links: [
+      { title: "Контакты", path: "/contacts" },
+      { title: "Первичная консультация", path: "/consultation-request" },
+      ...(isLoggedIn ? [{ title: "Техподдержка", path: "/support" }] : []),
     ],
   },
 ];
@@ -107,6 +110,7 @@ function Header() {
   const bellRef = useRef(null);
   const { isAuthenticated } = useAuth() || {};
   const isLoggedIn = !!isAuthenticated;
+  const dropdowns = buildDropdowns(isLoggedIn);
 
   const navigate = useNavigate();
 
@@ -322,20 +326,11 @@ function Header() {
               </NavLink>
 
               <NavLink
-                to="/contacts"
-                className="header__nav-link"
-                onClick={closeMenu}
-              >
-                <FiPhone />
-                <span>Контакты</span>
-              </NavLink>
-
-              <NavLink
                 to="/donation"
                 className="header__nav-link"
                 onClick={closeMenu}
               >
-                <FiHeart  />
+                <FiHeart />
                 <span>Помочь</span>
               </NavLink>
 

@@ -57,6 +57,11 @@ import AdminVacancies from "./pages/AdminVacancies";
 import AdminQuestionnaires from "./pages/AdminQuestionnaires";
 import ChildSchedule from "./pages/ChildSchedule";
 import TeacherSchedule from "./pages/TeacherSchedule";
+import SupportList from "./pages/Support/SupportList";
+import SupportNew from "./pages/Support/SupportNew";
+import SupportTicket from "./pages/Support/SupportTicket";
+import AdminSupport from "./pages/AdminSupport";
+import AdminSupportTicket from "./pages/AdminSupportTicket";
 import PrivateRoute from "./components/PrivateRoute";
 import AdminRoute from "./components/AdminRoute";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
@@ -173,6 +178,10 @@ function App() {
               )
             }
           />
+          <Route path="/support" element={<SupportList />} />
+          <Route path="/support/new" element={<SupportNew />} />
+          <Route path="/support/:id" element={<SupportTicket />} />
+
           <Route
             path="/my-schedule"
             element={
@@ -228,6 +237,10 @@ function App() {
             {/* Consultations & Questionnaires */}
             <Route path="/admin/consultations" element={<AdminConsultations />} />
             <Route path="/admin/questionnaires" element={<AdminQuestionnaires />} />
+
+            {/* Tech support */}
+            <Route path="/admin/support" element={<AdminSupport />} />
+            <Route path="/admin/support/:id" element={<AdminSupportTicket />} />
 
             {/* CMS hub */}
             <Route path="/admin/cms" element={<AdminCMSPanel />} />

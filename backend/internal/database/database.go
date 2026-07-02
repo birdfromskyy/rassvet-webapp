@@ -93,6 +93,11 @@ func Migrate(db *gorm.DB) {
 		// CMS: vacancies
 		&models.Vacancy{},
 
+		// Tech support
+		&models.SupportTicket{},
+		&models.SupportMessage{},
+		&models.SupportAttachment{},
+
 	)
 
 	if err != nil {

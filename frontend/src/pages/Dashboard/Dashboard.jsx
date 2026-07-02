@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import Header from "../../components/Header/Header";
@@ -10,6 +10,7 @@ import scheduleService from "../../services/scheduleService";
 import { isAdmin as isAdminRole, isTeacher as isTeacherRole } from "../../utils/roles";
 import questionnaireService from "../../services/questionnaireService";
 import { siteSettingService, getUploadUrl } from "../../services/cmsService";
+import supportService from "../../services/supportService";
 
 import { toast } from "react-toastify";
 
@@ -140,58 +141,43 @@ const TeacherScheduleWidget = ({ user }) => {
 // Shows children's schedule for today (user or admin with linked children)
 const ChildScheduleWidget = () => {
   const navigate = useNavigate();
-  const [children, setChildren] = useState([]);
+  // null = children not yet loaded; [] = loaded but empty; [...] = loaded with data
+  const [children, setChildren] = useState(null);
   const [activeChildIndex, setActiveChildIndex] = useState(0);
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const todayWeekday = getTodayWeekday();
   const weekStartISO = formatDateISO(getMonday(new Date()));
-  const activeChild = children[activeChildIndex];
+  const activeChild = children?.[activeChildIndex];
 
+  // Load children list once
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const childrenData = await scheduleService.getMyChildren();
-        setChildren(childrenData);
-        if (childrenData.length > 0) {
-          const data = await scheduleService.getChildSchedule(
-            childrenData[0].student_id,
-            weekStartISO
-          );
-          setSlots(
-            (data.slots || []).filter((s) => s.weekday === todayWeekday)
-          );
-        }
-      } catch {
-        setSlots([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [weekStartISO, todayWeekday]);
+    scheduleService.getMyChildren()
+      .then((data) => setChildren(data))
+      .catch(() => setChildren([]));
+  }, []);
 
+  // Load schedule when children list is ready or active child index changes.
+  // Using children (array ref) + activeChildIndex avoids the race condition
+  // where the old code had activeChild (object) as a dep: setChildren() triggered
+  // a re-render, activeChild changed from undefined to children[0], and this
+  // effect fired a second time while the first effect's getChildSchedule was
+  // still in flight — producing two concurrent requests with a last-write-wins race.
   useEffect(() => {
-    if (!activeChild) return;
-    const loadChildSchedule = async () => {
-      setLoading(true);
-      try {
-        const data = await scheduleService.getChildSchedule(
-          activeChild.student_id,
-          weekStartISO
-        );
-        setSlots(
-          (data.slots || []).filter((s) => s.weekday === todayWeekday)
-        );
-      } catch {
-        setSlots([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadChildSchedule();
-  }, [activeChildIndex, activeChild, weekStartISO, todayWeekday]);
+    if (children === null) return; // still waiting for children list
+    const child = children[activeChildIndex];
+    if (!child) { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    scheduleService
+      .getChildSchedule(child.student_id, weekStartISO)
+      .then((data) => {
+        if (!cancelled) setSlots((data.slots || []).filter((s) => s.weekday === todayWeekday));
+      })
+      .catch(() => { if (!cancelled) setSlots([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeChildIndex, children, weekStartISO, todayWeekday]);
 
   return (
     <section className="dashboard-schedule">
@@ -205,7 +191,7 @@ const ChildScheduleWidget = () => {
         </button>
       </div>
 
-      {children.length > 1 && (
+      {(children?.length ?? 0) > 1 && (
         <div className="dashboard-schedule__switcher">
           <button
             onClick={() =>
@@ -412,18 +398,37 @@ const Dashboard = ({ user, onLogout }) => {
 
   const [hasChildren, setHasChildren] = useState(false);
   const [childrenLoading, setChildrenLoading] = useState(true);
+  const [supportCount, setSupportCount] = useState(0);
 
   useEffect(() => {
     document.title = "Личный кабинет";
   }, []);
 
-  useEffect(() => {
+  const loadChildren = useCallback(() => {
+    setChildrenLoading(true);
     scheduleService
       .getMyChildren()
       .then((data) => setHasChildren(data.length > 0))
       .catch(() => setHasChildren(false))
       .finally(() => setChildrenLoading(false));
   }, []);
+
+  // pageshow fires with event.persisted=true when Safari restores the page from
+  // Back/Forward Cache. Without this, childrenLoading stays true forever because
+  // the in-flight getMyChildren() was cancelled when the page was frozen.
+  useEffect(() => {
+    loadChildren();
+    const onPageShow = (e) => { if (e.persisted) loadChildren(); };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, [loadChildren]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    supportService.adminUnreadCount()
+      .then(({ count }) => setSupportCount(count))
+      .catch(() => {});
+  }, [isAdmin]);
 
   const handleLogout = async () => {
     try {
@@ -458,8 +463,16 @@ const Dashboard = ({ user, onLogout }) => {
         button: "Открыть",
         path: "/admin/reviews",
       },
+      {
+        title: "Техподдержка",
+        text: supportCount > 0
+          ? `Открытых обращений: ${supportCount}`
+          : "Обращения пользователей в службу поддержки.",
+        button: "Открыть",
+        path: "/admin/support",
+      },
     ],
-    []
+    [supportCount]
   );
 
   const userCards = useMemo(
@@ -475,6 +488,12 @@ const Dashboard = ({ user, onLogout }) => {
         text: "Поддержите деятельность нашего центра.",
         button: "Перейти",
         path: "/donation",
+      },
+      {
+        title: "Техподдержка",
+        text: "Обратитесь в службу поддержки по любому вопросу.",
+        button: "Перейти",
+        path: "/support",
       },
     ],
     []

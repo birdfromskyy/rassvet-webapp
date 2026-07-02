@@ -84,6 +84,9 @@ func main() {
 	// Vacancies handler
 	vacancyHandler := handlers.NewVacancyHandler(db)
 
+	// Support (tech support tickets)
+	supportHandler := handlers.NewSupportHandler(db)
+
 	// Client-side error reporting (log-only, no DB)
 	clientErrorHandler := handlers.NewClientErrorHandler()
 
@@ -363,6 +366,13 @@ func main() {
 			admin.PUT("/questionnaires/:id/status", questionnaireHandler.AdminUpdateStatus)
 			admin.POST("/questionnaires/:id/anonymize", questionnaireHandler.AdminAnonymize)
 			admin.DELETE("/questionnaires/:id", questionnaireHandler.AdminDelete)
+
+			// Tech support (admin)
+			admin.GET("/support/tickets", supportHandler.AdminListTickets)
+			admin.GET("/support/tickets/:id", supportHandler.AdminGetTicket)
+			admin.POST("/support/tickets/:id/messages", supportHandler.AdminReplyToTicket)
+			admin.PUT("/support/tickets/:id/status", supportHandler.AdminUpdateStatus)
+			admin.GET("/support/unread-count", supportHandler.AdminUnreadCount)
 		}
 
 		protected.GET("/my-children", userStudentHandler.GetMyChildren)
@@ -398,6 +408,14 @@ func main() {
 		protected.GET("/questionnaire", questionnaireHandler.GetMine)
 		protected.POST("/questionnaire", questionnaireHandler.Upload)
 		protected.GET("/questionnaire/file", questionnaireHandler.ServeFile)
+
+		// Tech support (user)
+		protected.GET("/support/files/:filename", supportHandler.ServeFile)
+		protected.POST("/support/tickets", supportHandler.CreateTicket)
+		protected.GET("/support/tickets", supportHandler.ListMyTickets)
+		protected.GET("/support/tickets/:id", supportHandler.GetMyTicket)
+		protected.POST("/support/tickets/:id/messages", supportHandler.ReplyToTicket)
+		protected.PUT("/support/tickets/:id/close", supportHandler.CloseMyTicket)
 	}
 
 	// Background context — cancelled on graceful shutdown to stop background workers.
