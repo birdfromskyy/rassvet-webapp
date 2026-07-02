@@ -224,8 +224,11 @@ const AdminSchedule = () => {
 	// Approve-blocking conflict dialog
 	const [approveConflictDialog, setApproveConflictDialog] = useState({ open: false, pairs: [] })
 
-	// Delete manual slots confirmation dialog
-	const [deleteManualDialog, setDeleteManualDialog] = useState({ open: false, countdown: 5 })
+	// Clear auto slots confirmation dialog
+	const [clearAutoDialog, setClearAutoDialog] = useState({ open: false, countdown: 3 })
+	const clearAutoTimerRef = useRef(null)
+	// Clear manual slots confirmation dialog
+	const [deleteManualDialog, setDeleteManualDialog] = useState({ open: false, countdown: 3 })
 	// Delete single slot confirmation dialog
 	const [deleteSlotDialog, setDeleteSlotDialog] = useState({ open: false, slotId: null, slotLabel: '' })
 	const deleteManualTimerRef = useRef(null)
@@ -494,15 +497,25 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const clearAuto = () => {
-		const doIt = () => doClearAuto()
-		if (isPastWeek) {
-			openPastWeekConfirm('Удалить все авто-слоты прошедшей недели? Ручные слоты сохранятся. Перегенерации не будет.', doIt)
-		} else if (isCurrentWeek) {
-			openPastWeekConfirm('Удалить все авто-слоты текущей недели? Ручные слоты сохранятся. Перегенерации не будет.', doIt)
-		} else {
-			doIt()
+	const openClearAutoDialog = () => {
+		setClearAutoDialog({ open: true, countdown: 3 })
+		let count = 3
+		clearAutoTimerRef.current = setInterval(() => {
+			count -= 1
+			setClearAutoDialog(prev => ({ ...prev, countdown: count }))
+			if (count <= 0) {
+				clearInterval(clearAutoTimerRef.current)
+				clearAutoTimerRef.current = null
+			}
+		}, 1000)
+	}
+
+	const closeClearAutoDialog = () => {
+		if (clearAutoTimerRef.current) {
+			clearInterval(clearAutoTimerRef.current)
+			clearAutoTimerRef.current = null
 		}
+		setClearAutoDialog({ open: false, countdown: 3 })
 	}
 
 	const copyManualFromPrevWeek = async () => {
@@ -517,8 +530,8 @@ const AdminSchedule = () => {
 	}
 
 	const openDeleteManualDialog = () => {
-		setDeleteManualDialog({ open: true, countdown: 5 })
-		let count = 5
+		setDeleteManualDialog({ open: true, countdown: 3 })
+		let count = 3
 		deleteManualTimerRef.current = setInterval(() => {
 			count -= 1
 			setDeleteManualDialog(prev => ({ ...prev, countdown: count }))
@@ -534,7 +547,7 @@ const AdminSchedule = () => {
 			clearInterval(deleteManualTimerRef.current)
 			deleteManualTimerRef.current = null
 		}
-		setDeleteManualDialog({ open: false, countdown: 5 })
+		setDeleteManualDialog({ open: false, countdown: 3 })
 	}
 
 	const doDeleteManualSlots = async () => {
@@ -542,7 +555,7 @@ const AdminSchedule = () => {
 		try {
 			const data = await scheduleService.clearManualSlots(scheduleData.schedule.id)
 			setScheduleData(data)
-			toast.success('Ручные слоты удалены')
+			toast.success('Ручные слоты очищены')
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка удаления ручных слотов')
 		}
@@ -1371,11 +1384,11 @@ const AdminSchedule = () => {
 								size='small'
 								variant='outlined'
 								startIcon={<ClearIcon />}
-								onClick={clearAuto}
+								onClick={openClearAutoDialog}
 								disabled={generating}
-								color={(isPastWeek || isCurrentWeek) ? 'warning' : 'error'}
+								color='error'
 							>
-								{(isPastWeek || isCurrentWeek) ? '⚠ Очистить авто' : 'Очистить авто'}
+								Очистить авто
 							</Button>
 							<Button
 								size='small'
@@ -1383,7 +1396,7 @@ const AdminSchedule = () => {
 								color='error'
 								onClick={openDeleteManualDialog}
 							>
-								Удалить ручные
+								Очистить ручные
 							</Button>
 
 							<Divider orientation='vertical' flexItem sx={{ mx: 0.5 }} />
@@ -2511,7 +2524,36 @@ const AdminSchedule = () => {
 				</DialogActions>
 			</Dialog>
 
-			{/* Delete manual slots confirmation dialog */}
+			{/* Clear auto slots confirmation dialog */}
+			<Dialog
+				open={clearAutoDialog.open}
+				onClose={closeClearAutoDialog}
+				maxWidth='xs'
+				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
+			>
+				<DialogTitle className='admin-module-dialog__title'>Очистить авто-слоты?</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
+					<Typography variant='body2'>
+						Все авто-слоты этой недели будут удалены. Ручные слоты сохранятся. Перегенерации не будет.
+					</Typography>
+				</DialogContent>
+				<DialogActions className='admin-module-dialog__actions'>
+					<Button onClick={closeClearAutoDialog}>Отмена</Button>
+					<Button
+						variant='contained'
+						color='error'
+						onClick={() => { closeClearAutoDialog(); doClearAuto() }}
+						disabled={clearAutoDialog.countdown > 0}
+					>
+						{clearAutoDialog.countdown > 0
+							? `Очистить (${clearAutoDialog.countdown})`
+							: 'Очистить'}
+					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Clear manual slots confirmation dialog */}
 			<Dialog
 				open={deleteManualDialog.open}
 				onClose={closeDeleteManualDialog}
@@ -2519,10 +2561,10 @@ const AdminSchedule = () => {
 				fullWidth
 				PaperProps={{ className: 'admin-module-dialog' }}
 			>
-				<DialogTitle className='admin-module-dialog__title'>Удалить ручные слоты?</DialogTitle>
+				<DialogTitle className='admin-module-dialog__title'>Очистить ручные слоты?</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='body2'>
-						Вы уверены, что хотите удалить все ручные слоты? Авто-слоты останутся без изменений.
+						Все ручные слоты будут удалены. Авто-слоты останутся без изменений.
 					</Typography>
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>
@@ -2534,8 +2576,8 @@ const AdminSchedule = () => {
 						disabled={deleteManualDialog.countdown > 0}
 					>
 						{deleteManualDialog.countdown > 0
-							? `Удалить (${deleteManualDialog.countdown})`
-							: 'Удалить'}
+							? `Очистить (${deleteManualDialog.countdown})`
+							: 'Очистить'}
 					</Button>
 				</DialogActions>
 			</Dialog>
