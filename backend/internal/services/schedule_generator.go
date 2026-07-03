@@ -8,10 +8,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
 )
+
+// generationMu защищает от параллельных генераций: два одновременных запуска
+// удаляют слоты друг друга через CleanupAutoSlots и портят оба результата.
+var generationMu sync.Mutex
 
 const DefaultBreakMinutes = 0
 const IdealStudentGapMinutes = 10
@@ -19,7 +24,13 @@ const MaxStudentGapMinutes = 30
 const TeacherGapMinutes = 10
 const MaxRepairSwapSlots = 4
 const EarlyStopUnplacedLessons = 5
-const MaxScheduleStrategies = 7
+const MaxScheduleStrategies = 6
+const MaxRetryPasses = 2
+
+// OverloadedTeacherRatio — порог загрузки (минуты занятий / минуты доступности),
+// начиная с которого преподаватель считается перегруженным и его дни
+// упаковываются отдельным алгоритмом в стратегии packed-overloaded.
+const OverloadedTeacherRatio = 0.9
 
 type ScheduleGenerator struct {
 	db                   *gorm.DB
@@ -121,6 +132,7 @@ type WeeklyTask struct {
 	TaskIndex              int
 	HasStrictRoom          bool
 	AvailableWindowMinutes int // total intersection of teacher+student windows across all weekdays
+	TeacherTotalTasks      int // total number of tasks for this teacher in the current run
 }
 
 type CandidateSlot struct {
@@ -208,6 +220,11 @@ func (g *ScheduleGenerator) GenerateScheduleWithProgress(
 	generatedByUserID uint,
 	progress ScheduleGenerationProgressFunc,
 ) (*ScheduleResponse, error) {
+	if !generationMu.TryLock() {
+		return nil, fmt.Errorf("генерация расписания уже выполняется — дождитесь её завершения")
+	}
+	defer generationMu.Unlock()
+
 	g.loadSettings()
 	reportGenerationProgress(progress, 1,
 		fmt.Sprintf("Настройки: окно ученика %d мин, перерыв преподавателя %d мин", g.maxStudentGapMinutes, g.teacherGapMinutes),
@@ -255,6 +272,11 @@ func (g *ScheduleGenerator) ResetAutoScheduleWithProgress(
 	generatedByUserID uint,
 	progress ScheduleGenerationProgressFunc,
 ) (*ScheduleResponse, error) {
+	if !generationMu.TryLock() {
+		return nil, fmt.Errorf("генерация расписания уже выполняется — дождитесь её завершения")
+	}
+	defer generationMu.Unlock()
+
 	g.loadSettings()
 	reportGenerationProgress(progress, 1,
 		fmt.Sprintf("Настройки: окно ученика %d мин, перерыв преподавателя %d мин", g.maxStudentGapMinutes, g.teacherGapMinutes),
@@ -381,102 +403,33 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 }
 
 func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, progress ScheduleGenerationProgressFunc) error {
-	// Phase 1: combinatorial scan — try all (student_gap × teacher_gap) pairs
-	// using the default strategy, pick the combination that places the most lessons.
+	// Single phase: run every (student_gap × teacher_gap) combination with every
+	// strategy and keep the global optimum by quality score. A more permissive
+	// setting can never lose to a stricter one because the stricter combos are
+	// part of the scan.
 	combos := g.buildGapCombinations()
-	multiRun := len(combos) > 1
-	bestCombo := combos[len(combos)-1] // default: the user-configured max values
-	// Save user-configured max values — Phase 2 must always run with these,
-	// not with Phase 1's winning combo which may be more restrictive.
 	originalStudentGap := g.maxStudentGapMinutes
 	originalTeacherGap := g.teacherGapMinutes
 
-	log.Printf("[GEN] GenerateBestAutoSchedule START: scheduleID=%d originalStudentGap=%d originalTeacherGap=%d combos=%d multiRun=%v",
-		schedule.ID, originalStudentGap, originalTeacherGap, len(combos), multiRun)
+	log.Printf("[GEN] GenerateBestAutoSchedule START: scheduleID=%d originalStudentGap=%d originalTeacherGap=%d combos=%d",
+		schedule.ID, originalStudentGap, originalTeacherGap, len(combos))
 	for i, c := range combos {
 		log.Printf("[GEN]   combo[%d]: studentGap=%d teacherGap=%d", i, c.studentGap, c.teacherGap)
 	}
 
-	var bestPhase1Result *generationRunResult
-	if multiRun {
-		bestCount := -1
-		defaultStrategy := g.scheduleStrategies()[0]
-		for i, combo := range combos {
-			g.maxStudentGapMinutes = combo.studentGap
-			g.teacherGapMinutes = combo.teacherGap
-			if err := g.CleanupAutoSlots(schedule.ID); err != nil {
-				return err
-			}
-			ctx, err := g.LoadGenerationContext(*schedule)
-			if err != nil {
-				return err
-			}
-			result, err := g.RunGenerationStrategy(schedule.ID, ctx, defaultStrategy)
-			if err != nil {
-				return err
-			}
-			isBest := result.ScheduledCount > bestCount
-			log.Printf("[GEN] Phase1 combo[%d] studentGap=%d teacherGap=%d → scheduled=%d qualityScore=%d isBestSoFar=%v",
-				i, combo.studentGap, combo.teacherGap, result.ScheduledCount, result.QualityScore, isBest)
-			if isBest {
-				bestCount = result.ScheduledCount
-				bestCombo = combo
-				copyResult := result
-				bestPhase1Result = &copyResult
-			}
-			percent := 5 + (i+1)*40/len(combos)
-			reportGenerationProgress(progress, percent,
-				fmt.Sprintf("Поиск: окно %d/%d мин → %d занятий", combo.studentGap, combo.teacherGap, result.ScheduledCount), "scan")
-		}
-		// Restore the user's configured max constraints for Phase 2.
-		// Phase 1 found a baseline result; Phase 2 must run with the full
-		// allowed gaps so it is not artificially restricted.
-		g.maxStudentGapMinutes = originalStudentGap
-		g.teacherGapMinutes = originalTeacherGap
-
-		phase1AutoSlotsCount := 0
-		if bestPhase1Result != nil {
-			phase1AutoSlotsCount = len(bestPhase1Result.AutoSlots)
-		}
-		log.Printf("[GEN] Phase1 DONE: bestCombo=(%d,%d) bestCount=%d phase1AutoSlots=%d; RESTORED gaps to studentGap=%d teacherGap=%d",
-			bestCombo.studentGap, bestCombo.teacherGap, bestCount, phase1AutoSlotsCount, g.maxStudentGapMinutes, g.teacherGapMinutes)
-		if bestPhase1Result != nil {
-			log.Printf("[GEN] Phase1 bestResult: strategy=%q scheduledCount=%d qualityScore=%d unplaced=%d autoSlots=%d",
-				bestPhase1Result.Strategy.Name, bestPhase1Result.ScheduledCount, bestPhase1Result.QualityScore,
-				len(bestPhase1Result.UnplacedTasks), len(bestPhase1Result.AutoSlots))
-		}
-
-		reportGenerationProgress(progress, 45,
-			fmt.Sprintf("Лучшее в поиске: окно %d/%d мин (%d занятий)", bestCombo.studentGap, bestCombo.teacherGap, bestCount), "scan")
-	}
-
-	// Phase 2: run ALL Phase 1 combos × all strategies to find the global optimum.
-	// This guarantees that (10,15) settings can't do worse than (10,10), because
-	// (10,10) is one of the Phase 1 combos and will be tested with every strategy.
 	strategies := g.scheduleStrategies()
-	best := bestPhase1Result
+	var best *generationRunResult
 	strategyCount := len(strategies)
 	if strategyCount > MaxScheduleStrategies {
 		strategyCount = MaxScheduleStrategies
 	}
 
-	// In single-combo mode there is nothing to iterate over — just use originalGap.
-	phase2Combos := []gapCombo{{originalStudentGap, originalTeacherGap}}
-	if multiRun {
-		phase2Combos = combos
-	}
+	phase2Combos := combos
 	totalRuns := len(phase2Combos) * strategyCount
 
-	log.Printf("[GEN] Phase2 START: phase2Combos=%d strategies=%d totalRuns=%d baseline=%v",
-		len(phase2Combos), strategyCount, totalRuns, bestPhase1Result != nil)
-	if best != nil {
-		log.Printf("[GEN] Phase2 baseline (Phase1 best): scheduled=%d qualityScore=%d", best.ScheduledCount, best.QualityScore)
-	}
+	log.Printf("[GEN] Scan START: combos=%d strategies=%d totalRuns=%d", len(phase2Combos), strategyCount, totalRuns)
 
 	phase2Start := 5
-	if multiRun {
-		phase2Start = 48
-	}
 	runIndex := 0
 
 	for _, phase2Combo := range phase2Combos {
@@ -506,6 +459,8 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 			if err != nil {
 				return err
 			}
+			log.Printf("[GEN] strategy=%q combo(%d,%d) per-teacher auto: %s",
+				strategy.Name, phase2Combo.studentGap, phase2Combo.teacherGap, describeAutoSlotsPerTeacher(result.AutoSlots, ctx))
 			isNewBest := best == nil || result.QualityScore > best.QualityScore
 			if best != nil {
 				log.Printf("[GEN] Phase2 combo(%d,%d) strategy[%d]=%q scheduled=%d qs=%d | best: scheduled=%d qs=%d | isNewBest=%v",
@@ -565,10 +520,22 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 	if err != nil {
 		return err
 	}
-	var repairErr error
-	best.UnplacedTasks, repairErr = g.RepairWeeklyTasksWithSwaps(schedule.ID, best.UnplacedTasks, ctx)
-	if repairErr != nil {
-		return repairErr
+	// Финальный ремонт до неподвижной точки: swap-ремонт и релокация блокеров
+	// открывают позиции друг для друга.
+	for pass := 0; pass < 3 && len(best.UnplacedTasks) > 0; pass++ {
+		before := len(best.UnplacedTasks)
+		var repairErr error
+		best.UnplacedTasks, repairErr = g.RepairWeeklyTasksWithSwaps(schedule.ID, best.UnplacedTasks, ctx)
+		if repairErr != nil {
+			return repairErr
+		}
+		best.UnplacedTasks, repairErr = g.RepairWeeklyTasksWithRelocation(schedule.ID, best.UnplacedTasks, ctx)
+		if repairErr != nil {
+			return repairErr
+		}
+		if len(best.UnplacedTasks) >= before {
+			break
+		}
 	}
 	log.Printf("[GEN] Final repair done: remaining unplaced=%d", len(best.UnplacedTasks))
 
@@ -582,15 +549,49 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 	return nil
 }
 
+func describeAutoSlotsPerTeacher(slots []models.ScheduleSlot, ctx *GenerationContext) string {
+	names := make(map[uint]string)
+	for _, a := range ctx.Assignments {
+		names[a.TeacherID] = a.Teacher.FullName
+	}
+	counts := make(map[uint]int)
+	for _, s := range slots {
+		counts[s.TeacherID]++
+	}
+	ids := make([]uint, 0, len(counts))
+	for id := range counts {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return counts[ids[i]] > counts[ids[j]] })
+	parts := make([]string, 0, len(ids))
+	for _, id := range ids {
+		name := names[id]
+		if idx := strings.Index(name, " "); idx > 0 {
+			name = name[:idx]
+		}
+		parts = append(parts, fmt.Sprintf("%s=%d", name, counts[id]))
+	}
+	return strings.Join(parts, " ")
+}
+
 func (g *ScheduleGenerator) RunGenerationStrategy(
 	scheduleID uint,
 	ctx *GenerationContext,
 	strategy ScheduleStrategy,
 ) (generationRunResult, error) {
 	tasks := g.BuildWeeklyTasks(ctx.Assignments, ctx)
-	g.SortTasksByStrategy(tasks, strategy.IndividualOrder)
 
-	unplacedTasks, err := g.runIndividualTaskPipeline(scheduleID, tasks, ctx)
+	var unplacedTasks []WeeklyTask
+	var err error
+	switch strategy.IndividualOrder {
+	case "packed_days":
+		unplacedTasks, err = g.runPackedDaysPipeline(scheduleID, tasks, 0, ctx)
+	case "packed_overloaded":
+		unplacedTasks, err = g.runPackedDaysPipeline(scheduleID, tasks, OverloadedTeacherRatio, ctx)
+	default:
+		g.SortTasksByStrategy(tasks, strategy.IndividualOrder)
+		unplacedTasks, err = g.runIndividualTaskPipeline(scheduleID, tasks, ctx)
+	}
 	if err != nil {
 		return generationRunResult{}, err
 	}
@@ -602,7 +603,7 @@ func (g *ScheduleGenerator) RunGenerationStrategy(
 		UnplacedTasks: unplacedTasks,
 		AutoSlots:     autoSlots,
 		ScheduledCount: scheduledCount,
-		QualityScore:  g.scoreGeneratedSchedule(ctx, scheduledCount, len(unplacedTasks)),
+		QualityScore:  g.scoreGeneratedSchedule(ctx, scheduledCount, unplacedTasks),
 	}, nil
 }
 
@@ -611,22 +612,56 @@ func (g *ScheduleGenerator) runIndividualTaskPipeline(
 	tasks []WeeklyTask,
 	ctx *GenerationContext,
 ) ([]WeeklyTask, error) {
-	unplacedTasks, err := g.PlaceWeeklyTasks(scheduleID, tasks, ctx)
+	unplaced, err := g.PlaceWeeklyTasks(scheduleID, tasks, ctx)
 	if err != nil {
 		return nil, err
 	}
-	return g.RepairWeeklyTasksWithSwaps(scheduleID, unplacedTasks, ctx)
+	unplaced, err = g.RepairWeeklyTasksWithSwaps(scheduleID, unplaced, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Retry passes: after the main placement round more anchors exist in the
+	// schedule, so previously rejected tasks may now satisfy hasValidTeacherGap.
+	// Re-sort unplaced by most-constrained (fewest available window minutes)
+	// to maximise the chance that tight students get placed before loose ones
+	// consume the remaining anchors.
+	for pass := 0; pass < MaxRetryPasses && len(unplaced) > 0; pass++ {
+		prevCount := len(unplaced)
+		// Retry order: teachers with the most total tasks first so their chains
+		// can grow using new anchors, then tightest windows within each teacher.
+		sort.SliceStable(unplaced, func(i, j int) bool {
+			if unplaced[i].TeacherTotalTasks != unplaced[j].TeacherTotalTasks {
+				return unplaced[i].TeacherTotalTasks > unplaced[j].TeacherTotalTasks
+			}
+			return unplaced[i].AvailableWindowMinutes < unplaced[j].AvailableWindowMinutes
+		})
+		unplaced, err = g.PlaceWeeklyTasks(scheduleID, unplaced, ctx)
+		if err != nil {
+			return nil, err
+		}
+		unplaced, err = g.RepairWeeklyTasksWithSwaps(scheduleID, unplaced, ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(unplaced) >= prevCount {
+			break // no progress — further passes won't help
+		}
+		log.Printf("[GEN] retry pass %d/%d: placed %d more, remaining unplaced=%d",
+			pass+1, MaxRetryPasses, prevCount-len(unplaced), len(unplaced))
+	}
+
+	return unplaced, nil
 }
 
 func (g *ScheduleGenerator) scheduleStrategies() []ScheduleStrategy {
 	return []ScheduleStrategy{
+		{Name: "packed-days", IndividualOrder: "packed_days"},
+		{Name: "packed-overloaded", IndividualOrder: "packed_overloaded"},
 		{Name: "default", IndividualOrder: "default"},
 		{Name: "teacher-blocks", IndividualOrder: "teacher_blocks"},
 		{Name: "no-availability-priority", IndividualOrder: "no_availability"},
 		{Name: "student-blocks", IndividualOrder: "student_blocks"},
-		{Name: "high-visits-first", IndividualOrder: "visits_first"},
-		{Name: "long-duration-first", IndividualOrder: "duration_first"},
-		{Name: "broad-availability-first", IndividualOrder: "broad_availability"},
 	}
 }
 
@@ -713,7 +748,7 @@ func (g *ScheduleGenerator) tryRepairWeeklyTaskWithSwap(
 		targetPlaced := !containsWeeklyTask(unplaced, task)
 
 		if targetPlaced && placedCount > len(removedSlots) {
-			score := g.scoreGeneratedSchedule(ctx, g.countScheduledSlots(ctx.ExistingSlots), len(unplaced))
+			score := g.scoreGeneratedSchedule(ctx, g.countScheduledSlots(ctx.ExistingSlots), unplaced)
 			if bestWeekday == -1 || score > bestScore {
 				bestScore = score
 				bestWeekday = weekday
@@ -938,6 +973,15 @@ func (g *ScheduleGenerator) BuildWeeklyTasks(
 			expanded[k].AvailableWindowMinutes = windowMinutes
 		}
 		tasks = append(tasks, expanded...)
+	}
+
+	// Compute per-teacher task count so sorting strategies can use it.
+	teacherTaskCount := make(map[uint]int, 16)
+	for _, t := range tasks {
+		teacherTaskCount[t.TeacherID]++
+	}
+	for i := range tasks {
+		tasks[i].TeacherTotalTasks = teacherTaskCount[tasks[i].TeacherID]
 	}
 
 	return tasks
@@ -1256,9 +1300,19 @@ func (g *ScheduleGenerator) countScheduledSlots(slots []models.ScheduleSlot) int
 	return count
 }
 
-func (g *ScheduleGenerator) scoreGeneratedSchedule(ctx *GenerationContext, scheduledCount int, unplacedCount int) int {
+func (g *ScheduleGenerator) scoreGeneratedSchedule(ctx *GenerationContext, scheduledCount int, unplaced []WeeklyTask) int {
 	score := scheduledCount * 100000
-	score -= unplacedCount * 10000
+	score -= len(unplaced) * 10000
+	// Квадратичный штраф за концентрацию непроставленных занятий у одного
+	// преподавателя: расписание, где один преподаватель теряет 26 занятий,
+	// хуже расписания с тем же итогом, но равномерным распределением потерь.
+	perTeacher := make(map[uint]int)
+	for _, t := range unplaced {
+		perTeacher[t.TeacherID]++
+	}
+	for _, n := range perTeacher {
+		score -= n * n * 500
+	}
 	score -= g.totalStudentGapPenalty(ctx) * 20
 	score -= g.totalTeacherGapPenalty(ctx) * 10
 	return score
