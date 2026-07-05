@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import Header from '../components/Header/Header'
 import Footer from '../components/Footer/Footer'
 import scheduleService from '../services/scheduleService'
+import useBrandFont from '../hooks/useBrandFont'
 import './TeacherSchedule.scss'
 import './ChildSchedule.scss'
 
@@ -41,6 +42,7 @@ const getDayDate = (weekStart, weekday) => {
 }
 
 const ChildSchedule = ({ user }) => {
+  useBrandFont()
   const [children, setChildren] = useState([])
   const [activeIndex, setActiveIndex] = useState(0)
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))

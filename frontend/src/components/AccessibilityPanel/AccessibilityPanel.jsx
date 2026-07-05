@@ -45,12 +45,18 @@ function AccessibilityPanel() {
     localStorage.setItem("accessibilitySound", sound ? "on" : "off");
 
     if (!enabled || !sound) {
-      window.speechSynthesis.cancel();
+      // speechSynthesis is absent on some Android browsers / WebViews —
+      // guard so this doesn't throw on every page load (see /main crash).
+      window.speechSynthesis?.cancel();
     }
   }, [enabled, theme, fontSize, spacing, images, sound]);
 
   useEffect(() => {
     if (!enabled || !sound) return;
+    // No Web Speech API on this browser → skip TTS entirely.
+    if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+      return;
+    }
 
     let lastText = "";
 
@@ -95,7 +101,7 @@ function AccessibilityPanel() {
 
       lastText = text;
 
-      window.speechSynthesis.cancel();
+      window.speechSynthesis?.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "ru-RU";
@@ -108,7 +114,7 @@ function AccessibilityPanel() {
 
     return () => {
       document.removeEventListener("mouseover", speakElement);
-      window.speechSynthesis.cancel();
+      window.speechSynthesis?.cancel();
     };
   }, [enabled, sound]);
 

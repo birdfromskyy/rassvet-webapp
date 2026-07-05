@@ -87,6 +87,14 @@ export default function Footer() {
               <Link to="/privacy" className="footer__privacy-link">
                 Политика обработки персональных данных
               </Link>
+              <a
+                href="https://vk.com/wg_1p"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="footer__author"
+              >
+                Made with <span className="footer__author-heart">❤️</span> by @wg_1p
+              </a>
               <img src={footerHouse} alt="" className="footer__decor" />
             </div>
           </div>

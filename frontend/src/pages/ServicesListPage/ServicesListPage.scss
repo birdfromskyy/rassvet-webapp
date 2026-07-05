@@ -1,0 +1,116 @@
+/* /services-list — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.serviceslist-page {
+  @include design2-base;
+
+  .sl-section {
+    background: $paper;
+  }
+
+  /* One category per row (full width). */
+  .sl-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sl-card {
+    padding: clamp(24px, 2.6vw, 36px);
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+  }
+
+  .sl-card__title {
+    margin: 0 0 16px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid rgba(244, 223, 0, 0.7);
+    font-size: clamp(19px, 1.8vw, 24px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $ink;
+  }
+
+  /* Single column of items inside each full-width category card. */
+  .sl-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    > li {
+      position: relative;
+      padding-left: 18px;
+      margin-bottom: 14px;
+      font-size: 15px;
+      line-height: 1.55;
+      color: $content;
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: $yellow;
+      }
+
+      strong {
+        color: $ink;
+        font-weight: 700;
+      }
+    }
+  }
+
+  .sl-sublist {
+    margin: 8px 0 0;
+    padding-left: 16px;
+    list-style: none;
+
+    li {
+      position: relative;
+      padding-left: 14px;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: $muted;
+
+      &::before {
+        content: "–";
+        position: absolute;
+        left: 0;
+        color: rgba(7, 68, 98, 0.4);
+      }
+    }
+  }
+
+  .sl-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: clamp(28px, 4vh, 48px);
+    padding: clamp(28px, 3vw, 44px);
+    border-radius: 26px;
+    background: $night;
+    color: #ffffff;
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: clamp(20px, 2vw, 28px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.78);
+    }
+  }
+}

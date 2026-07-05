@@ -4,6 +4,7 @@ import { toast } from 'react-toastify'
 import Header from '../components/Header/Header'
 import Footer from '../components/Footer/Footer'
 import scheduleService from '../services/scheduleService'
+import useBrandFont from '../hooks/useBrandFont'
 import './TeacherSchedule.scss'
 
 const ALL_TEACHERS = { id: '', full_name: 'Все преподаватели' }
@@ -53,6 +54,7 @@ const getSlotStudent = slot => {
 }
 
 const TeacherSchedule = ({ user }) => {
+  useBrandFont()
   const [teachers, setTeachers] = useState([])
   const [students, setStudents] = useState([])
   const [teacher, setTeacher] = useState(ALL_TEACHERS)

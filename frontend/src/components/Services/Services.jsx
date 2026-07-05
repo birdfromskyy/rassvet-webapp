@@ -6,7 +6,9 @@ import iconMedical from "../../assets/service2.png";
 import iconPsychologic from "../../assets/service3.png";
 import iconAdaptation from "../../assets/adaptation.png";
 
-const servicesData = [
+// Exported for the experimental home page concepts (/secondmain, /thirdmain)
+// so the service content stays defined in exactly one place.
+export const servicesData = [
   {
     id: 1,
     title: "Социально-бытовые",

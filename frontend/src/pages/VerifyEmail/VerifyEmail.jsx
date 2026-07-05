@@ -3,8 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import authService from '../../services/authService'
 import './VerifyEmail.scss'
+import useBrandFont from "../../hooks/useBrandFont";
 
 const VerifyEmail = () => {
+  useBrandFont();
   const navigate = useNavigate()
   const location = useLocation()
 

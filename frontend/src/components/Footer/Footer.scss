@@ -51,6 +51,7 @@
   display: block;
 }
 
+
 .footer__socials {
   display: flex;
   gap: 12px;
@@ -172,6 +173,24 @@
   &:hover {
     color: rgba(255, 255, 255, 0.9);
   }
+}
+
+/* Developer credit — bottom bar, to the right of the privacy link */
+.footer__author {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.2s;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.9);
+  }
+}
+
+.footer__author-heart {
+  font-size: 12px;
+  vertical-align: middle;
 }
 
 /* НЕМНОГО СЖИМАЕМ */

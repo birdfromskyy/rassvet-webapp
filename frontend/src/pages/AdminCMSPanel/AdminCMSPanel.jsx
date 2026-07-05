@@ -23,6 +23,7 @@ import {
   Work as VacanciesIcon,
 } from "@mui/icons-material";
 
+import useBrandFont from "../../hooks/useBrandFont";
 import "./AdminCMSPanel.scss";
 
 const GROUPS = [
@@ -77,6 +78,7 @@ const ALL_MODULES = GROUPS.flatMap(g => g.modules);
 function AdminCMSPanel() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  useBrandFont();
 
   const query = search.toLowerCase().trim();
 

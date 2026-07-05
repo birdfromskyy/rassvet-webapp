@@ -6,6 +6,7 @@ import documentService from '../../services/documentService'
 import questionnaireService from '../../services/questionnaireService'
 import consultationService from '../../services/consultationService'
 import './Profile.scss'
+import useBrandFont from '../../hooks/useBrandFont'
 
 import Header from '../../components/Header/Header'
 import Footer from '../../components/Footer/Footer'
@@ -177,6 +178,7 @@ const FileDropZone = ({ label, files, existingFiles, onAdd, onRemoveExisting, on
 
 // ── Main component ────────────────────────────────────────────────────────────
 const Profile = ({ user, onUpdateUser, onLogout }) => {
+  useBrandFont()
   const navigate = useNavigate()
 
   useEffect(() => { document.title = 'Профиль' }, [])
@@ -564,7 +566,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
   }
 
   return (
-    <>
+    <div className="profile-root">
       <Header />
       <main className="profile-page">
         <section className="profile">
@@ -1269,7 +1271,7 @@ const Profile = ({ user, onUpdateUser, onLogout }) => {
         </section>
       </main>
       <Footer />
-    </>
+    </div>
   )
 }
 

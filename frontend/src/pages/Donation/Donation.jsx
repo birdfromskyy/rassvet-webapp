@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
 import { siteSettingService, getUploadUrl } from "../../services/cmsService";
 import { FiAward, FiBook, FiCpu, FiHeart } from "react-icons/fi";
+import useReveal from "../../hooks/useReveal";
+import useBrandFont from "../../hooks/useBrandFont";
 import donationImage from "../../assets/donation.png";
 import "./Donation.scss";
+
+/* Donation page — "Rassvet 2.0" design (Skills/Design2.md).
+   Same data & behaviour: CMS-driven requisites, QR, SberPay number,
+   and copy-to-clipboard buttons. */
 
 const DEFAULTS = {
   donation_recipient: "ИП Якубенок О.А.",
@@ -30,34 +36,40 @@ function CopyButton({ value }) {
   };
 
   return (
-    <button className="donation__copy" onClick={copy} title="Скопировать">
+    <button className="dn-copy" onClick={copy} title="Скопировать" type="button">
       {copied ? "✓" : "⎘"}
     </button>
   );
 }
 
 export default function Donation() {
+  const rootRef = useRef(null);
   const [s, setS] = useState(DEFAULTS);
 
   useEffect(() => {
     document.title = "Поддержать центр";
   }, []);
 
+  useBrandFont();
+
   useEffect(() => {
     Promise.allSettled(KEYS.map((key) => siteSettingService.getByKey(key))).then(
       (results) => {
         const loaded = { ...DEFAULTS };
-
         KEYS.forEach((key, index) => {
-          if (results[index].status === "fulfilled" && results[index].value?.value) {
+          if (
+            results[index].status === "fulfilled" &&
+            results[index].value?.value
+          ) {
             loaded[key] = results[index].value.value;
           }
         });
-
         setS(loaded);
-      }
+      },
     );
   }, []);
+
+  useReveal(rootRef, [s.donation_qr_url]);
 
   const qrUrl = s.donation_qr_url ? getUploadUrl(s.donation_qr_url) : null;
 
@@ -70,120 +82,97 @@ export default function Donation() {
     { label: "Расчётный счёт", value: s.donation_rs },
   ];
 
+  const stories = [
+    { icon: "💬", text: "Кто-то впервые произнёс своё имя и посмотрел маме в глаза" },
+    { icon: "📖", text: "Кто-то научился сидеть за партой и слушать занятие от начала до конца" },
+    { icon: "🤝", text: "Кто-то нашёл здесь первых настоящих друзей" },
+    { icon: "🌱", text: "Кто-то сделал первые шаги к самостоятельности" },
+  ];
+
+  const impact = [
+    { Icon: FiAward, text: "Обучение и повышение квалификации наших специалистов" },
+    { Icon: FiBook, text: "Учебные материалы, игровые и коррекционные пособия" },
+    { Icon: FiCpu, text: "Диагностическое и коррекционное оборудование" },
+    { Icon: FiHeart, text: "Новые программы для детей с разными потребностями" },
+  ];
+
   return (
-    <div className="page page--donation">
+    <div className="donation-page" ref={rootRef}>
       <Header />
 
-      <main className="donation">
-        <div className="page-container donation__container">
-          <section className="donation__hero">
-            <div className="donation__hero-content">
-              <span className="section-badge">Поддержать центр</span>
+      {/* ── Hero (dark) ────────────────────────────────────────── */}
+      <section className="d2-section d2-hero">
+        <div className="d2-hero__glow" aria-hidden="true" />
+        <div className="page-container d2-hero__inner">
+          <div className="d2-hero__content" data-reveal>
+            <span className="d2-tag">Поддержать центр</span>
+            <h1 className="d2-hero__title">Помогите детям найти свой рассвет</h1>
+            <p className="d2-hero__text">
+              Центр «РАСсвет» работает с детьми с расстройством аутистического
+              спектра и другими особенностями развития. Каждый день наши
+              педагоги, логопеды и дефектологи помогают детям делать то, что
+              раньше казалось невозможным — говорить, учиться, дружить, расти.
+            </p>
+          </div>
+          <div className="d2-hero__visual" data-reveal data-reveal-delay="1">
+            <img className="dn-hero-img" src={donationImage} alt="" />
+          </div>
+        </div>
+      </section>
 
-              <h1>Помогите детям найти свой рассвет</h1>
-
-              <p className="donation__hero-lead">
-                Центр «РАСсвет» работает с детьми с расстройством аутистического
-                спектра и другими особенностями развития. Каждый день наши
-                педагоги, логопеды и дефектологи помогают детям делать то, что
-                раньше казалось невозможным — говорить, учиться, дружить, расти.
-              </p>
-
-              <p className="donation__hero-lead">
-                Многие семьи, которые к нам приходят, находятся в сложной
-                жизненной ситуации. Ваша поддержка помогает нам сохранять
-                доступность занятий, развивать программы и быть рядом с теми, кто
-                в нас нуждается.
-              </p>
-            </div>
-
-            <div className="donation__hero-image">
-              <img src={donationImage} alt="" />
-            </div>
-          </section>
-
-          <div className="donation__hero-stories">
-            <div className="donation__story">
-              <span className="donation__story-icon">💬</span>
-              <p>Кто-то впервые произнёс своё имя и посмотрел маме в глаза</p>
-            </div>
-
-            <div className="donation__story">
-              <span className="donation__story-icon">📖</span>
-              <p>
-                Кто-то научился сидеть за партой и слушать занятие от начала до
-                конца
-              </p>
-            </div>
-
-            <div className="donation__story">
-              <span className="donation__story-icon">🤝</span>
-              <p>Кто-то нашёл здесь первых настоящих друзей</p>
-            </div>
-
-            <div className="donation__story">
-              <span className="donation__story-icon">🌱</span>
-              <p>Кто-то сделал первые шаги к самостоятельности</p>
-            </div>
+      {/* ── Stories + payment (light) ──────────────────────────── */}
+      <section className="d2-section d2-section--auto dn-section">
+        <div className="page-container">
+          <div className="dn-stories" data-reveal>
+            {stories.map((story) => (
+              <div className="dn-story" key={story.text}>
+                <span className="dn-story__icon">{story.icon}</span>
+                <p>{story.text}</p>
+              </div>
+            ))}
           </div>
 
-          <p className="donation__hero-cta">
-            За каждой из этих историй — месяцы работы, терпение и вера в
-            ребёнка. Ваш вклад делает эти истории возможными.
+          <p className="dn-lead" data-reveal>
+            За каждой из этих историй — месяцы работы, терпение и вера в ребёнка.
+            Ваш вклад делает эти истории возможными.
           </p>
 
-          <section className="donation__content">
-            <div className="donation__card donation__card--qr">
+          <div className="dn-cards" data-reveal>
+            <div className="dn-card">
               <h2>Оплата по QR-коду</h2>
-
-              <p className="donation__card-hint">
-                Откройте приложение СберБанк, нажмите «Оплатить» → «По QR-коду»
-                и наведите камеру. Или просто наведите камеру телефона на код.
+              <p className="dn-card__hint">
+                Откройте приложение СберБанк, нажмите «Оплатить» → «По QR-коду» и
+                наведите камеру. Или просто наведите камеру телефона на код.
               </p>
-
-              <div className="donation__qr-wrap">
+              <div className="dn-qr">
                 {qrUrl ? (
-                  <img
-                    src={qrUrl}
-                    alt="QR-код для оплаты"
-                    className="donation__qr-img"
-                  />
+                  <img src={qrUrl} alt="QR-код для оплаты" />
                 ) : (
-                  <div className="donation__qr-placeholder">
-                    QR-код
-                    <br />
-                    загружается в CMS
-                  </div>
+                  <div className="dn-qr__placeholder">QR-код загружается в CMS</div>
                 )}
               </div>
-
               {s.donation_sberpay_number && (
-                <div className="donation__sberpay">
-                  <span className="donation__sberpay-label">Номер СберПэй</span>
-
-                  <div className="donation__sberpay-value">
+                <div className="dn-sberpay">
+                  <span className="dn-sberpay__label">Номер СберПэй</span>
+                  <span className="dn-sberpay__value">
                     <strong>{s.donation_sberpay_number}</strong>
                     <CopyButton value={s.donation_sberpay_number} />
-                  </div>
+                  </span>
                 </div>
               )}
             </div>
 
-            <div className="donation__card donation__card--req">
+            <div className="dn-card">
               <h2>Банковские реквизиты</h2>
-
-              <p className="donation__card-hint">
+              <p className="dn-card__hint">
                 Для перевода через мобильный банк или интернет-банк любого банка.
-                Нажмите <span className="donation__copy-hint">⎘</span>, чтобы
-                скопировать.
+                Нажмите <span className="dn-copy-hint">⎘</span>, чтобы скопировать.
               </p>
-
-              <div className="donation__req-list">
+              <div className="dn-req">
                 {requisites.map(({ label, value }) => (
-                  <div className="donation__req-row" key={label}>
-                    <span className="donation__req-label">{label}</span>
-
-                    <span className="donation__req-value">
+                  <div className="dn-req__row" key={label}>
+                    <span className="dn-req__label">{label}</span>
+                    <span className="dn-req__value">
                       {value}
                       <CopyButton value={value} />
                     </span>
@@ -191,52 +180,32 @@ export default function Donation() {
                 ))}
               </div>
             </div>
-          </section>
+          </div>
 
-          <section className="donation__impact">
-            <h2>Куда идут ваши средства</h2>
-
-            <div className="donation__impact-grid">
-              {[
-                {
-                  Icon: FiAward,
-                  text: "Обучение и повышение квалификации наших специалистов",
-                },
-                {
-                  Icon: FiBook,
-                  text: "Учебные материалы, игровые и коррекционные пособия",
-                },
-                {
-                  Icon: FiCpu,
-                  text: "Диагностическое и коррекционное оборудование",
-                },
-                {
-                  Icon: FiHeart,
-                  text: "Новые программы для детей с разными потребностями",
-                },
-              ].map(({ Icon, text }) => (
-                <div className="donation__impact-item" key={text}>
-                  <span className="donation__impact-icon">
+          <div className="dn-impact" data-reveal>
+            <h2 className="d2-h2">Куда идут ваши средства</h2>
+            <div className="dn-impact__grid">
+              {impact.map(({ Icon, text }) => (
+                <div className="dn-impact__item" key={text}>
+                  <span className="dn-impact__icon">
                     <Icon />
                   </span>
-
                   <p>{text}</p>
                 </div>
               ))}
             </div>
-          </section>
+          </div>
 
-          <section className="donation__closing">
+          <div className="dn-closing" data-reveal>
             <p>
               Спасибо, что думаете о наших детях. Любая помощь — это шаг к тому,
               чтобы каждый ребёнок мог раскрыться в своём темпе и почувствовать
               себя увиденным.
             </p>
-
-            <p>— Команда центра «РАСсвет»</p>
-          </section>
+            <p className="dn-closing__sign">— Команда центра «РАСсвет»</p>
+          </div>
         </div>
-      </main>
+      </section>
 
       <Footer />
     </div>

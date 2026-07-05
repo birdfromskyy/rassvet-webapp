@@ -1,4 +1,5 @@
 import "./AdminModule.scss";
+import useBrandFont from '../hooks/useBrandFont'
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -46,6 +47,7 @@ import scheduleService from "../services/scheduleService";
 const EMPTY_ROOM = { name: "", is_active: true };
 
 const AdminRooms = () => {
+  useBrandFont()
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
   const [allSubjects, setAllSubjects] = useState([]);

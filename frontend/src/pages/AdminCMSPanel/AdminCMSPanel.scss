@@ -1,283 +1,234 @@
+/* Admin panel menus (/admin/cms and /admin/schedule) —
+   "Rassvet 2.0" design (Skills/Design2.md). Shared by both panels. */
+
+@use "../../styles/design2" as *;
+
 .admin-cms {
   min-height: 100vh;
-  padding: 46px 0 80px;
-  background: #f7f4ec;
-  color: #074462;
+  background: $paper;
+  color: $ink;
+  font-family: $font;
+  padding-bottom: 72px;
 }
 
 .admin-cms__container {
-  width: min(100% - 48px, 1400px);
+  width: min(100% - 40px, 1400px);
   margin: 0 auto;
 }
 
+/* ---- dark hero band ---------------------------------------- */
+
 .admin-cms__hero {
-  margin-bottom: 36px;
-
+  position: relative;
   display: flex;
+  align-items: flex-end;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 28px;
-
-  padding: 38px;
-
-  border-radius: 34px;
-  background: #ffffff;
-
-  box-shadow: 0 18px 42px rgba(7, 68, 98, 0.1);
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 24px auto 28px;
+  padding: 44px clamp(24px, 3vw, 44px);
+  border-radius: 28px;
+  background:
+    radial-gradient(60% 120% at 90% -20%, rgba(11, 95, 136, 0.5), transparent 70%),
+    $night;
+  color: #ffffff;
+  overflow: hidden;
 
   h1 {
-    margin: 18px 0 16px;
-
-    font-family: "Merriweather", serif;
-    font-size: clamp(42px, 5vw, 68px);
-    line-height: 0.95;
-
-    color: #074462;
+    margin: 16px 0 10px;
+    font-size: clamp(28px, 3vw, 42px);
+    font-weight: 800;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
   }
 
   p {
-    max-width: 760px;
     margin: 0;
-
-    color: #55707f;
-    font-size: 19px;
+    max-width: 640px;
+    font-size: clamp(15px, 1.3vw, 18px);
     line-height: 1.55;
+    color: rgba(255, 255, 255, 0.78);
   }
 }
 
-.admin-cms__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 9px 18px;
-
-  border-radius: 999px;
-
-  background: #f4df00;
-  color: #074462;
-
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.admin-cms__back {
-  min-height: 46px;
-
+.admin-cms__badge,
+.admin-cms__badge--schedule {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-
-  padding: 0 20px;
-
-  border: 2px solid #074462;
+  padding: 7px 15px;
   border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 
+  &::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: $yellow;
+  }
+}
+
+.admin-cms__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-cms__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 14px;
   background: transparent;
-  color: #074462;
-
-  font-weight: 800;
+  color: #ffffff;
+  font-family: $font;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
 
-  white-space: nowrap;
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+
+  svg {
+    font-size: 20px;
+  }
+}
+
+/* ---- search ------------------------------------------------ */
+
+.admin-cms__search {
+  margin: 0 0 24px;
+
+  input {
+    width: min(100%, 480px);
+    height: 52px;
+    padding: 0 20px;
+    border: 1.5px solid rgba(7, 68, 98, 0.16);
+    border-radius: 16px;
+    background: #ffffff;
+    color: $ink;
+    font-family: $font;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s ease;
+
+    &::placeholder {
+      color: #9fb1bd;
+    }
+
+    &:focus {
+      border-color: $ink;
+    }
+  }
+}
+
+/* ---- groups + grid ----------------------------------------- */
+
+.admin-cms__group {
+  margin-bottom: 32px;
+}
+
+.admin-cms__group-title {
+  margin: 0 0 16px;
+  font-size: clamp(18px, 1.6vw, 22px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: $ink;
 }
 
 .admin-cms__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
 }
 
 .admin-cms-card {
-  min-height: 260px;
-
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-
+  gap: 6px;
   padding: 26px;
-
-  border-radius: 30px;
-
+  border-radius: 22px;
   background: #ffffff;
-
-  box-shadow: 0 14px 34px rgba(7, 68, 98, 0.08);
-
-  transition: 0.25s ease;
+  border: 1px solid $border;
+  box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 22px 44px rgba(7, 68, 98, 0.14);
-  }
-
-  button {
-    margin-top: auto;
-
-    min-height: 46px;
-
-    padding: 0 22px;
-
-    border: none;
-    border-radius: 999px;
-
-    background: #f4df00;
-    color: #074462;
-
-    font-weight: 900;
-    cursor: pointer;
+    box-shadow: 0 20px 42px rgba(7, 68, 98, 0.12);
   }
 }
 
 .admin-cms-card__icon {
-  width: 66px;
-  height: 66px;
-
-  margin-bottom: 22px;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
-  border-radius: 22px;
-
-  background: rgba(244, 223, 0, 0.45);
-
-  color: #074462;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 12px;
+  border-radius: 16px;
+  background: rgba(244, 223, 0, 0.24);
+  color: $ink;
 
   svg {
-    font-size: 34px;
+    font-size: 28px;
   }
 }
 
 .admin-cms-card__content {
+  flex: 1;
+
   h2 {
-    margin: 0 0 12px;
-
-    font-family: "Merriweather", serif;
-    font-size: 24px;
-    line-height: 1.15;
-
-    color: #074462;
+    margin: 0 0 8px;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: $ink;
   }
 
   p {
-    margin: 0 0 22px;
-
-    color: #55707f;
-    font-size: 15px;
+    margin: 0;
+    font-size: 14.5px;
     line-height: 1.55;
+    color: $muted;
   }
 }
 
-@media (max-width: 1200px) {
-  .admin-cms__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.admin-cms-card button {
+  align-self: flex-start;
+  min-height: 44px;
+  margin-top: 18px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 999px;
+  background: $yellow;
+  color: $ink;
+  font-family: $font;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(244, 223, 0, 0.3);
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 640px) {
   .admin-cms__hero {
-    flex-direction: column;
-    padding: 28px;
+    padding: 32px 24px;
   }
-
-  .admin-cms__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .admin-cms__back {
-    width: fit-content;
-  }
-}
-
-@media (max-width: 560px) {
-  .admin-cms {
-    padding: 28px 0 56px;
-  }
-
-  .admin-cms__container {
-    width: min(100% - 28px, 1400px);
-  }
-
-  .admin-cms__hero {
-    padding: 22px;
-    border-radius: 24px;
-
-    h1 {
-      font-size: 36px;
-    }
-
-    p {
-      font-size: 16px;
-    }
-  }
-
-  .admin-cms__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-cms-card {
-    min-height: auto;
-    padding: 22px;
-    border-radius: 24px;
-  }
-}
-
-.admin-cms__search {
-  width: 100%;
-  margin-bottom: 30px;
-
-  input {
-    width: 100%;
-    height: 52px;
-    padding: 0 20px;
-
-    border: 2px solid rgba(7, 68, 98, 0.16);
-    border-radius: 10px;
-
-    background: #ffffff;
-    color: #074462;
-
-    font-size: 16px;
-    font-weight: 700;
-
-    outline: none;
-
-    &:focus {
-      border-color: #074462;
-      background: #ffffff;
-    }
-
-    &::placeholder {
-      color: rgba(7, 68, 98, 0.55);
-    }
-  }
-}
-/* ── Grouped layout ── */
-.admin-cms__group {
-  margin-bottom: 40px;
-
-  &:last-child { margin-bottom: 0; }
-}
-
-.admin-cms__group-title {
-  font-family: "Merriweather", serif;
-  font-size: 18px;
-  font-weight: 700;
-  color: #074462;
-  margin: 0 0 18px;
-  padding-left: 4px;
-  border-left: 4px solid #f4df00;
-  padding-left: 14px;
-}
-
-/* Schedule panel badge */
-.admin-cms__badge--schedule {
-  background: #e8f4fd;
-  color: #074462;
-}
-
-/* Actions container for back button alignment */
-.admin-cms__actions {
-  flex-shrink: 0;
 }

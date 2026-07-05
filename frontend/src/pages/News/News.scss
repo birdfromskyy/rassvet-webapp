@@ -1,344 +1,219 @@
+/* /news — "Rassvet 2.0" design (Skills/Design2.md).
+   Reuses the shared <NewsCard>, restyled within this page's scope. */
+
+@use "../../styles/design2" as *;
+
 .news-page {
-  background: #f7f4ec;
-  min-height: 100vh;
-}
+  @include design2-base;
 
-.news {
-  padding: 48px 0 80px;
-}
-
-.news__hero {
-  display: block;
-  text-align: center;
-  gap: 20px;
-  margin-bottom: 36px;
-}
-
-.news__title {
-  margin: 10px 0 0;
-  font-family: "Merriweather", serif;
-  font-size: clamp(38px, 5vw, 68px);
-  line-height: 0.95;
-
-  color: #074462;
-}
-
-.news__subtitle {
-  margin: 20px 0 0;
-
-  color: #1f678f;
-  font-size: 20px;
-  line-height: 1.5;
-}
-
-.news__back {
-  border: 2px solid #074462;
-  background: transparent;
-  color: #074462;
-
-  border-radius: 999px;
-
-  padding: 14px 24px;
-
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.news__filters {
-  display: grid;
-  grid-template-columns: 1fr 260px 170px;
-
-  gap: 18px;
-
-  margin-bottom: 40px;
-}
-
-.news__search input,
-.news__select select {
-  width: 100%;
-  height: 58px;
-
-  border: 2px solid rgba(7, 68, 98, 0.14);
-  border-radius: 18px;
-
-  background: #ffffff;
-
-  padding: 0 18px;
-
-  font-size: 16px;
-  color: #074462;
-
-  outline: none;
-}
-
-.news__search-btn {
-  border: none;
-  border-radius: 18px;
-
-  background: #f7df00;
-  color: #074462;
-
-  font-size: 16px;
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-.news__layout {
-  display: block;
-}
-
-.news__grid {
-  display: grid;
-
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-
-  gap: 28px;
-
-  width: 100%;
-}
-
-.news__sidebar-card {
-  position: sticky;
-  top: 100px;
-
-  background: #ffffff;
-
-  border-radius: 28px;
-
-  padding: 24px;
-
-  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.12);
-}
-
-.news__sidebar-card h2 {
-  margin: 0 0 20px;
-
-  color: #074462;
-  font-size: 24px;
-}
-
-.news__pagination {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-
-  margin-top: 42px;
-}
-
-.news__pagination button {
-  width: 48px;
-  height: 48px;
-
-  border: none;
-  border-radius: 14px;
-
-  background: #ffffff;
-  color: #074462;
-
-  font-weight: 700;
-
-  cursor: pointer;
-}
-
-.news__pagination button.is-active {
-  background: #f7df00;
-}
-
-.news__state {
-  background: #ffffff;
-
-  border-radius: 28px;
-
-  padding: 50px 32px;
-
-  text-align: center;
-
-  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.12);
-}
-
-.news__state h3 {
-  margin: 0 0 12px;
-
-  color: #074462;
-  font-size: 28px;
-}
-
-.news__state p {
-  margin: 0;
-
-  color: #55707f;
-  font-size: 16px;
-}
-
-.news__state--error h3 {
-  color: #d64545;
-}
-
-@media (max-width: 1100px) {
-  .news__layout {
-    grid-template-columns: 1fr;
+  /* Compact hero band (like /support, /consultation-request) instead of
+     a full screen, so the news grid + search results sit right below. */
+  .d2-hero {
+    min-height: auto;
+    padding: 140px 0 52px;
   }
 
-  .news__sidebar-card {
-    position: static;
-  }
-}
-
-@media (max-width: 900px) {
-  .news__hero {
-    flex-direction: column;
+  .d2-hero__inner--solo {
+    max-width: 720px;
   }
 
-  .news__filters {
-    grid-template-columns: 1fr;
+  /* ---- live search (inside the compact dark hero) ---------- */
+
+  .np-search {
+    max-width: 480px;
+    margin-top: 30px;
   }
 
-  .news__grid {
-    grid-template-columns: 1fr;
-  }
-}
+  .np-search__field {
+    position: relative;
+    display: flex;
+    align-items: center;
 
-@media (max-width: 560px) {
-  .news {
-    padding: 32px 0 56px;
-  }
-
-  .news__container {
-    width: min(100% - 28px, 1180px);
-  }
-
-  .news__subtitle {
-    font-size: 17px;
-  }
-
-  .news__back {
-    width: 100%;
-  }
-
-  .news__sidebar-card,
-  .news__state {
-    padding: 20px;
-    border-radius: 22px;
-  }
-}
-
-.news__search {
-  position: relative;
-}
-
-.news__search input {
-  padding-right: 46px;
-}
-
-.news__clear {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-
-  width: 28px;
-  height: 28px;
-
-  border: none;
-  border-radius: 50%;
-
-  background: rgba(7, 68, 98, 0.1);
-  color: #074462;
-
-  font-size: 22px;
-  line-height: 1;
-
-  cursor: pointer;
-}
-
-.news__clear:hover {
-  background: rgba(7, 68, 98, 0.18);
-}
-
-.news__select {
-  position: relative;
-
-  select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-
-    min-width: 240px;
-    height: 54px;
-
-    padding: 0 52px 0 20px;
-
-    border: 1px solid rgba(7, 68, 98, 0.12);
-    border-radius: 18px;
-
-    background: #ffffff;
-
-    color: #074462;
-
-    font-size: 15px;
-    font-weight: 700;
-
-    cursor: pointer;
-
-    transition: 0.2s ease;
-
-    box-shadow: 0 10px 24px rgba(7, 68, 98, 0.06);
-
-    &:hover {
-      border-color: rgba(7, 68, 98, 0.25);
-    }
-
-    &:focus {
+    input {
+      width: 100%;
+      height: 54px;
+      padding: 0 44px 0 46px;
+      border-radius: 16px;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 16px;
       outline: none;
+      transition: border-color 0.2s ease, background 0.2s ease;
 
-      border-color: #f4df00;
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+      }
 
-      box-shadow:
-        0 0 0 4px rgba(244, 223, 0, 0.25),
-        0 10px 24px rgba(7, 68, 98, 0.06);
+      &:focus {
+        border-color: $yellow;
+        background: rgba(255, 255, 255, 0.12);
+      }
     }
   }
 
-  &::after {
-    content: "";
-
+  .np-search__icon {
     position: absolute;
-
+    left: 16px;
     top: 50%;
-    right: 20px;
-
-    width: 10px;
-    height: 10px;
-
-    border-right: 2px solid #074462;
-    border-bottom: 2px solid #074462;
-
-    transform:
-      translateY(-60%)
-      rotate(45deg);
-
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.6);
     pointer-events: none;
   }
-}
 
-@media (max-width: 700px) {
-  .news__select {
-    width: 100%;
+  .np-search__clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
 
-    select {
-      width: 100%;
-      min-width: unset;
+    &:hover {
+      background: rgba(255, 255, 255, 0.25);
     }
   }
-}
 
-.news__select select option {
-  background: #ffffff;
-  color: #074462;
+  /* ---- grid ------------------------------------------------- */
 
-  font-size: 15px;
-  font-weight: 600;
+  .np-section {
+    background: $paper;
+  }
 
-  padding: 12px;
+  .np-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 22px;
+  }
+
+  .np-cell {
+    display: flex;
+  }
+
+  /* ---- NewsCard restyle (scoped) ---------------------------- */
+
+  .news-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.06);
+    cursor: pointer;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 22px 46px rgba(7, 68, 98, 0.12);
+    }
+  }
+
+  .news-card__image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: $paper;
+  }
+
+  .news-card__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 22px 24px 20px;
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      color: $ink;
+    }
+
+    p {
+      margin: 0 0 16px;
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: $muted;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  .news-card__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: auto;
+    font-size: 13px;
+    color: $muted;
+  }
+
+  .news-card__link {
+    align-self: flex-start;
+    margin-top: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(244, 223, 0, 0.24);
+    color: $ink;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: $yellow;
+    }
+  }
+
+  /* ---- pagination ------------------------------------------- */
+
+  .np-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 36px;
+
+    button {
+      min-width: 44px;
+      height: 44px;
+      padding: 0 12px;
+      border: 1.5px solid rgba(7, 68, 98, 0.18);
+      border-radius: 12px;
+      background: #ffffff;
+      color: $ink;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+
+      &:hover {
+        border-color: $ink;
+      }
+
+      &.is-active {
+        background: $ink;
+        border-color: $ink;
+        color: #ffffff;
+      }
+    }
+  }
 }

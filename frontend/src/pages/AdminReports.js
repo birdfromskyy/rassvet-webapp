@@ -1,4 +1,5 @@
 import './AdminModule.scss'
+import useBrandFont from '../hooks/useBrandFont'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ExcelJS from 'exceljs'
@@ -25,6 +26,11 @@ import scheduleService from '../services/scheduleService'
 const ALL_OPTION = { id: '', full_name: 'Все' }
 const pad = n => String(n).padStart(2, '0')
 const isoDate = date => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+// ISO "YYYY-MM-DD" → "DD.MM.YYYY" for display
+const displayDate = iso => {
+	const [y, m, d] = String(iso || '').split('-')
+	return d && m && y ? `${d}.${m}.${y}` : (iso || '-')
+}
 const ruSort = (a = '', b = '') => String(a).localeCompare(String(b), 'ru')
 
 const lessonTypeLabel = type => (type === 'group' ? 'Групповое' : 'Индивидуальное')
@@ -126,7 +132,7 @@ const addLessonsSection = (ws, lessons) => {
 	styleHeaderRow(header)
 	lessons.forEach(lesson => {
 		const dr = ws.addRow([
-			lesson.date, `${lesson.start_time}-${lesson.end_time}`, `${lesson.duration_min} мин`,
+			displayDate(lesson.date), `${lesson.start_time}-${lesson.end_time}`, `${lesson.duration_min} мин`,
 			lessonTypeLabel(lesson.slot_type), lessonPersonLabel(lesson) || '-',
 			lesson.subject_name || '-', lesson.room_name || '-', lesson.teacher_name || '-',
 		])
@@ -168,7 +174,7 @@ const addStudentLessons = (ws, lessons) => {
 	styleHeaderRow(header)
 	lessons.forEach(lesson => {
 		const dr = ws.addRow([
-			lesson.date, `${lesson.start_time}-${lesson.end_time}`, `${lesson.duration_min} мин`,
+			displayDate(lesson.date), `${lesson.start_time}-${lesson.end_time}`, `${lesson.duration_min} мин`,
 			lessonTypeLabel(lesson.slot_type), lessonPersonLabel(lesson) || '-',
 			lesson.subject_name || '-', lesson.room_name || '-', lesson.teacher_name || '-',
 		])
@@ -179,6 +185,7 @@ const addStudentLessons = (ws, lessons) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const AdminReports = () => {
+  useBrandFont()
 	const navigate = useNavigate()
 	const today = new Date()
 
@@ -463,7 +470,7 @@ const AdminReports = () => {
 								<TableBody>
 									{lessons.map((lesson, index) => (
 										<TableRow key={`${lesson.date}-${lesson.start_time}-${index}`}>
-											<TableCell>{lesson.date}</TableCell>
+											<TableCell>{displayDate(lesson.date)}</TableCell>
 											<TableCell>{lesson.start_time}–{lesson.end_time}</TableCell>
 											<TableCell align='center'>{lesson.duration_min} мин</TableCell>
 											<TableCell>{lessonTypeLabel(lesson.slot_type)}</TableCell>

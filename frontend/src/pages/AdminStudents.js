@@ -1,4 +1,5 @@
 import "./AdminModule.scss";
+import useBrandFont from '../hooks/useBrandFont'
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -55,6 +56,7 @@ const EMPTY_STUDENT = { full_name: "", is_active: true };
 const EMPTY_AVAIL = { weekday: 1, start_time: "09:00", end_time: "18:00" };
 
 const AdminStudents = () => {
+  useBrandFont()
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);

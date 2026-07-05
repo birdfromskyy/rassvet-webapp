@@ -1,4 +1,5 @@
 import "./AdminModule.scss";
+import useBrandFont from '../hooks/useBrandFont'
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -42,6 +43,7 @@ import scheduleService from "../services/scheduleService";
 const EMPTY = { name: "", default_duration_min: 50, is_active: true };
 
 const AdminSubjects = () => {
+  useBrandFont()
   const navigate = useNavigate();
   const [subjects, setSubjects] = useState([]);
   const [loading, setLoading] = useState(true);

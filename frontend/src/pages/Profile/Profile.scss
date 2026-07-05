@@ -759,3 +759,203 @@
     align-items: flex-start;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Rassvet 2.0 rebrand — appended overrides (colors / surfaces / fonts).
+   Layout above is preserved; this block only restyles the look to match
+   Skills/Design2.md. JSX/logic untouched.
+   ═══════════════════════════════════════════════════════════════════ */
+
+$rv-ink: #074462;
+$rv-night: #052c40;
+$rv-paper: #f7f4ec;
+$rv-yellow: #f4df00;
+$rv-muted: #55707f;
+$rv-content: #2a4050;
+$rv-border: rgba(7, 68, 98, 0.1);
+$rv-font: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+.profile-page {
+  background: $rv-paper;
+  font-family: $rv-font;
+  padding-bottom: 72px;
+}
+
+/* header → dark rounded band */
+.profile__header {
+  margin-top: 24px;
+  padding: 36px clamp(24px, 3vw, 44px);
+  border-radius: 28px;
+  background:
+    radial-gradient(60% 120% at 90% -20%, rgba(11, 95, 136, 0.5), transparent 70%),
+    $rv-night;
+  color: #ffffff;
+}
+
+.profile__title {
+  color: #ffffff;
+  font-family: $rv-font;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.profile__subtitle {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* cards / surfaces */
+.profile__card,
+.child-card,
+.doc-zone,
+.consult-card,
+.docs-card,
+.questionnaire-info,
+.profile-danger-zone {
+  background: #ffffff;
+  border: 1px solid $rv-border;
+  border-radius: 22px;
+  box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+  font-family: $rv-font;
+}
+
+.doc-zone__item,
+.doc-zone__item--new,
+.consult-card__note,
+.child-card__note {
+  background: $rv-paper;
+  border-radius: 14px;
+}
+
+/* section headings */
+.profile__section > h2,
+.profile__section > h3,
+.docs-section-head,
+.child-card__name,
+.consult-card__header {
+  color: $rv-ink;
+  font-family: $rv-font;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* inputs */
+.profile-page input,
+.profile-page select,
+.profile-page textarea {
+  border: 1.5px solid rgba(7, 68, 98, 0.16);
+  border-radius: 14px;
+  background: $rv-paper;
+  color: $rv-ink;
+  font-family: $rv-font;
+
+  &:focus {
+    border-color: $rv-ink;
+    background: #ffffff;
+    outline: none;
+  }
+}
+
+.profile__field > span,
+.profile__field > label,
+.doc-zone__label {
+  color: $rv-ink;
+  font-weight: 700;
+}
+
+/* primary buttons → yellow */
+.profile__save,
+.profile__cta-btn,
+.child-add-btn,
+.child-form__actions button[type="submit"] {
+  background: $rv-yellow !important;
+  color: $rv-ink !important;
+  border: none !important;
+  border-radius: 14px !important;
+  font-family: $rv-font !important;
+  font-weight: 800 !important;
+}
+
+/* secondary / ghost buttons */
+.profile__save--ghost,
+.profile__cta-btn--secondary,
+.child-card__edit {
+  background: transparent !important;
+  color: $rv-ink !important;
+  border: 1.5px solid rgba(7, 68, 98, 0.28) !important;
+  border-radius: 14px !important;
+  font-family: $rv-font !important;
+  font-weight: 700 !important;
+}
+
+/* file links */
+.child-card__filelink,
+.doc-zone__filename {
+  color: #0b5f88;
+}
+
+/* danger zone */
+.profile-danger-zone {
+  border-color: rgba(232, 104, 74, 0.35);
+}
+
+.profile-danger-zone__title {
+  color: #c0472c;
+  font-family: $rv-font;
+  font-weight: 800;
+}
+
+.profile-danger-zone__btn,
+.profile__delete-btn,
+.child-card__delete,
+.doc-zone__remove {
+  background: rgba(232, 104, 74, 0.12) !important;
+  color: #c0472c !important;
+  border: 1px solid rgba(232, 104, 74, 0.3) !important;
+  border-radius: 12px !important;
+  font-family: $rv-font !important;
+  font-weight: 700 !important;
+}
+
+/* notices / hints */
+.profile__notice,
+.docs-hint,
+.docs-small-hint,
+.doc-zone__hint {
+  color: $rv-muted;
+}
+
+.docs-hint--warn {
+  color: #c0472c;
+}
+
+.docs-count {
+  background: rgba(244, 223, 0, 0.3);
+  color: $rv-ink;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+/* header → opaque + fixed + Manrope (identical to new-design pages) */
+.profile-root .header {
+  background: #f3efe3;
+  font-family: $rv-font;
+}
+.profile-root .header--hidden {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (min-width: 993px) {
+  .profile-root .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+  .profile-root .profile-page {
+    padding-top: 150px;
+  }
+  .profile-root .profile__header {
+    margin-top: 0;
+  }
+}

@@ -1,157 +1,127 @@
+/* /privacy — "Rassvet 2.0" design (Skills/Design2.md). */
+@use "../../styles/design2" as *;
+
 .privacy-page {
-  padding: 60px 0 80px;
-  background: #f7f4ec;
-  min-height: calc(100vh - 120px);
+  min-height: 100vh;
+  background: $paper;
+  color: $ink;
+  font-family: $font;
+  padding: 48px 0 80px;
 
-  &__content {
-    max-width: 860px;
-    margin: 0 auto;
-    background: #fff;
-    border-radius: 16px;
-    padding: 48px 56px;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  .page-container { width: min(94%, 980px); }
+}
 
-    @media (max-width: 700px) {
-      padding: 28px 20px;
-    }
+.privacy-page__content {
+  padding: clamp(28px, 4vw, 56px);
+  border-radius: 28px;
+  background: #ffffff;
+  border: 1px solid $border;
+  box-shadow: 0 20px 46px rgba(7, 68, 98, 0.08);
 
-    h1 {
-      font-size: 28px;
-      font-weight: 800;
-      color: #074462;
-      margin-bottom: 6px;
-    }
+  h1 {
+    margin: 0 0 8px;
+    font-size: clamp(28px, 3.4vw, 44px);
+    font-weight: 800;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+    color: $ink;
+  }
 
-    h2 {
-      font-size: 18px;
-      font-weight: 700;
-      color: #074462;
-      margin: 36px 0 12px;
-    }
+  h2 {
+    margin: 34px 0 12px;
+    padding-top: 22px;
+    border-top: 1px solid $border;
+    font-size: clamp(19px, 1.8vw, 24px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $ink;
+  }
 
-    h3 {
-      font-size: 15px;
-      font-weight: 700;
-      color: #333;
-      margin: 20px 0 8px;
-    }
+  h2:first-of-type { border-top: none; padding-top: 0; }
 
-    p {
-      font-size: 15px;
-      color: #444;
-      line-height: 1.7;
-      margin-bottom: 12px;
-    }
+  p, li {
+    font-size: 15.5px;
+    line-height: 1.7;
+    color: $content;
+  }
 
-    ul {
-      padding-left: 20px;
-      margin-bottom: 12px;
+  ul, ol { padding-left: 22px; margin: 0 0 14px; }
+  li { margin-bottom: 6px; }
 
-      li {
-        font-size: 15px;
-        color: #444;
-        line-height: 1.7;
-        margin-bottom: 6px;
-      }
-    }
+  /* Emphasised links: red underline for accent. */
+  a {
+    color: $ink;
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-color: #d64530;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
 
-    section {
-      border-top: 1px solid #eee;
-      padding-top: 8px;
-
-      &:first-of-type {
-        border-top: none;
-      }
-    }
-
-    a {
-      color: #c84b31;
-      text-decoration: underline;
-      &:hover { text-decoration: none; }
+    &:hover {
+      color: #d64530;
     }
   }
 
-  &__updated {
-    font-size: 13px;
-    color: #888;
-    margin-bottom: 24px;
+  strong { color: $ink; }
+}
+
+/* header → opaque + fixed + Manrope (identical to new-design pages) */
+.privacy-root .header {
+  background: #f3efe3;
+  font-family: $font;
+}
+.privacy-root .header--hidden {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (min-width: 993px) {
+  .privacy-root .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
   }
-
-  &__table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-    margin-bottom: 16px;
-
-    th {
-      background: #f0f4f8;
-      color: #074462;
-      font-weight: 700;
-      padding: 10px 12px;
-      text-align: left;
-      border: 1px solid #dde3ea;
-    }
-
-    td {
-      padding: 9px 12px;
-      border: 1px solid #dde3ea;
-      color: #444;
-      vertical-align: top;
-      line-height: 1.5;
-    }
-
-    tr:nth-child(even) td {
-      background: #fafafa;
-    }
+  .privacy-root .privacy-page {
+    padding-top: 150px;
   }
 }
 
-/* CMS body — Quill HTML output */
-.privacy-page__cms-body {
-  font-size: 15px;
-  color: #444;
-  line-height: 1.7;
+.privacy-page__updated {
+  display: inline-block;
+  margin: 0 0 20px;
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: rgba(244, 223, 0, 0.24);
+  color: $ink;
+  font-size: 13.5px;
+  font-weight: 700;
+}
 
-  h1, h2, h3 { color: #074462; margin: 28px 0 10px; }
-  h2 { font-size: 18px; font-weight: 700; border-top: 1px solid #eee; padding-top: 8px; }
-  h3 { font-size: 15px; font-weight: 700; }
-  p  { margin-bottom: 10px; }
+.privacy-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0 22px;
+  font-size: 14px;
 
-  ul, ol {
-    padding-left: 20px;
-    margin-bottom: 12px;
-    li { margin-bottom: 5px; }
+  th {
+    background: $night;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 12px 14px;
   }
 
-  strong { color: #222; }
+  th:first-child { border-top-left-radius: 12px; }
+  th:last-child { border-top-right-radius: 12px; }
 
-  a {
-    color: #c84b31;
-    text-decoration: underline;
-    &:hover { text-decoration: none; }
+  td {
+    padding: 11px 14px;
+    border-bottom: 1px solid $border;
+    color: $content;
+    vertical-align: top;
+    line-height: 1.5;
   }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-    margin-bottom: 16px;
-
-    th {
-      background: #f0f4f8;
-      color: #074462;
-      font-weight: 700;
-      padding: 10px 12px;
-      text-align: left;
-      border: 1px solid #dde3ea;
-    }
-
-    td {
-      padding: 9px 12px;
-      border: 1px solid #dde3ea;
-      vertical-align: top;
-    }
-
-    tr:nth-child(even) td { background: #fafafa; }
-  }
+  tr:nth-child(even) td { background: $paper; }
 }

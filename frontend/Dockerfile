@@ -12,6 +12,10 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 ENV NODE_OPTIONS="--max-old-space-size=1536"
+# Do not ship source maps — keeps the original (readable) source out of
+# browser DevTools → Sources. The app still works; only the .map files
+# that reverse the minified bundle are omitted.
+ENV GENERATE_SOURCEMAP=false
 RUN npm run build
 
 # Stage 2 — serve with nginx

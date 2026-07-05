@@ -1,0 +1,12 @@
+/* /docs — "Rassvet 2.0" design (Skills/Design2.md).
+   File cards come from the shared `d2-files` / `d2-file` set. */
+
+@use "../../styles/design2" as *;
+
+.docs-page {
+  @include design2-base;
+
+  .dp-section {
+    background: $paper;
+  }
+}

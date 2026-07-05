@@ -92,13 +92,14 @@
 }
 
 .header__nav-link {
+  position: relative;
   min-width: auto;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 0 2px;
+  padding: 0 2px 6px;
   border: none;
   background: transparent;
   color: #074462;
@@ -120,10 +121,26 @@
 }
 
 .header__nav-link:hover,
-.header__nav-link.active,
 .header__nav-item.is-open .header__nav-link--trigger {
   color: #0b6d9e;
   transform: translateY(-1px);
+}
+
+/* Current page: a soft yellow highlight around the item (clearer than a
+   thin underline). box-shadow spread extends the fill without shifting
+   layout. */
+.header__nav-link.active,
+.header__nav-item--active .header__nav-link--trigger {
+  color: #074462;
+  background: rgba(244, 223, 0, 0.42);
+  border-radius: 11px;
+  box-shadow: 0 0 0 6px rgba(244, 223, 0, 0.42);
+}
+
+/* In the open mobile menu the links are full-width rows — no spread. */
+.header__nav.is-open .header__nav-link.active {
+  box-shadow: none;
+  border-radius: 16px;
 }
 
 .header__nav-link--trigger {
@@ -184,6 +201,7 @@
 }
 
 .header__dropdown a {
+  position: relative;
   color: #ffffff;
   text-decoration: none;
   font-size: 15px;
@@ -193,6 +211,24 @@
 
 .header__dropdown a:hover {
   opacity: 0.82;
+}
+
+/* Current sub-page inside the open dropdown: yellow accent + marker. */
+.header__dropdown a.active {
+  color: #f4df00;
+  padding-left: 14px;
+}
+
+.header__dropdown a.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f4df00;
 }
 
 .header__search {
@@ -722,12 +758,26 @@
 }
 
 @media (max-width: 440px) {
-  .header__logo {
-    display: none;
+  /* Keep the logo (home link) visible — just smaller — and make the
+     action buttons compact so everything fits without overflow. */
+  .header__logo img {
+    width: 64px;
   }
 
+  .header__consultation,
   .header__account {
-    display: inline-flex;
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+
+  .header__actions {
+    gap: 4px;
+  }
+
+  .header__burger {
+    width: 32px;
+    height: 32px;
   }
 }
 
@@ -1024,5 +1074,43 @@
 
   .header__dropdown {
     top: calc(100% + 10px);
+  }
+}
+
+/* ── Accessibility mode: huge fonts break the rigid header grid, so
+   let it stack/wrap instead of overlapping. ────────────────────────── */
+body.accessibility-mode {
+  .header__main {
+    grid-template-columns: 1fr;
+    row-gap: 14px;
+    align-items: stretch;
+  }
+
+  .header__center {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    width: 100%;
+  }
+
+  .header__nav {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px 22px;
+  }
+
+  .header__search {
+    width: 100%;
+  }
+
+  .header__actions {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 10px;
+  }
+
+  .header__top {
+    flex-wrap: wrap;
+    gap: 10px 16px;
   }
 }

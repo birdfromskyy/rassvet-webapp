@@ -5,8 +5,10 @@ import { toast } from "react-toastify";
 import authService from "../../services/authService";
 
 import "./Login.scss";
+import useBrandFont from "../../hooks/useBrandFont";
 
 const Login = ({ onLogin }) => {
+  useBrandFont();
   useEffect(() => {
     document.title = "Вход";
   }, []);
@@ -108,6 +110,7 @@ const Login = ({ onLogin }) => {
                     <button
                       type="button"
                       className="login-form__eye"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setShowPassword((v) => !v)}
                       tabIndex={-1}
                       aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}

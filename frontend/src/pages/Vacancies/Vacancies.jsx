@@ -1,9 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
-import { FiBriefcase, FiClock, FiPhone, FiUserCheck } from "react-icons/fi";
+import useReveal from "../../hooks/useReveal";
+import useBrandFont from "../../hooks/useBrandFont";
 import "./Vacancies.scss";
-import { Link } from "react-router-dom";
+
+/* Vacancies page — "Rassvet 2.0" design (Skills/Design2.md).
+   Content unchanged: the same in-page vacancies as before. */
 
 const vacancies = [
   {
@@ -76,10 +80,9 @@ const vacancies = [
 
 function VacancySection({ title, items }) {
   return (
-    <div className="vacancy-card__section">
-      <h3>{title}</h3>
-
-      <ul>
+    <div className="vp-block">
+      <h4 className="vp-block__title">{title}</h4>
+      <ul className="vp-block__list">
         {items.map((item, index) => (
           <li key={index}>{item}</li>
         ))}
@@ -89,70 +92,92 @@ function VacancySection({ title, items }) {
 }
 
 function Vacancies() {
+  const rootRef = useRef(null);
+
   useEffect(() => {
     document.title = "Вакансии";
   }, []);
 
+  useBrandFont();
+  useReveal(rootRef);
+
   return (
-    <div className="page page--vacancies">
+    <div className="vacancies-page" ref={rootRef}>
       <Header />
 
-      <main className="vacancies">
-        <section className="vacancies__hero">
-          <div className="page-container vacancies__hero-inner">
-            <div>
-              <span className="section-badge">Вакансии</span>
-
-              <h1>Станьте частью команды «РАСсвет»</h1>
-
-              <p>
-                Мы ищем специалистов, которые любят детей, готовы развиваться и
-                помогать семьям на пути к новым возможностям.
-              </p>
-            </div>
+      <section className="d2-section d2-hero">
+        <div className="d2-hero__glow" aria-hidden="true" />
+        <div className="page-container d2-hero__inner d2-hero__inner--solo">
+          <div className="d2-hero__content" data-reveal>
+            <span className="d2-tag">Вакансии</span>
+            <h1 className="d2-hero__title">
+              Станьте частью команды «РАСсвет»
+            </h1>
+            <p className="d2-hero__text">
+              Мы ищем специалистов, которые любят детей, готовы развиваться и
+              помогать семьям на пути к новым возможностям.
+            </p>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="vacancies__list">
-          <div className="page-container">
-            <h2 className="vacancies__title">Открытые вакансии</h2>
+      <section className="d2-section d2-section--auto vp-section">
+        <div className="page-container">
+          <div className="d2-head" data-reveal>
+            <span className="d2-tag d2-tag--dark">Открытые вакансии</span>
+            <h2 className="d2-h2">Присоединяйтесь к нам</h2>
+          </div>
 
-            <div className="vacancies__grid">
-              {vacancies.map((vacancy) => (
-                <article className="vacancy-card" key={vacancy.title}>
-                  <div className="vacancy-card__top">
-                    <span>Вакансия</span>
-                    <h2>{vacancy.title}</h2>
-                  </div>
+          <div className="vp-list">
+            {vacancies.map((vacancy) => (
+              <article className="vp-card" key={vacancy.title} data-reveal>
+                <header className="vp-card__head">
+                  <span className="vp-card__badge">Вакансия</span>
+                  <h3>{vacancy.title}</h3>
+                </header>
 
+                <div className="vp-card__body">
                   <VacancySection title="Образование" items={vacancy.education} />
                   <VacancySection title="Опыт" items={vacancy.experience} />
-                  <VacancySection title="Особые требования" items={vacancy.requirements} />
-                  <VacancySection title="Должностные обязанности" items={vacancy.duties} />
-                  <VacancySection title="Пожелания к личным качествам" items={vacancy.qualities} />
-                  <VacancySection title="Условия работы" items={vacancy.conditions} />
-                </article>
-              ))}
-            </div>
+                  <VacancySection
+                    title="Особые требования"
+                    items={vacancy.requirements}
+                  />
+                  <VacancySection
+                    title="Должностные обязанности"
+                    items={vacancy.duties}
+                  />
+                  <VacancySection
+                    title="Пожелания к личным качествам"
+                    items={vacancy.qualities}
+                  />
+                  <VacancySection
+                    title="Условия работы"
+                    items={vacancy.conditions}
+                  />
+                  {vacancy.contact && (
+                    <VacancySection title="Контакты" items={vacancy.contact} />
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
-        </section>
-        <section className="vacancies__contact">
-  <div className="page-container">
-    <div className="vacancies__contact-card">
-      <h2>Заинтересовала вакансия?</h2>
 
-      <p>
-        Свяжитесь с нами любым удобным способом. Мы ответим на ваши вопросы,
-        расскажем подробнее об условиях работы и договоримся о собеседовании.
-      </p>
-
-      <Link to="/contacts" className="vacancies__contact-btn">
-        Перейти в контакты
-      </Link>
-    </div>
-  </div>
-</section>
-      </main>
+          <div className="vp-cta" data-reveal>
+            <div>
+              <h3>Заинтересовала вакансия?</h3>
+              <p>
+                Свяжитесь с нами любым удобным способом. Мы ответим на ваши
+                вопросы, расскажем подробнее об условиях работы и договоримся о
+                собеседовании.
+              </p>
+            </div>
+            <Link to="/contacts" className="d2-btn d2-btn--yellow">
+              Перейти в контакты
+            </Link>
+          </div>
+        </div>
+      </section>
 
       <Footer />
     </div>

@@ -212,7 +212,7 @@ export default function AdminQuestionnaires() {
       <div className="admin-module__container">
         <section className="admin-module__hero">
           <div>
-            <span className="admin-module__badge">Документооборот</span>
+            <span className="admin-module__badge">Анкеты</span>
 
             <h1>{MODULE_TITLE}</h1>
 

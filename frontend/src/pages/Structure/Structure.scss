@@ -1,0 +1,76 @@
+/* /structure — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.structure-page {
+  @include design2-base;
+
+  .sp-section {
+    background: $paper;
+  }
+
+  .sp-frame {
+    display: block;
+    width: 100%;
+    padding: clamp(16px, 3vw, 40px);
+    border: 1px solid $border;
+    border-radius: 28px;
+    background: #ffffff;
+    box-shadow: 0 20px 46px rgba(7, 68, 98, 0.1);
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 28px 60px rgba(7, 68, 98, 0.14);
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+    }
+  }
+
+  .sp-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: rgba(5, 22, 32, 0.92);
+    cursor: zoom-out;
+    overflow: auto;
+
+    img {
+      max-width: min(96vw, 1300px);
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      background: #ffffff;
+      cursor: default;
+    }
+  }
+
+  .sp-lightbox__close {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 46px;
+    height: 46px;
+    border: none;
+    border-radius: 50%;
+    background: #ffffff;
+    color: $ink;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+}

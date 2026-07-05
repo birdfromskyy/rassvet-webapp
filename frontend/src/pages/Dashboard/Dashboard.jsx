@@ -11,6 +11,7 @@ import { isAdmin as isAdminRole, isTeacher as isTeacherRole } from "../../utils/
 import questionnaireService from "../../services/questionnaireService";
 import { siteSettingService, getUploadUrl } from "../../services/cmsService";
 import supportService from "../../services/supportService";
+import useBrandFont from "../../hooks/useBrandFont";
 
 import { toast } from "react-toastify";
 
@@ -400,6 +401,8 @@ const Dashboard = ({ user, onLogout }) => {
   const [childrenLoading, setChildrenLoading] = useState(true);
   const [supportCount, setSupportCount] = useState(0);
 
+  useBrandFont();
+
   useEffect(() => {
     document.title = "Личный кабинет";
   }, []);
@@ -500,7 +503,7 @@ const Dashboard = ({ user, onLogout }) => {
   );
 
   const subtitle = isAdmin
-    ? "Здесь вы можете управлять расписанием, отзывами и контентом сайта."
+    ? "Здесь вы можете управлять расписанием, отзывами, контентом сайта и техподдержкой."
     : isTeacher
     ? "Здесь вы можете просматривать своё расписание занятий."
     : hasChildren
@@ -508,28 +511,41 @@ const Dashboard = ({ user, onLogout }) => {
     : "Загрузите документы, чтобы администрация смогла привязать ребёнка к вашему аккаунту.";
 
   return (
-    <div className="page page--dashboard">
+    <div className="dashboard-page">
       <Header />
 
-      <main className="dashboard">
-        <div className=" page-container">
+      {/* ── Hero (dark band) ── */}
+      <section className="dash-hero">
+        <div className="dash-hero__glow" aria-hidden="true" />
+        <div className="page-container dash-hero__inner">
+          <div>
+            <span className="d2-tag">Личный кабинет</span>
+            <h1 className="dash-hero__title">
+              Здравствуйте,&nbsp;{user?.first_name}!
+            </h1>
+            <p className="dash-hero__subtitle">{subtitle}</p>
+          </div>
+          <div className="dash-hero__actions">
+            <button
+              type="button"
+              className="d2-btn d2-btn--outline-light"
+              onClick={() => navigate("/profile")}
+            >
+              Профиль
+            </button>
+            <button
+              type="button"
+              className="d2-btn d2-btn--yellow"
+              onClick={handleLogout}
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
+      </section>
 
-          {/* ── Hero ── */}
-          <section className="dashboard__hero">
-            <div>
-              <span className="section-badge">Личный кабинет</span>
-              <h1 className="dashboard__title">
-                Здравствуйте,&nbsp;{user?.first_name}!
-              </h1>
-              <p className="dashboard__subtitle">{subtitle}</p>
-            </div>
-            <div className="dashboard__actions">
-              <button onClick={() => navigate("/profile")}>Профиль</button>
-              <button className="dashboard__logout" onClick={handleLogout}>
-                Выйти
-              </button>
-            </div>
-          </section>
+      <main className="dash-body">
+        <div className="page-container">
 
           {/* ── Admin layout: 3 blocks ── */}
           {isAdmin && (

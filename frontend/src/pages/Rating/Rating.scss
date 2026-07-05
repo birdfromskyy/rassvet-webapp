@@ -1,0 +1,11 @@
+/* /rating — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.rating-page {
+  @include design2-base;
+
+  .rating-section {
+    background: $paper;
+  }
+}

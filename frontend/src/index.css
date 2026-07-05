@@ -26,6 +26,15 @@ body,
   min-height: 100%;
 }
 
+/* Prevent any element that slightly exceeds the viewport from letting
+   the page drag left/right on mobile. `clip` (not `hidden`) doesn't
+   create a scroll container, so sticky/fixed headers keep working. */
+html,
+body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 body {
   background: #f7f4ec;
 }
@@ -167,4 +176,47 @@ body {
   color: #1c1c1c;
   border-color: #ffe96a;
 
+}
+
+/* ── Toast notifications — brand styling (react-toastify) ─────────────── */
+.Toastify__toast {
+  border-radius: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #074462;
+  box-shadow: 0 16px 40px rgba(7, 68, 98, 0.18);
+  border: 1px solid rgba(7, 68, 98, 0.08);
+}
+
+.Toastify__toast-body {
+  color: #074462;
+}
+
+.Toastify__toast--success {
+  background: #ffffff;
+  border-left: 4px solid #2e9e5b;
+}
+
+.Toastify__toast--error {
+  background: #ffffff;
+  border-left: 4px solid #e8684a;
+}
+
+.Toastify__toast--info,
+.Toastify__toast--warning,
+.Toastify__toast--default {
+  background: #ffffff;
+  border-left: 4px solid #f4df00;
+}
+
+.Toastify__progress-bar--success { background: #2e9e5b; }
+.Toastify__progress-bar--error { background: #e8684a; }
+.Toastify__progress-bar {
+  background: #f4df00;
+}
+
+.Toastify__close-button {
+  color: #55707f;
+  opacity: 0.7;
 }

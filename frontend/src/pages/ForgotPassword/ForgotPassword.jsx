@@ -5,10 +5,12 @@ import { toast } from "react-toastify";
 import authService from "../../services/authService";
 
 import "./ForgotPassword.scss";
+import useBrandFont from "../../hooks/useBrandFont";
 
 const steps = ["Email", "Код", "Готово"];
 
 const ForgotPassword = () => {
+  useBrandFont();
   useEffect(() => {
     document.title = "Восстановление пароля";
   }, []);

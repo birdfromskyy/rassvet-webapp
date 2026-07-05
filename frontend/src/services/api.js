@@ -9,6 +9,19 @@ const api = axios.create({
 	timeout: 15000,
 })
 
+// WebKit browsers (Safari on macOS/iOS, and in-app WebViews like MAX)
+// aggressively cache GET responses and can serve a stale one — which
+// shows up as "data didn't load" (e.g. empty user/schedule lists). A
+// unique `_ts` param per GET makes each URL distinct so no cache can
+// match. It's CORS-safe (no custom headers) and the backend ignores
+// unknown query params.
+api.interceptors.request.use(config => {
+	if ((config.method || 'get').toLowerCase() === 'get') {
+		config.params = { ...(config.params || {}), _ts: Date.now() }
+	}
+	return config
+})
+
 // Track whether a refresh is already in flight so concurrent 401s
 // don't each trigger their own refresh — they queue and retry together.
 let isRefreshing = false

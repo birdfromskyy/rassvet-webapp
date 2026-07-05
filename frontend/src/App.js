@@ -5,20 +5,21 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Home from "./pages/Home";
+import NotFound from "./pages/NotFound/NotFound";
 import ScrollToTop from "./components/ScrollToTop/ScrollToTop";
-import ServicesListPage from "./pages/ServicesListPage";
-import Mission from "./pages/Mission";
-import History from "./pages/History";
-import Docs from "./pages/Docs";
-import Employees from "./pages/Employees";
-import AvailablePlaces from "./pages/AvailablePlaces";
-import InternalRules from "./pages/InternalRules";
-import Structure from "./pages/Structure";
-import Rating from "./pages/Rating";
-import ServicesDescription from "./pages/ServicesDescription";
-import Contacts from "./pages/Contacts";
+import ServicesListPage from "./pages/ServicesListPage/ServicesListPage";
+import Mission from "./pages/Mission/Mission";
+import History from "./pages/History/History";
+import Docs from "./pages/Docs/Docs";
+import Employees from "./pages/Employees/Employees";
+import AvailablePlaces from "./pages/AvailablePlaces/AvailablePlaces";
+import InternalRules from "./pages/InternalRules/InternalRules";
+import Structure from "./pages/Structure/Structure";
+import Rating from "./pages/Rating/Rating";
+import ServicesDescription from "./pages/ServicesDescription/ServicesDescription";
+import Contacts from "./pages/Contacts/Contacts";
 import Donation from "./pages/Donation/Donation";
-import SocialServiceForm from "./pages/SocialServiceForm";
+import SocialServiceForm from "./pages/SocialServiceForm/SocialServiceForm";
 import Awards from "./pages/Awards/Awards";
 import Login from "./pages/Login/Login";
 import Register from "./pages/Register/Register";
@@ -66,7 +67,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import AdminRoute from "./components/AdminRoute";
 import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
 import Profile from "./pages/Profile/Profile";
-import FinActivities from "./pages/FinActivities";
+import FinActivities from "./pages/FinActivities/FinActivities";
 import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
 import Achievements from "./pages/Achievements/Achievements";
 import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest";
@@ -162,12 +163,14 @@ function App() {
         <Route path="/news" element={<News />} />
         <Route path="/news/:slug" element={<NewsDetail />} />
 
+        {/* Отзывы: смотреть может любой, оставить — только авторизованный */}
+        <Route path="/reviews" element={<Reviews user={user} />} />
+
         <Route element={<PrivateRoute isAuthenticated={isAuthenticated} />}>
           <Route
             path="/dashboard"
             element={<Dashboard user={user} onLogout={handleLogout} />}
           />
-          <Route path="/reviews" element={<Reviews user={user} />} />
           <Route
             path="/create-review"
             element={
@@ -308,8 +311,16 @@ function App() {
             <Navigate to="/main" replace />
           }
         />
+
+        {/* Catch-all: any unknown path → branded 404 page */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
-      <ToastContainer position="top-right" />
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3500}
+        newestOnTop
+        theme="light"
+      />
     </AuthContext.Provider>
   );
 }

@@ -163,11 +163,6 @@ export default function AdminCmsFiles({ section, title }) {
         </section>
 
         <section className="admin-module__panel">
-          <p className="admin-module__hint">
-            Файлы отображаются в порядке поля «Порядок». Меньшее значение —
-            выше.
-          </p>
-
           <div className="admin-module__toolbar">
             <div className="admin-module__search">
               <SearchIcon />

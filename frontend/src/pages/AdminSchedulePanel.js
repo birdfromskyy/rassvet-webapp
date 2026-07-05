@@ -12,6 +12,7 @@ import {
 	Assessment as ReportsIcon,
 } from '@mui/icons-material'
 
+import useBrandFont from '../hooks/useBrandFont'
 import './AdminCMSPanel/AdminCMSPanel.scss'
 
 const MODULES = [
@@ -68,6 +69,7 @@ const MODULES = [
 const AdminSchedulePanel = () => {
 	const navigate = useNavigate()
 	const [search, setSearch] = useState('')
+	useBrandFont()
 
 	const filtered = MODULES.filter(m =>
 		`${m.title} ${m.description}`.toLowerCase().includes(search.toLowerCase().trim())

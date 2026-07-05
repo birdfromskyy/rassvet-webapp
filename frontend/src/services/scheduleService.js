@@ -348,25 +348,31 @@ const scheduleService = {
 	},
 
 	// ========== PARENT SCHEDULE ==========
+	// Read by the dashboard/schedule widgets on user devices, including
+	// in-app WebViews (VK, MAX) that can serve a stale cached GET. A unique
+	// `_ts` param makes each URL distinct so no cache (WebView/proxy) can
+	// return a stale response — the child's schedule loads reliably. The
+	// backend ignores unknown query params. (No custom headers: they'd
+	// trigger a CORS preflight the backend doesn't allow.)
 	getMyChildren: async () => {
-		const r = await api.get('/my-children')
+		const r = await api.get('/my-children', { params: { _ts: Date.now() } })
 		return r.data.children || []
 	},
 	getChildSchedule: async (studentId, weekStart) => {
 		const r = await api.get(`/my-children/${studentId}/schedule`, {
-			params: { week_start: weekStart },
+			params: { week_start: weekStart, _ts: Date.now() },
 		})
 		return r.data
 	},
 	getTeacherPublishedSchedule: async (weekStart, filters = {}) => {
-		const params = { week_start: weekStart }
+		const params = { week_start: weekStart, _ts: Date.now() }
 		if (filters.teacher_id) params.teacher_id = filters.teacher_id
 		if (filters.student_id) params.student_id = filters.student_id
 		const r = await api.get('/teacher/schedule', { params })
 		return r.data
 	},
 	getTeacherScheduleOptions: async () => {
-		const r = await api.get('/teacher/schedule/options')
+		const r = await api.get('/teacher/schedule/options', { params: { _ts: Date.now() } })
 		return r.data
 	},
 	getLinkedTeacher: async (userId) => {

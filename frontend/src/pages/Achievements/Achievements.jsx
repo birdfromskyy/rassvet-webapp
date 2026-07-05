@@ -1,7 +1,12 @@
+import { useEffect, useRef, useState } from "react";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
+import useReveal from "../../hooks/useReveal";
+import useBrandFont from "../../hooks/useBrandFont";
 import "./Achievements.scss";
-import { useState, useEffect } from "react";
+
+/* Achievements page — "Rassvet 2.0" design (Skills/Design2.md).
+   Content is unchanged: the same in-page success stories as before. */
 
 const stories = [
   {
@@ -26,55 +31,111 @@ const stories = [
 ];
 
 function Achievements() {
+  const rootRef = useRef(null);
+  const [lightbox, setLightbox] = useState(null);
+
   useEffect(() => {
     document.title = "Наши успехи";
   }, []);
 
+  useBrandFont();
+  useReveal(rootRef);
+
+  useEffect(() => {
+    if (!lightbox) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setLightbox(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [lightbox]);
+
   return (
-    <div className="page page--achievements">
+    <div className="achievements-page" ref={rootRef}>
       <Header />
 
-      <main className="achievements">
-        <section className="achievements__hero">
-          <div className="page-container">
-            <span className="section-badge">Наши успехи</span>
-
-            <h1>Истории маленьких побед</h1>
-
-            <p>
+      {/* ── Screen 1: hero (dark) ──────────────────────────────── */}
+      <section className="d2-section d2-hero">
+        <div className="d2-hero__glow" aria-hidden="true" />
+        <div className="page-container d2-hero__inner d2-hero__inner--solo">
+          <div className="d2-hero__content" data-reveal>
+            <span className="d2-tag">Наши успехи</span>
+            <h1 className="d2-hero__title">Истории маленьких побед</h1>
+            <p className="d2-hero__text">
               Каждая история — это путь ребёнка, семьи и специалистов Центра. Мы
               радуемся даже небольшим шагам, потому что именно из них
               складываются большие возможности.
             </p>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section className="achievements__stories">
-          <div className="page-container achievements__grid">
+      {/* ── Screen 2: stories (light) ──────────────────────────── */}
+      <section className="d2-section d2-section--auto ap-stories">
+        <div className="page-container">
+          <div className="d2-head" data-reveal>
+            <span className="d2-tag d2-tag--dark">Истории успеха</span>
+            <h2 className="d2-h2">Наши маленькие герои</h2>
+          </div>
+
+          <div className="ap-grid">
             {stories.map((story, index) => (
-              <article className="achievement-card" key={story.name}>
-                <div className="achievement-card__media">
-                  <img src={story.image} alt={story.name} />
-
-                  {story.secondImage && <img src={story.secondImage} alt="" />}
+              <article
+                className={`ap-card${index % 2 === 1 ? " ap-card--reverse" : ""}`}
+                key={story.name}
+                data-reveal
+              >
+                <div
+                  className={`ap-card__media${
+                    story.secondImage ? " ap-card__media--pair" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="ap-photo"
+                    onClick={() => setLightbox(story.image)}
+                    title="Нажмите, чтобы увеличить"
+                  >
+                    <img src={story.image} alt={story.name} />
+                  </button>
+                  {story.secondImage && (
+                    <button
+                      type="button"
+                      className="ap-photo"
+                      onClick={() => setLightbox(story.secondImage)}
+                      title="Нажмите, чтобы увеличить"
+                    >
+                      <img src={story.secondImage} alt="" />
+                    </button>
+                  )}
                 </div>
 
-                <div className="achievement-card__content">
-                  <span>История успеха</span>
-
-                  <h2>{story.name}</h2>
-
+                <div className="ap-card__content">
+                  <span className="ap-card__label">История успеха</span>
+                  <h3>{story.name}</h3>
                   {story.text.map((paragraph, i) => (
                     <p key={i}>{paragraph}</p>
                   ))}
-
                   <strong>Маленькими шагами к большим возможностям!</strong>
                 </div>
               </article>
             ))}
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      {lightbox && (
+        <div className="ap-lightbox" onClick={() => setLightbox(null)}>
+          <button
+            className="ap-lightbox__close"
+            onClick={() => setLightbox(null)}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+          <img src={lightbox} alt="" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
 
       <Footer />
     </div>

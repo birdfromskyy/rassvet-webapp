@@ -3,6 +3,7 @@ import Header from '../../components/Header/Header'
 import Footer from '../../components/Footer/Footer'
 import { siteSettingService } from '../../services/cmsService'
 import './PrivacyPolicy.scss'
+import useBrandFont from '../../hooks/useBrandFont'
 
 const KEYS = [
   'privacy_operator_name',
@@ -17,6 +18,7 @@ const KEYS = [
 const val = (settings, key, fallback = '') => settings[key] || fallback
 
 const PrivacyPolicy = () => {
+  useBrandFont()
   const [settings, setSettings] = useState({})
   const [loading, setLoading]   = useState(true)
 
@@ -46,7 +48,7 @@ const PrivacyPolicy = () => {
   const date = val(s, 'privacy_policy_updated', '—')
 
   return (
-    <>
+    <div className="privacy-root">
       <Header />
       <main className="privacy-page">
         <div className="page-container">
@@ -308,7 +310,7 @@ const PrivacyPolicy = () => {
         </div>
       </main>
       <Footer />
-    </>
+    </div>
   )
 }
 

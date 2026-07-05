@@ -215,7 +215,7 @@ export default function AdminConsultations() {
       <div className="admin-module__container">
         <section className="admin-module__hero">
           <div>
-            <span className="admin-module__badge">CRM</span>
+            <span className="admin-module__badge">Консультации</span>
 
             <h1>{MODULE_TITLE}</h1>
 
@@ -291,7 +291,7 @@ export default function AdminConsultations() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Дата</TableCell>
-                    <TableCell>Возраст</TableCell>
+                    <TableCell>Давность</TableCell>
                     <TableCell>Родитель</TableCell>
                     <TableCell>Телефон</TableCell>
                     <TableCell>Ребёнок / возраст</TableCell>

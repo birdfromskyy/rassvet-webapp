@@ -5,8 +5,10 @@ import { toast } from "react-toastify";
 import authService from "../../services/authService";
 
 import "./Register.scss";
+import useBrandFont from "../../hooks/useBrandFont";
 
 const Register = () => {
+  useBrandFont();
   useEffect(() => {
     document.title = "Регистрация";
   }, []);
@@ -220,6 +222,7 @@ const Register = () => {
                     <button
                       type="button"
                       className="register-form__eye"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setShowPassword((v) => !v)}
                       tabIndex={-1}
                       aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
@@ -253,6 +256,7 @@ const Register = () => {
                     <button
                       type="button"
                       className="register-form__eye"
+                      onMouseDown={(e) => e.preventDefault()}
                       onClick={() => setShowConfirm((v) => !v)}
                       tabIndex={-1}
                       aria-label={showConfirm ? "Скрыть пароль" : "Показать пароль"}

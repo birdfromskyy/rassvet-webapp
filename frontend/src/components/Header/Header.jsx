@@ -18,7 +18,7 @@ import {
   FiHeadphones,
 } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { siteSettingService } from "../../services/cmsService";
 import notificationService from "../../services/notificationService";
@@ -74,7 +74,6 @@ const buildDropdowns = (isLoggedIn) => [
       { title: "Алгоритм получения услуг", path: "/service-algorithm" },
       { title: "Свободные места", path: "/available-places" },
       { title: "Форма социального обслуживания", path: "/social-service-form" },
-      { title: "Поддержать центр", path: "/donation" },
     ],
   },
   {
@@ -113,6 +112,7 @@ function Header() {
   const dropdowns = buildDropdowns(isLoggedIn);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     document.body.style.overflow = isMenuOpen ? "hidden" : "";
@@ -289,6 +289,10 @@ function Header() {
                 <div
                   className={`header__nav-item header__nav-item--dropdown ${
                     openDropdown === dropdown.id ? "is-open" : ""
+                  } ${
+                    dropdown.links.some((l) => l.path === location.pathname)
+                      ? "header__nav-item--active"
+                      : ""
                   }`}
                   key={dropdown.id}
                 >
@@ -331,7 +335,7 @@ function Header() {
                 onClick={closeMenu}
               >
                 <FiHeart />
-                <span>Помочь</span>
+                <span>Поддержать</span>
               </NavLink>
 
               <NavLink

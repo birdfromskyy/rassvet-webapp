@@ -312,19 +312,19 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	var user models.User
 	if err := h.db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		log.Printf("[LOGIN] email=%s ip=%s success=false reason=user_not_found", req.Email, c.ClientIP())
+		log.Printf("[LOGIN] email=%s ip=%s success=false reason=user_not_found ua=%q", req.Email, c.ClientIP(), c.Request.UserAgent())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный email или пароль"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		log.Printf("[LOGIN] email=%s ip=%s success=false reason=wrong_password", user.Email, c.ClientIP())
+		log.Printf("[LOGIN] email=%s ip=%s success=false reason=wrong_password ua=%q", user.Email, c.ClientIP(), c.Request.UserAgent())
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный email или пароль"})
 		return
 	}
 
 	if !user.IsVerified {
-		log.Printf("[LOGIN] email=%s ip=%s success=false reason=not_verified", user.Email, c.ClientIP())
+		log.Printf("[LOGIN] email=%s ip=%s success=false reason=not_verified ua=%q", user.Email, c.ClientIP(), c.Request.UserAgent())
 		ctx := context.Background()
 
 		cooldown, err := h.getVerificationCooldown(ctx, user.Email)
@@ -375,7 +375,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[LOGIN] email=%s ip=%s success=true reason=ok", user.Email, c.ClientIP())
+	log.Printf("[LOGIN] email=%s ip=%s success=true reason=ok ua=%q", user.Email, c.ClientIP(), c.Request.UserAgent())
 
 	userResp := gin.H{
 		"id":          user.ID,
@@ -1056,10 +1056,11 @@ func (h *AuthHandler) DeleteMyAccount(c *gin.Context) {
 		h.db.Unscoped().Delete(&q)
 	}
 
-	// Anonymize consultation requests (keep record for admin stats, detach from user)
-	h.db.Model(&models.ConsultationRequest{}).Where("user_id = ?", uid).Update("user_id", nil)
-
-	// Delete notifications
+	// Cascade-delete all related records — mirrors the admin DeleteUser
+	// hard-delete so self-deletion and admin deletion behave identically.
+	h.db.Unscoped().Where("user_id = ?", uid).Delete(&models.ConsultationRequest{})
+	h.db.Unscoped().Where("user_id = ?", uid).Delete(&models.Review{})
+	h.db.Unscoped().Where("user_id = ?", uid).Delete(&models.UserStudent{})
 	h.db.Unscoped().Where("user_id = ?", uid).Delete(&models.Notification{})
 
 	// Hard-delete the user so the email can be reused immediately.

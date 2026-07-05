@@ -1,220 +1,244 @@
+/* /my-schedule (teacher + child views share these styles) —
+   "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../styles/design2" as *;
+
 .schedule-page {
-  background: #f7f4ec;
+  background: $paper;
+  color: $ink;
+  font-family: $font;
   min-height: 100vh;
+
+  /* header: pinned + translucent (see Design2.md §4) */
+  .header {
+    background: #f3efe3;
+  }
+  .header--hidden { transform: none; opacity: 1; pointer-events: auto; }
+  @media (min-width: 993px) {
+    .header { position: fixed; top: 0; left: 0; right: 0; }
+  }
 }
 
 .schedule {
-  padding: 46px 0 80px;
+  padding: 118px 0 72px;
 }
 
+.schedule__container {
+  width: min(100% - 40px, 1400px);
+  margin: 0 auto;
+}
+
+/* ---- hero (dark rounded band) ------------------------------- */
+
 .schedule__hero {
-  margin-bottom: 40px;
+  position: relative;
+  padding: 40px clamp(24px, 3vw, 44px);
+  margin-bottom: 24px;
+  border-radius: 28px;
+  background:
+    radial-gradient(60% 120% at 90% -20%, rgba(11, 95, 136, 0.5), transparent 70%),
+    $night;
+  color: #ffffff;
+  overflow: hidden;
+
+  .section-badge {
+    background: rgba(244, 223, 0, 0.9) !important;
+  }
 }
 
 .schedule__title {
-  margin: 18px 0 0;
-  font-family: "Merriweather", serif;
-  font-size: clamp(36px, 5vw, 64px);
-  line-height: 1;
-  color: #074462;
+  margin: 14px 0 8px;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
 }
 
 .schedule__subtitle {
-  margin: 14px 0 0;
-  color: #55707f;
-  font-size: 18px;
+  margin: 0;
+  font-size: clamp(15px, 1.3vw, 18px);
   line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
 }
 
-/* ── Фильтры ─────────────────────────────────────────────── */
+/* ---- filters ------------------------------------------------ */
 
 .schedule__filters {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
-/* ── Навигация по неделям ────────────────────────────────── */
+/* ---- week nav ----------------------------------------------- */
 
 .schedule__week-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 36px;
-}
+  gap: 18px;
+  margin-bottom: 18px;
 
-.schedule__week-nav button {
-  width: 46px;
-  height: 46px;
-  border: none;
-  border-radius: 999px;
-  background: #f7df00;
-  color: #074462;
-  font-size: 22px;
-  font-weight: 800;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: opacity 0.15s;
-}
+  button {
+    width: 44px;
+    height: 44px;
+    border: 1.5px solid rgba(7, 68, 98, 0.2);
+    border-radius: 14px;
+    background: #ffffff;
+    color: $ink;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
 
-.schedule__week-nav button:hover {
-  opacity: 0.8;
+    &:hover {
+      background: $ink;
+      color: #ffffff;
+    }
+  }
 }
 
 .schedule__week-label {
-  min-width: 280px;
+  min-width: 260px;
   text-align: center;
-  font-family: "Merriweather", serif;
-  font-size: 20px;
-  color: #074462;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
+  color: $ink;
 }
 
-/* ── Легенда ─────────────────────────────────────────────── */
+/* ---- legend ------------------------------------------------- */
 
 .schedule__legend {
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 26px;
+  font-size: 14px;
+  color: $muted;
 }
 
 .schedule__legend-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  color: #55707f;
 }
 
 .schedule__legend-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
 }
 
-/* ── День ────────────────────────────────────────────────── */
+/* ---- states ------------------------------------------------- */
+
+.schedule__loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px;
+}
+
+.schedule__empty {
+  padding: 48px 24px;
+  text-align: center;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid $border;
+  color: $muted;
+
+  h2 {
+    color: $ink;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 8px 0 0;
+  }
+}
+
+/* ---- day + slots -------------------------------------------- */
 
 .schedule__day {
-  background: #ffffff;
-  border-radius: 28px;
-  padding: 28px;
-  margin-bottom: 20px;
-  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.08);
+  margin-bottom: 28px;
 }
 
 .schedule__day-title {
-  margin: 0 0 20px;
-  font-family: "Merriweather", serif;
-  font-size: 22px;
-  color: #074462;
+  margin: 0 0 14px;
+  font-size: clamp(20px, 1.8vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: $ink;
 }
 
 .schedule__day-date {
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: 400;
-  color: rgba(7, 68, 98, 0.55);
+  color: $muted;
+  font-weight: 600;
+  font-size: 0.7em;
 }
 
-/* ── Слоты ───────────────────────────────────────────────── */
-
 .schedule__slots {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
 .schedule__slot {
   display: grid;
-  grid-template-columns: 120px 1fr 1fr 1fr 1fr;
+  grid-template-columns: 150px repeat(4, minmax(0, 1fr));
+  gap: 18px;
   align-items: center;
-  gap: 16px;
-  padding: 16px 20px;
+  padding: 18px 22px;
   border-radius: 18px;
-  background: #f7f4ec;
-}
+  background: #ffffff;
+  border: 1px solid $border;
+  box-shadow: 0 10px 26px rgba(7, 68, 98, 0.05);
+  border-left: 4px solid rgba(7, 68, 98, 0.25);
 
-.schedule__slot--group {
-  background: rgba(76, 175, 80, 0.08);
-}
-
-.schedule__slot--individual {
-  background: rgba(7, 68, 98, 0.06);
+  &--group {
+    border-left-color: #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+  }
 }
 
 .schedule__slot-time {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: rgba(7, 68, 98, 0.1);
-  color: #074462;
+  font-size: 16px;
   font-weight: 800;
-  font-size: 14px;
-  white-space: nowrap;
+  color: $ink;
 }
 
 .schedule__slot-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #ffffff;
-  background: #074462;
-  border-radius: 999px;
-  padding: 3px 10px;
   display: inline-block;
   margin-top: 6px;
-}
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(7, 68, 98, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  color: $muted;
 
-.schedule__slot-label--group {
-  background: #43a047;
+  &--group {
+    background: rgba(76, 175, 80, 0.16);
+    color: #2e7d32;
+  }
 }
 
 .schedule__slot-cell {
-  color: #074462;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 600;
+  color: $content;
+
+  small {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $muted;
+  }
 }
 
-.schedule__slot-cell small {
-  display: block;
-  color: #8fa5b0;
-  font-weight: 400;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 3px;
-}
-
-/* ── Состояния ───────────────────────────────────────────── */
-
-.schedule__empty {
-  background: #ffffff;
-  border-radius: 28px;
-  padding: 52px 28px;
-  text-align: center;
-  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.08);
-}
-
-.schedule__empty p {
-  margin: 12px 0 0;
-  color: #55707f;
-  font-size: 17px;
-}
-
-.schedule__loading {
-  display: flex;
-  justify-content: center;
-  padding: 60px 0;
-}
-
-/* ── Адаптив ─────────────────────────────────────────────── */
+/* ---- responsive --------------------------------------------- */
 
 @media (max-width: 900px) {
   .schedule__filters {
@@ -223,31 +247,22 @@
 
   .schedule__slot {
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-
-  .schedule__slot-time {
-    grid-column: 1 / -1;
-    justify-content: flex-start;
+    gap: 12px;
   }
 }
 
 @media (max-width: 560px) {
-  .schedule {
-    padding: 28px 0 56px;
-  }
-
-  .schedule__day {
-    padding: 20px;
-    border-radius: 22px;
-  }
-
   .schedule__slot {
     grid-template-columns: 1fr;
   }
 
+  /* keep the week navigation from overflowing narrow screens */
   .schedule__week-label {
     min-width: 0;
-    font-size: 16px;
+    font-size: 15px;
+  }
+
+  .schedule__week-nav {
+    gap: 10px;
   }
 }

@@ -1,4 +1,5 @@
 import './AdminModule.scss'
+import useBrandFont from '../hooks/useBrandFont'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -56,6 +57,7 @@ const EMPTY_FORM = {
 }
 
 const AdminGroupLessons = () => {
+  useBrandFont()
 	const navigate = useNavigate()
 	const [groups, setGroups] = useState([])
 	const [teachers, setTeachers] = useState([])

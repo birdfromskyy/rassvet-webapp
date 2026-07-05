@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
+import useBrandFont from "../../hooks/useBrandFont";
 import "./ConsultationRequest.scss";
 import consultationService from "../../services/consultationService";
 
@@ -32,6 +33,7 @@ const FIO_MIN = 2;
 const FIO_MAX = 100;
 
 const ConsultationRequest = ({ user }) => {
+  useBrandFont();
   useEffect(() => { document.title = "Заявка на консультацию"; }, []);
 
   const fullName = user
@@ -111,20 +113,23 @@ const ConsultationRequest = ({ user }) => {
   };
 
   return (
-    <div className="page page--consultation">
+    <div className="consultation-page">
       <Header />
 
-      <main className="consultation">
-        <div className="page-container consultation__container">
-          <section className="consultation__hero">
-            <span className="section-badge">Первичная консультация</span>
-            <h1>Заявка на консультацию</h1>
-            <p>
-              Заполните короткую форму, и администрация Центра свяжется с вами,
-              чтобы уточнить запрос и подсказать дальнейшие шаги.
-            </p>
-          </section>
+      <section className="cr-hero">
+        <div className="cr-hero__glow" aria-hidden="true" />
+        <div className="page-container">
+          <span className="d2-tag">Первичная консультация</span>
+          <h1 className="cr-hero__title">Заявка на консультацию</h1>
+          <p className="cr-hero__text">
+            Заполните короткую форму, и администрация Центра свяжется с вами,
+            чтобы уточнить запрос и подсказать дальнейшие шаги.
+          </p>
+        </div>
+      </section>
 
+      <main className="cr-body">
+        <div className="page-container">
           <section className="consultation__content">
             {sent ? (
               <div className="consultation-success">

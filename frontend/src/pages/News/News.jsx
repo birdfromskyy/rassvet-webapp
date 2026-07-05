@@ -1,25 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import NewsCard from "../../components/NewsCard/NewsCard";
 import newsService from "../../services/newsService";
-import "./News.scss";
-
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
+import useReveal from "../../hooks/useReveal";
+import useBrandFont from "../../hooks/useBrandFont";
+import "./News.scss";
+
+/* News list page — "Rassvet 2.0" design (Skills/Design2.md).
+   Same data & behaviour: paginated + searchable published articles. */
 
 const News = () => {
-  const navigate = useNavigate();
-
+  const rootRef = useRef(null);
   const [articles, setArticles] = useState([]);
-  const [popularArticles, setPopularArticles] = useState([]);
-
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
@@ -27,148 +24,121 @@ const News = () => {
     document.title = "Новости";
   }, []);
 
-  useEffect(() => {
-    fetchPopularArticles();
-  }, []);
+  useBrandFont();
 
   useEffect(() => {
+    const fetchArticles = async () => {
+      setLoading(true);
+      try {
+        const params = { page, limit: 9, ...(search && { search }) };
+        const data = await newsService.getPublishedArticles(params);
+        setArticles(data.articles || []);
+        setTotalPages(data.pagination?.pages || 1);
+      } catch (err) {
+        console.error(err);
+        setError("Не удалось загрузить новости");
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchArticles();
   }, [page, search]);
 
-  const fetchArticles = async () => {
-    setLoading(true);
+  useReveal(rootRef, [articles.length, loading]);
 
-    try {
-      const params = {
-        page,
-        limit: 9,
-        ...(search && { search }),
-      };
-
-      const data = await newsService.getPublishedArticles(params);
-
-      setArticles(data.articles || []);
-      setTotalPages(data.pagination?.pages || 1);
-    } catch (error) {
-      console.error(error);
-      setError("Не удалось загрузить новости");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchPopularArticles = async () => {
-    try {
-      const data = await newsService.getPopularArticles(5);
-      setPopularArticles(data || []);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
-  };
-
+  /* Live search: debounce keystrokes, then filter. The hero is compact,
+     so results are already visible below — no scrolling needed. */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   return (
-    <>
+    <div className="news-page" ref={rootRef}>
       <Header />
-      <main className="news-page">
-        <section className="news">
-          <div className="page-container">
-            <div className="news__hero">
-              <div>
-                <span className="section-badge">Новости центра</span>
 
-                <h1 className="news__title">
-                  Новости, события и полезные материалы
-                </h1>
+      <section className="d2-section d2-hero">
+        <div className="d2-hero__glow" aria-hidden="true" />
+        <div className="page-container d2-hero__inner d2-hero__inner--solo">
+          <div className="d2-hero__content" data-reveal>
+            <span className="d2-tag">Новости центра</span>
+            <h1 className="d2-hero__title">
+              Новости, события и полезные материалы
+            </h1>
+            <p className="d2-hero__text">
+              Следите за жизнью центра «РАСсвет», мероприятиями, обновлениями и
+              важной информацией.
+            </p>
 
-                <p className="news__subtitle">
-                  Следите за жизнью центра «РАСсвет», мероприятиями,
-                  обновлениями и важной информацией.
-                </p>
-              </div>
-            </div>
-
-            <form className="news__filters" onSubmit={handleSearch}>
-              <div className="news__search">
+            <div className="np-search">
+              <div className="np-search__field">
+                <span className="np-search__icon" aria-hidden="true">
+                  ⌕
+                </span>
                 <input
                   type="text"
                   placeholder="Поиск по новостям..."
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                 />
-
                 {searchInput && (
                   <button
                     type="button"
-                    className="news__clear"
-                    onClick={() => {
-                      setSearchInput("");
-                      setSearch("");
-                      setPage(1);
-                    }}
+                    className="np-search__clear"
+                    onClick={() => setSearchInput("")}
                     aria-label="Очистить поиск"
                   >
                     ×
                   </button>
                 )}
               </div>
-
-              <button type="submit" className="btn btn--secondary">
-                Искать
-              </button>
-            </form>
-
-            <div className="news__layout">
-              <div className="news__main">
-                {loading ? (
-                  <div className="news__state">
-                    <h3>Загрузка...</h3>
-                  </div>
-                ) : error ? (
-                  <div className="news__state news__state--error">
-                    <h3>{error}</h3>
-                  </div>
-                ) : articles.length === 0 ? (
-                  <div className="news__state">
-                    <h3>Новостей пока нет</h3>
-                    <p>Материалы появятся позже.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="news__grid">
-                      {articles.map((article) => (
-                        <NewsCard key={article.id} article={article} />
-                      ))}
-                    </div>
-
-                    {totalPages > 1 && (
-                      <div className="news__pagination">
-                        {Array.from({ length: totalPages }, (_, i) => (
-                          <button
-                            key={i}
-                            className={page === i + 1 ? "is-active" : ""}
-                            onClick={() => setPage(i + 1)}
-                          >
-                            {i + 1}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
             </div>
           </div>
-        </section>
-      </main>
+        </div>
+      </section>
+
+      <section className="d2-section d2-section--auto np-section" id="np-results">
+        <div className="page-container">
+          {loading ? (
+            <p className="d2-empty">Загрузка...</p>
+          ) : error ? (
+            <p className="d2-empty">{error}</p>
+          ) : articles.length === 0 ? (
+            <p className="d2-empty">Новостей пока нет. Материалы появятся позже.</p>
+          ) : (
+            <>
+              <div className="np-grid">
+                {articles.map((article) => (
+                  <div className="np-cell" key={article.id} data-reveal>
+                    <NewsCard article={article} />
+                  </div>
+                ))}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="np-pagination">
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={page === i + 1 ? "is-active" : ""}
+                      onClick={() => setPage(i + 1)}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+
       <Footer />
-    </>
+    </div>
   );
 };
 

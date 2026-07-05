@@ -1,0 +1,979 @@
+/* ============================================================
+   /thirdmain — home page concept #2.
+   "Dawn" layout + the brand palette shared with /secondmain:
+   deep brand navy, yellow accent, warm cream paper. Manrope
+   typography. True fullpage scrolling on desktop (JS-driven,
+   one gesture = one screen).
+   Everything is scoped under .third-main so nothing leaks.
+
+   Palette (brand)
+   ─ ink     #074462  headings / primary buttons on light
+   ─ night   #052c40  dark screens (hero, video)
+   ─ paper   #f7f4ec  warm light background
+   ─ yellow  #f4df00  CTA on dark, accents
+   ─ muted   #55707f  secondary text
+   ============================================================ */
+
+$tm-ink: #074462;
+$tm-night: #052c40;
+$tm-night-2: #0a3a55;
+$tm-paper: #f7f4ec;
+$tm-yellow: #f4df00;
+$tm-muted: #55707f;
+$tm-border: rgba(7, 68, 98, 0.1);
+$tm-font: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+.third-main {
+  background: $tm-paper;
+  color: $tm-ink;
+  font-family: $tm-font;
+
+  /* ---- header: always visible on this page ------------------ */
+  /* Fullpage screens need a predictable anchor — the auto-hide
+     behaviour of the shared header reads as random here, so it is
+     pinned and given a translucent blur. */
+
+  .header {
+    background: #f3efe3;
+  }
+
+  .header--hidden {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Desktop: take the header out of flow so the first screen starts at
+     the very top and the header floats over it. Sticky (in-flow) would
+     push the hero down on first paint, then snap up after a scroll. */
+  @media (min-width: 993px) {
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+  }
+
+  /* ---- shared primitives ------------------------------------ */
+
+  .tm-section {
+    position: relative;
+    /* Desktop full-page scroll aligns each screen top to y=0, so a
+       screen must fill EXACTLY the visible viewport — otherwise the
+       next screen peeks at the bottom. `dvh` tracks the real visible
+       height (svh can compute short on desktop Safari). Mobile drops
+       this to `auto` in the media query below. */
+    min-height: 100vh; /* fallback for browsers without dvh */
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 118px 0 64px;
+    overflow: hidden;
+  }
+
+  .tm-h2 {
+    margin: 0;
+    font-family: $tm-font;
+    font-size: clamp(32px, 3.6vw, 54px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    color: $tm-ink;
+
+    &--light {
+      color: #ffffff;
+    }
+  }
+
+  .tm-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    &::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: $tm-yellow;
+    }
+
+    &--dark {
+      border-color: rgba(7, 68, 98, 0.25);
+      color: $tm-muted;
+    }
+  }
+
+  .tm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 54px;
+    padding: 0 30px;
+    border-radius: 16px;
+    border: 1.5px solid transparent;
+    font-family: $tm-font;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      transform 0.22s ease,
+      box-shadow 0.22s ease,
+      background-color 0.22s ease,
+      border-color 0.22s ease,
+      color 0.22s ease;
+
+    &--yellow {
+      background: $tm-yellow;
+      color: $tm-ink;
+      box-shadow: 0 12px 30px rgba(244, 223, 0, 0.22);
+
+      &:hover {
+        transform: translateY(-2px);
+        background: #f7e62e;
+        box-shadow: 0 18px 38px rgba(244, 223, 0, 0.3);
+      }
+    }
+
+    &--outline-light {
+      border-color: rgba(255, 255, 255, 0.35);
+      color: #ffffff;
+      background: transparent;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.6);
+      }
+    }
+
+    &--ink {
+      background: $tm-ink;
+      color: #ffffff;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px rgba(7, 68, 98, 0.26);
+      }
+    }
+  }
+
+  /* ---- reveal-on-scroll ------------------------------------ */
+
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(26px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: opacity, transform;
+
+    &.is-in {
+      opacity: 1;
+      transform: none;
+      /* Drop will-change so a descendant modal's position:fixed anchors
+         to the viewport, not this element. */
+      will-change: auto;
+    }
+  }
+
+  [data-reveal-delay="1"] { transition-delay: 0.12s; }
+  [data-reveal-delay="2"] { transition-delay: 0.24s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  /* ---- side dot navigation --------------------------------- */
+
+  .tm-dots {
+    position: fixed;
+    right: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 900;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    &__dot {
+      position: relative;
+      width: 10px;
+      height: 10px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(7, 68, 98, 0.25);
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+
+      &:hover {
+        background: rgba(7, 68, 98, 0.55);
+
+        .tm-dots__tip {
+          opacity: 1;
+          transform: translate(0, -50%);
+        }
+      }
+
+      &.is-active {
+        background: $tm-ink;
+        transform: scale(1.35);
+        box-shadow: 0 0 0 4px rgba(244, 223, 0, 0.55);
+      }
+    }
+
+    &__tip {
+      position: absolute;
+      right: 22px;
+      top: 50%;
+      transform: translate(6px, -50%);
+      padding: 6px 12px;
+      border-radius: 10px;
+      background: $tm-ink;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    @media (max-width: 1100px) {
+      display: none;
+    }
+  }
+
+  /* ---- screen 1: hero ---------------------------------------- */
+
+  .tm-hero {
+    background: $tm-night;
+    color: #ffffff;
+  }
+
+  /* Dawn in brand colors: warm yellow glow at the horizon,
+     lighter brand blue high in the "sky". */
+  .tm-hero__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(58% 46% at 24% 108%, rgba(244, 223, 0, 0.2), transparent 70%),
+      radial-gradient(42% 36% at 62% 112%, rgba(244, 223, 0, 0.1), transparent 70%),
+      radial-gradient(70% 60% at 85% -12%, rgba(11, 95, 136, 0.4), transparent 75%);
+  }
+
+  .tm-hero__inner {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1.08fr 0.92fr;
+    align-items: center;
+    gap: clamp(32px, 4vw, 64px);
+  }
+
+  .tm-hero__title {
+    margin: 28px 0 18px;
+    font-size: clamp(40px, 4.8vw, 72px);
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    color: #ffffff;
+  }
+
+  .tm-hero__text {
+    margin: 0 0 36px;
+    max-width: 540px;
+    font-size: clamp(17px, 1.4vw, 20px);
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .tm-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 44px;
+  }
+
+  .tm-hero__features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 26px;
+  }
+
+  .tm-hero__feature {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+
+    span:last-child {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.85);
+    }
+
+    &[href]:hover span:last-child {
+      color: $tm-yellow;
+    }
+  }
+
+  /* Icon chips must be LIGHT on dark screens: the source PNGs are
+     dark brand-blue and disappear on a dark translucent chip. */
+  .tm-hero__feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: #f7f4ec;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+
+    img {
+      width: 26px;
+      height: 26px;
+      object-fit: contain;
+    }
+  }
+
+  .tm-hero__visual {
+    display: flex;
+    justify-content: center;
+  }
+
+  .tm-hero__video-card {
+    width: min(100%, 560px);
+    border-radius: 22px;
+    overflow: hidden;
+    background: $tm-night-2;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+
+    iframe {
+      display: block;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+    }
+  }
+
+  .tm-hero__video-caption {
+    padding: 14px 20px;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    text-align: center;
+  }
+
+  .tm-scroll-hint {
+    position: absolute;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 18px;
+    cursor: pointer;
+    animation: tm-bounce 2.2s ease-in-out infinite;
+    transition: border-color 0.2s ease, color 0.2s ease;
+
+    &:hover {
+      border-color: $tm-yellow;
+      color: $tm-yellow;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      animation: none;
+    }
+  }
+
+  @keyframes tm-bounce {
+    0%, 100% { transform: translate(-50%, 0); }
+    50% { transform: translate(-50%, 8px); }
+  }
+
+  /* ---- screen 2: about ---------------------------------------- */
+
+  .tm-about {
+    background: $tm-paper;
+  }
+
+  .tm-about__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(32px, 5vw, 90px);
+    align-items: center;
+  }
+
+  .tm-about__intro {
+    position: relative;
+
+    .tm-h2 {
+      margin: 20px 0 18px;
+    }
+  }
+
+  .tm-about__lead {
+    margin: 0 0 30px;
+    font-size: clamp(16px, 1.3vw, 19px);
+    line-height: 1.6;
+    color: $tm-muted;
+  }
+
+  .tm-about__illustration {
+    display: block;
+    width: clamp(110px, 12vw, 170px);
+    margin-top: 40px;
+    opacity: 0.9;
+  }
+
+  .tm-about__facts {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tm-about__fact {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    padding: 26px 0;
+    border-bottom: 1px solid $tm-border;
+    transition: padding-left 0.25s ease;
+
+    &:first-child {
+      border-top: 1px solid $tm-border;
+    }
+
+    &:hover {
+      padding-left: 10px;
+    }
+
+    p {
+      margin: 2px 0 0;
+      font-size: clamp(16px, 1.3vw, 19px);
+      line-height: 1.55;
+      color: $tm-ink;
+      font-weight: 600;
+    }
+  }
+
+  .tm-about__fact-num {
+    display: inline-block;
+    font-size: 15px;
+    font-weight: 800;
+    color: rgba(7, 68, 98, 0.5);
+    letter-spacing: 0.1em;
+    padding-top: 5px;
+    border-bottom: 2px solid $tm-yellow;
+    padding-bottom: 4px;
+    justify-self: start;
+  }
+
+  /* ---- screen 3: services (tabs) ------------------------------- */
+
+  .tm-services {
+    background: #ffffff;
+  }
+
+  .tm-services__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(28px, 4vw, 64px);
+    align-items: stretch;
+  }
+
+  .tm-services__side {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    align-items: flex-start;
+  }
+
+  .tm-services__tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .tm-services__tab {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 16px 20px;
+    border: 1.5px solid $tm-border;
+    border-radius: 18px;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+
+    span:last-child {
+      font-family: $tm-font;
+      font-size: 16px;
+      font-weight: 700;
+      color: $tm-ink;
+      line-height: 1.3;
+    }
+
+    &:hover {
+      border-color: rgba(7, 68, 98, 0.35);
+      transform: translateX(4px);
+    }
+
+    &.is-active {
+      background: rgba(244, 223, 0, 0.16);
+      border-color: $tm-ink;
+      box-shadow: 0 10px 26px rgba(7, 68, 98, 0.1);
+
+      .tm-services__tab-dot {
+        background: $tm-yellow;
+      }
+    }
+  }
+
+  .tm-services__tab-dot {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(7, 68, 98, 0.3);
+    transition: background 0.2s ease;
+  }
+
+  /* Fixed height + internal scroll: switching tabs never changes
+     the page layout, so the screen no longer shifts on click. */
+  .tm-services__panel {
+    height: clamp(460px, 64vh, 680px);
+    overflow-y: auto;
+    padding: clamp(26px, 3vw, 42px);
+    border-radius: 26px;
+    background: $tm-paper;
+    border: 1px solid $tm-border;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(7, 68, 98, 0.3) transparent;
+  }
+
+  .tm-services__panel-title {
+    margin: 0 0 12px;
+    font-size: clamp(22px, 2vw, 28px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $tm-ink;
+  }
+
+  .tm-services__panel-text {
+    margin: 0 0 24px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: $tm-muted;
+  }
+
+  /* Single column of CMS service items (same content as /services-list). */
+  .tm-services__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    > li {
+      position: relative;
+      padding-left: 20px;
+      margin-bottom: 16px;
+      font-size: 15px;
+      line-height: 1.55;
+      color: $tm-ink;
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 8px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: $tm-yellow;
+      }
+
+      strong {
+        font-weight: 700;
+        color: $tm-ink;
+      }
+    }
+  }
+
+  .tm-services__sublist {
+    margin: 8px 0 0;
+    padding-left: 16px;
+    list-style: none;
+
+    li {
+      position: relative;
+      padding-left: 14px;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: $tm-muted;
+
+      &::before {
+        content: "–";
+        position: absolute;
+        left: 0;
+        color: rgba(7, 68, 98, 0.4);
+      }
+    }
+  }
+
+  /* ---- screen 4: video stories (night) -------------------------- */
+
+  /* The empty-video case is handled in JS (the section isn't rendered
+     at all when there are no published videos), so no :has() needed. */
+  .tm-stories {
+    background: $tm-night;
+  }
+
+  .tm-stories__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(52% 44% at 78% 114%, rgba(244, 223, 0, 0.14), transparent 70%),
+      radial-gradient(60% 52% at 8% -10%, rgba(11, 95, 136, 0.35), transparent 75%);
+  }
+
+  .tm-stories__head {
+    position: relative;
+    z-index: 2;
+    margin-bottom: clamp(24px, 4vh, 40px);
+
+    .tm-h2 {
+      margin-top: 18px;
+    }
+  }
+
+  .tm-stories__rail {
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Scoped restyle of the reused <Stories /> component:
+     larger frames, centered row, light controls. */
+  .stories {
+    background: transparent;
+    padding: 0;
+  }
+
+  .stories__row {
+    justify-content: safe center;
+    gap: 22px;
+    padding-bottom: 18px;
+  }
+
+  .story-preview__frame {
+    width: 208px;
+    height: 368px;
+    border-radius: 26px;
+    border-width: 3px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4);
+
+    .story-preview:hover & {
+      transform: translateY(-8px);
+      box-shadow: 0 28px 60px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  .story-preview__title {
+    width: 208px;
+    margin-top: 12px;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 14px;
+  }
+
+  .stories__pagination {
+    padding-top: 16px;
+  }
+
+  .stories__pagination-btn {
+    background: rgba(255, 255, 255, 0.14);
+
+    &:not(:disabled):hover {
+      background: $tm-yellow;
+      color: $tm-ink;
+    }
+  }
+
+  .stories__pagination-dot {
+    background: rgba(255, 255, 255, 0.3);
+
+    &.is-active {
+      background: $tm-yellow;
+    }
+  }
+
+  @media (max-width: 700px) {
+    .story-preview__frame {
+      width: 150px;
+      height: 266px;
+      border-radius: 20px;
+    }
+
+    .story-preview__title {
+      width: 150px;
+    }
+  }
+
+  /* ---- screen 5: reviews (horizontal rail) ---------------------- */
+
+  .tm-reviews {
+    background: $tm-paper;
+  }
+
+  .tm-reviews__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: clamp(24px, 4vh, 44px);
+  }
+
+  .tm-reviews__rail {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 4px max(calc((100% - min(94%, 1440px)) / 2), 3%) 22px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(7, 68, 98, 0.3) transparent;
+  }
+
+  .tm-review {
+    flex: 0 0 min(420px, 82vw);
+    display: flex;
+    flex-direction: column;
+    scroll-snap-align: start;
+    position: relative;
+    padding: 34px 28px 26px;
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid $tm-border;
+    box-shadow: 0 12px 32px rgba(7, 68, 98, 0.06);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 44px rgba(7, 68, 98, 0.1);
+    }
+  }
+
+  .tm-review__quote {
+    position: absolute;
+    top: 6px;
+    left: 22px;
+    font-size: 68px;
+    line-height: 1;
+    font-weight: 800;
+    color: rgba(244, 223, 0, 0.9);
+    pointer-events: none;
+  }
+
+  .tm-review__content {
+    margin: 0 0 20px;
+    flex: 1;
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: #2a4050;
+  }
+
+  .tm-review__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* author + stars pinned to the top of the card (below the quote mark) */
+  .tm-review__meta--top {
+    margin: 40px 0 16px;
+  }
+
+  .tm-review__author {
+    font-size: 15px;
+    font-weight: 800;
+    color: $tm-ink;
+  }
+
+  .tm-review__stars {
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: #e3b800;
+  }
+
+  .tm-review__source {
+    font-size: 12.5px;
+    color: $tm-muted;
+  }
+
+  .tm-reviews__empty {
+    color: $tm-muted;
+  }
+
+  /* ---- screen 6: map -------------------------------------------- */
+
+  .tm-map {
+    background: #ffffff;
+    justify-content: flex-start;
+  }
+
+  .tm-map__inner {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr);
+    gap: clamp(24px, 3vw, 48px);
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .tm-map__info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 18px;
+    padding: clamp(26px, 3vw, 42px);
+    border-radius: 26px;
+    background: $tm-paper;
+    border: 1px solid $tm-border;
+
+    p {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.55;
+      color: $tm-muted;
+      font-weight: 600;
+    }
+  }
+
+  .tm-map__frame {
+    min-height: 420px;
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid $tm-border;
+    box-shadow: 0 20px 46px rgba(7, 68, 98, 0.1);
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 420px;
+      border: 0;
+    }
+  }
+
+  /* ---- responsive ------------------------------------------------ */
+
+  @media (max-width: 992px) {
+    .tm-section {
+      min-height: auto;
+      padding: 96px 0 56px;
+    }
+
+    /* Mobile keeps the header sticky (in flow) so the collapsible menu
+       works — so the hero sizes to its content instead of a forced
+       full screen, which would otherwise sit low under the header. */
+    .tm-hero {
+      min-height: auto;
+    }
+
+    .tm-hero__inner {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+
+    .tm-hero__content {
+      text-align: center;
+    }
+
+    .tm-hero__actions,
+    .tm-hero__features {
+      justify-content: center;
+    }
+
+    .tm-about__inner,
+    .tm-services__inner,
+    .tm-map__inner {
+      grid-template-columns: 1fr;
+    }
+
+    .tm-about__illustration {
+      display: none;
+    }
+
+    .tm-services__side {
+      align-items: stretch;
+
+      .tm-btn {
+        align-self: flex-start;
+      }
+    }
+
+    /* Content height wins on small screens */
+    .tm-services__panel {
+      height: auto;
+      max-height: none;
+      overflow: visible;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .tm-hero__title {
+      font-size: clamp(34px, 9vw, 44px);
+    }
+
+    .tm-services__list {
+      columns: 1;
+    }
+
+    .tm-scroll-hint {
+      display: none;
+    }
+
+    .tm-btn {
+      min-height: 50px;
+      padding: 0 24px;
+      font-size: 15px;
+    }
+
+    .tm-review {
+      flex-basis: 86vw;
+    }
+  }
+}

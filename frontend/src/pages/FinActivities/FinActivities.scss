@@ -1,0 +1,180 @@
+/* /fin-activities — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.fin-page {
+  @include design2-base;
+
+  .fp-section {
+    background: $paper;
+  }
+
+  .fp-intro {
+    margin-bottom: clamp(28px, 4vh, 48px);
+    max-width: 900px;
+  }
+
+  .fp-intro-text {
+    margin: 0 0 14px;
+    font-size: clamp(16px, 1.3vw, 19px);
+    line-height: 1.65;
+    color: $content;
+  }
+
+  .fp-intro-photos {
+    margin-top: 22px;
+  }
+
+  /* One block per row — full-width sections read better than a
+     cramped multi-column grid. */
+  .fp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .fp-card {
+    padding: clamp(24px, 2.6vw, 36px);
+    border-radius: 26px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+  }
+
+  .fp-card__title {
+    margin: 0 0 12px;
+    font-size: clamp(19px, 1.8vw, 24px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $ink;
+  }
+
+  .fp-card__text {
+    margin: 0 0 12px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: $content;
+  }
+
+  /* photo grid */
+  .fp-photos {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 16px;
+
+    &--two {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .fp-photo {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid $border;
+    border-radius: 16px;
+    background: $paper;
+    cursor: zoom-in;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 34px rgba(7, 68, 98, 0.14);
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: clamp(260px, 34vw, 420px);
+      object-fit: cover;
+    }
+  }
+
+  .fp-caption {
+    margin: 12px 0 0;
+    font-size: 13.5px;
+    color: $muted;
+    font-style: italic;
+  }
+
+  /* final CTA band */
+  .fp-final {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: clamp(28px, 4vh, 48px);
+    padding: clamp(26px, 3vw, 40px);
+    border-radius: 26px;
+    background: $night;
+    color: #ffffff;
+  }
+
+  .fp-final__label {
+    display: inline-block;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: $yellow;
+  }
+
+  .fp-final__text {
+    margin: 0;
+    max-width: 640px;
+    font-size: clamp(18px, 1.6vw, 22px);
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  /* lightbox */
+  .fp-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    background: rgba(5, 22, 32, 0.92);
+    cursor: zoom-out;
+
+    img {
+      max-width: min(94vw, 1100px);
+      max-height: 86vh;
+      object-fit: contain;
+      border-radius: 12px;
+      background: #ffffff;
+      cursor: default;
+    }
+  }
+
+  .fp-lightbox__close {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 46px;
+    height: 46px;
+    border: none;
+    border-radius: 50%;
+    background: #ffffff;
+    color: $ink;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      opacity: 0.85;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .fp-photos--two {
+      grid-template-columns: 1fr;
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import './AdminModule.scss'
+import useBrandFont from '../hooks/useBrandFont'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -56,6 +57,7 @@ const EMPTY_ASSIGNMENT = {
 }
 
 const AdminAssignments = () => {
+  useBrandFont()
 	const navigate = useNavigate()
 	const [assignments, setAssignments] = useState([])
 	const [students, setStudents] = useState([])

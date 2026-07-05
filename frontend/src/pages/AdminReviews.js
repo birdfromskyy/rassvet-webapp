@@ -165,13 +165,6 @@ const AdminReviews = () => {
           </div>
           <div className="admin-module__actions">
             <Button
-              startIcon={<BackIcon />}
-              onClick={() => navigate("/dashboard")}
-              className="admin-module__button admin-module__button--ghost"
-            >
-              На главную
-            </Button>
-            <Button
               onClick={() => navigate("/admin/pending-reviews")}
               className="admin-module__button admin-module__button--ghost"
             >
@@ -183,6 +176,13 @@ const AdminReviews = () => {
               className="admin-module__button admin-module__button--primary"
             >
               Добавить внешний отзыв
+            </Button>
+            <Button
+              startIcon={<BackIcon />}
+              onClick={() => navigate("/dashboard")}
+              className="admin-module__button admin-module__button--ghost"
+            >
+              Назад
             </Button>
           </div>
         </section>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import shortsService from "../../services/shortsService";
 import "./Stories.scss";
 
@@ -147,7 +148,10 @@ function Stories() {
         )}
       </div>
 
-      {activeStory && (
+      {/* Portal to <body>: keeps the modal out of any ancestor
+          stacking context (e.g. a page's fixed header), so it always
+          covers the whole viewport. */}
+      {activeStory && createPortal(
         <div className="stories-modal" onClick={closeStory}>
           <button className="stories-modal__close" type="button" onClick={closeStory} aria-label="Закрыть">
             ×
@@ -194,7 +198,8 @@ function Stories() {
             onClick={e => { e.stopPropagation(); nextStory(); }} aria-label="Следующая">
             →
           </button>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );

@@ -1,5 +1,6 @@
 import "./AdminModule.scss";
 import React, { useState, useEffect } from "react";
+import useBrandFont from "../hooks/useBrandFont";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -79,6 +80,7 @@ const PUBLIC_PAGE_URL = "/employees";
 
 const AdminTeachers = () => {
   const navigate = useNavigate();
+  useBrandFont();
   const [teachers, setTeachers] = useState([]);
   const [allSubjects, setAllSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -373,7 +375,7 @@ const AdminTeachers = () => {
       <div className="admin-module__container">
         <section className="admin-module__hero">
           <div>
-            <span className="admin-module__badge">CMS</span>
+            <span className="admin-module__badge">Справочник</span>
 
             <h1>{MODULE_TITLE}</h1>
 
