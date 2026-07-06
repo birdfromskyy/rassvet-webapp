@@ -1,41 +1,43 @@
 import api from './api'
+import { cachedGet, invalidate } from './cmsCache'
+
+const fetchArticles = (params) =>
+  cachedGet(`articles:list:${params.page || 1}:${params.limit}:${params.search || ''}`, () =>
+    api.get('/articles', { params }).then(r => r.data)
+  )
 
 const newsService = {
   getPublishedArticles: async (params = {}) => {
     const { page = 1, limit = 9, search } = params
     const query = { page, limit }
     if (search) query.search = search
-
-    const res = await api.get('/articles', { params: query })
-    return res.data
+    return fetchArticles(query)
   },
 
   getLatestArticles: async (limit = 5) => {
-    const res = await api.get('/articles', { params: { page: 1, limit } })
-    return res.data.articles || []
+    const data = await fetchArticles({ page: 1, limit })
+    return data.articles || []
   },
 
   getPopularArticles: async (limit = 5) => {
-    const res = await api.get('/articles', { params: { page: 1, limit } })
-    return res.data.articles || []
+    const data = await fetchArticles({ page: 1, limit })
+    return data.articles || []
   },
 
-  getArticleBySlug: async (slug) => {
-    const res = await api.get(`/articles/${slug}`)
-    return res.data
-  },
+  getArticleBySlug: async (slug) =>
+    cachedGet(`articles:slug:${slug}`, () => api.get(`/articles/${slug}`).then(r => r.data)),
 
   getRelatedArticles: async (slug, limit = 3) => {
-    const res = await api.get('/articles', { params: { page: 1, limit } })
-    return (res.data.articles || []).filter(a => a.slug !== slug)
+    const data = await fetchArticles({ page: 1, limit })
+    return (data.articles || []).filter(a => a.slug !== slug)
   },
 
   // Admin methods
   getAllArticles: () => api.get('/admin/articles').then(r => r.data),
   getArticleById: (id) => api.get(`/admin/articles/${id}`).then(r => r.data),
-  createArticle: (data) => api.post('/admin/articles', data).then(r => r.data),
-  updateArticle: (id, data) => api.put(`/admin/articles/${id}`, data).then(r => r.data),
-  deleteArticle: (id) => api.delete(`/admin/articles/${id}`).then(r => r.data),
+  createArticle: (data) => api.post('/admin/articles', data).then(r => { invalidate('articles'); return r.data }),
+  updateArticle: (id, data) => api.put(`/admin/articles/${id}`, data).then(r => { invalidate('articles'); return r.data }),
+  deleteArticle: (id) => api.delete(`/admin/articles/${id}`).then(r => { invalidate('articles'); return r.data }),
 }
 
 export default newsService

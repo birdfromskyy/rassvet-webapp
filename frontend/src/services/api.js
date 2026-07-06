@@ -22,6 +22,43 @@ api.interceptors.request.use(config => {
 	return config
 })
 
+// --- Network-failure telemetry -------------------------------------------
+// Requests that never reach the server (timeout / dropped connection) are
+// invisible in backend logs, so we can't see WHO/WHAT is failing when users
+// report "the site doesn't load". Report those failures (throttled + batched)
+// through the existing client-error channel so the backend logs them with the
+// caller's IP + User-Agent. Best-effort: if the network is fully down the
+// report can't send either, but intermittent failures get captured.
+let netFailBuffer = []
+let netFailTimer = null
+
+const flushNetFails = () => {
+	netFailTimer = null
+	if (netFailBuffer.length === 0) return
+	const batch = netFailBuffer
+	netFailBuffer = []
+	const summary = batch
+		.slice(0, 8)
+		.map(f => `${f.reason}:${f.method} ${f.url}`)
+		.join(' | ')
+	api
+		.post('/client-error', {
+			message: `[NET-FAIL x${batch.length}] ${summary}`.slice(0, 2000),
+			url: window.location.href,
+		}, { _netReport: true })
+		.catch(() => {})
+}
+
+const reportNetFail = (config, reason) => {
+	if (config?._netReport) return // never report the reporter's own failure
+	const method = (config?.method || 'GET').toUpperCase()
+	const url = (config?.url || '').split('?')[0]
+	netFailBuffer.push({ reason, method, url })
+	if (netFailBuffer.length > 50) netFailBuffer.shift()
+	// Throttle: at most one batched report per 15s so we don't add to the flood.
+	if (!netFailTimer) netFailTimer = setTimeout(flushNetFails, 15000)
+}
+
 // Track whether a refresh is already in flight so concurrent 401s
 // don't each trigger their own refresh — they queue and retry together.
 let isRefreshing = false
@@ -36,6 +73,12 @@ api.interceptors.response.use(
 	response => response,
 	async error => {
 		const original = error.config
+
+		// No HTTP response at all = the request died in the network
+		// (timeout / connection dropped) — the invisible-in-logs case.
+		if (!error.response) {
+			reportNetFail(original, error.code === 'ECONNABORTED' ? 'timeout' : 'network')
+		}
 
 		const isInitialCheck = original?._isInitialCheck === true
 		const isRefreshCall  = original?.url?.includes('/refresh')

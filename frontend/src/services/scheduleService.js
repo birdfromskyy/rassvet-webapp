@@ -324,6 +324,15 @@ const scheduleService = {
 		const r = await api.get('/admin/users')
 		return r.data.users || []
 	},
+	// Returns users AND per-user children counts in one request (backend
+	// aggregates them) — avoids the N+1 storm of /users/:id/children.
+	getUsersWithCounts: async () => {
+		const r = await api.get('/admin/users')
+		return {
+			users: r.data.users || [],
+			childrenCounts: r.data.children_counts || {},
+		}
+	},
 	createUser: async data => {
 		const r = await api.post('/admin/users', data)
 		return r.data.user

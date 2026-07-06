@@ -223,27 +223,17 @@ const AdminUsers = () => {
 
   const loadAll = async () => {
     try {
-      const [usersData, studentsData, teachersData] = await Promise.all([
-        scheduleService.getUsers(),
+      const [usersResult, studentsData, teachersData] = await Promise.all([
+        scheduleService.getUsersWithCounts(),
         scheduleService.getStudents(),
         scheduleService.getTeachers(),
       ]);
       setTeachers(teachersData);
       setTeacherLinkedUserIds(new Set(teachersData.filter(t => t.user_id).map(t => t.user_id)));
 
-      setUsers(usersData);
+      setUsers(usersResult.users);
       setStudents(studentsData);
-
-      const counts = {};
-      await Promise.allSettled(
-        usersData.map((u) =>
-          scheduleService.getUserChildren(u.id).then((ch) => {
-            counts[u.id] = ch.length;
-          })
-        )
-      );
-
-      setChildrenCounts(counts);
+      setChildrenCounts(usersResult.childrenCounts);
     } catch {
       toast.error("Ошибка загрузки данных");
     } finally {

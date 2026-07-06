@@ -238,7 +238,9 @@ function Header() {
   };
 
   return (
-    <header className={`header ${isHidden ? "header--hidden" : ""}`}>
+    <header
+      className={`header ${isHidden && !isMenuOpen ? "header--hidden" : ""} ${isMenuOpen ? "header--menu-open" : ""}`}
+    >
       <div className="container header__container">
         <div className="header__top">
           <button

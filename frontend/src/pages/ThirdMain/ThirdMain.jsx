@@ -4,6 +4,7 @@ import Footer from "../../components/Footer/Footer";
 import Stories from "../../components/Stories/Stories";
 import reviewService from "../../services/reviewService";
 import shortsService from "../../services/shortsService";
+import { serviceCmsService } from "../../services/cmsService";
 import usePageMeta from "../../hooks/usePageMeta";
 import "./ThirdMain.scss";
 
@@ -269,8 +270,10 @@ function ThirdMain() {
      /services-list — nested categories with items, rendered in the
      tab design below. */
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/services?type=services_list`)
-      .then((r) => r.json())
+    // Go through serviceCmsService so this shares the CMS cache (the home
+    // page is the most-visited — no need to re-fetch services every visit).
+    serviceCmsService
+      .getAll("services_list")
       .then((data) => {
         const all = (data || [])
           .filter((s) => s.is_active)

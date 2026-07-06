@@ -33,7 +33,25 @@ func (h *UserStudentHandler) GetUsers(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения пользователей"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"users": users})
+
+	// Children counts for every user in ONE aggregate query. Previously the
+	// admin UI fetched /users/:id/children per row (N+1) — ~60 parallel
+	// requests on page load, which flooded clients' networks.
+	type countRow struct {
+		UserID uint
+		Count  int
+	}
+	var rows []countRow
+	h.db.Model(&models.UserStudent{}).
+		Select("user_id, COUNT(*) as count").
+		Group("user_id").
+		Scan(&rows)
+	counts := make(map[uint]int, len(rows))
+	for _, r := range rows {
+		counts[r.UserID] = r.Count
+	}
+
+	c.JSON(http.StatusOK, gin.H{"users": users, "children_counts": counts})
 }
 
 type CreateUserRequest struct {

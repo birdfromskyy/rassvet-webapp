@@ -566,6 +566,17 @@
     padding: 8px 0;
   }
 
+  /* When the burger menu is open, pin the header to the top of the
+     viewport. `sticky` can be broken by an ancestor with overflow/transform
+     on some pages, which left the opened menu off-screen (user had to
+     scroll up to it). `fixed` is immune to that — menu is always visible. */
+  .header--menu-open {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+
   .container {
     max-width: 100%;
   }
