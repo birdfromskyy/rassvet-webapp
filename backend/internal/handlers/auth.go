@@ -60,11 +60,19 @@ const verificationCodeCooldown = 60 * time.Second
 const maxVerificationAttempts = 5
 const currentConsentVersion = "v1"
 
-const accessTokenMaxAge  = 30 * 60          // 30 min in seconds (matches JWT TTL)
-const refreshTokenTTL    = 7 * 24 * time.Hour
+const accessTokenMaxAge = 30 * 60 // 30 min in seconds (matches JWT TTL)
+const refreshTokenTTL = 7 * 24 * time.Hour
 const refreshTokenMaxAge = 7 * 24 * 60 * 60 // 7 days in seconds
 
 func refreshKey(token string) string { return "refresh:" + token }
+
+// userSessionsKey holds the set of a user's active refresh tokens, so every
+// device can be logged out at once (e.g. when the password changes).
+func userSessionsKey(userID uint) string { return fmt.Sprintf("user_sessions:%d", userID) }
+
+// userAccessTokensKey lets an administrator terminate already-issued access
+// JWTs too. JWTs are otherwise self-contained until their 30-minute expiry.
+func userAccessTokensKey(userID uint) string { return fmt.Sprintf("user_access_tokens:%d", userID) }
 
 // issueTokenPair generates a new access JWT + refresh UUID, sets both cookies,
 // and stores the refresh token in Redis.
@@ -82,6 +90,14 @@ func (h *AuthHandler) issueTokenPair(c *gin.Context, userID uint, role string) e
 	if err := h.rdb.Set(c.Request.Context(), refreshKey(refreshToken), payload, refreshTokenTTL).Err(); err != nil {
 		return err
 	}
+
+	// Track the token in the user's session set so all devices can be revoked
+	// together on a password change.
+	sessCtx := c.Request.Context()
+	_ = h.rdb.SAdd(sessCtx, userSessionsKey(userID), refreshToken).Err()
+	_ = h.rdb.Expire(sessCtx, userSessionsKey(userID), refreshTokenTTL).Err()
+	_ = h.rdb.SAdd(sessCtx, userAccessTokensKey(userID), accessToken).Err()
+	_ = h.rdb.Expire(sessCtx, userAccessTokensKey(userID), time.Duration(accessTokenMaxAge)*time.Second).Err()
 
 	secure := h.cfg.IsProduction
 	http.SetCookie(c.Writer, &http.Cookie{
@@ -136,6 +152,28 @@ func (h *AuthHandler) clearAuthCookies(c *gin.Context) {
 	}
 }
 
+// invalidateUserSessions revokes every refresh token of a user — logs them out
+// on all devices. Returns how many sessions were revoked. Called on password change.
+func (h *AuthHandler) invalidateUserSessions(ctx context.Context, userID uint) int {
+	setKey := userSessionsKey(userID)
+	n := 0
+	if tokens, err := h.rdb.SMembers(ctx, setKey).Result(); err == nil {
+		n = len(tokens)
+		for _, t := range tokens {
+			_ = h.rdb.Del(ctx, refreshKey(t)).Err()
+		}
+	}
+	_ = h.rdb.Del(ctx, setKey).Err()
+	accessKey := userAccessTokensKey(userID)
+	if tokens, err := h.rdb.SMembers(ctx, accessKey).Result(); err == nil {
+		for _, token := range tokens {
+			_ = h.rdb.Set(ctx, "blacklist:"+token, "1", time.Duration(accessTokenMaxAge)*time.Second).Err()
+		}
+	}
+	_ = h.rdb.Del(ctx, accessKey).Err()
+	return n
+}
+
 var (
 	pwUpperRe = regexp.MustCompile(`[A-Z]`)
 	pwDigitRe = regexp.MustCompile(`[0-9]`)
@@ -169,7 +207,6 @@ func validatePassword(p string) error {
 	}
 	return nil
 }
-
 
 type RegisterRequest struct {
 	Email        string `json:"email"          binding:"required,email,max=254"`
@@ -386,8 +423,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		"role":        user.Role,
 		"is_verified": user.IsVerified,
 	}
-	var teacher models.Teacher
-	if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
+	if teacher, err := findLinkedTeacher(h.db, user.ID); err == nil {
 		userResp["teacher_id"] = teacher.ID
 	}
 	c.JSON(http.StatusOK, gin.H{"user": userResp})
@@ -713,6 +749,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 	// Rotate: delete old refresh token and issue a new pair.
 	_ = h.rdb.Del(ctx, refreshKey(rt)).Err()
+	_ = h.rdb.SRem(ctx, userSessionsKey(payload.UserID), rt).Err()
 
 	if err := h.issueTokenPair(c, user.ID, string(user.Role)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
@@ -740,8 +777,7 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 		"role":        user.Role,
 	}
 
-	var teacher models.Teacher
-	if err := h.db.Where("user_id = ?", user.ID).First(&teacher).Error; err == nil {
+	if teacher, err := findLinkedTeacher(h.db, user.ID); err == nil {
 		resp["teacher_id"] = teacher.ID
 	}
 
@@ -855,6 +891,11 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 
 	_ = h.rdb.Del(ctx, key).Err()
 
+	// Password changed → revoke every existing session on all devices.
+	revoked := h.invalidateUserSessions(ctx, user.ID)
+	log.Printf("[SECURITY] password_reset user=%d email=%s ip=%s sessions_revoked=%d",
+		user.ID, user.Email, c.ClientIP(), revoked)
+
 	emailService := services.NewEmailService(h.cfg)
 	if err := emailService.SendNewPassword(req.Email, newPassword); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отправить новый пароль"})
@@ -953,6 +994,16 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	// Password changed in-cabinet → revoke all sessions (log out other devices),
+	// then re-issue tokens for THIS device so the current user stays logged in.
+	if req.Password != "" {
+		sessCtx := context.Background()
+		revoked := h.invalidateUserSessions(sessCtx, user.ID)
+		_ = h.issueTokenPair(c, user.ID, string(user.Role))
+		log.Printf("[SECURITY] password_change user=%d ip=%s sessions_revoked=%d",
+			user.ID, c.ClientIP(), revoked)
+	}
+
 	if emailChanged {
 		ctx := context.Background()
 		cooldown, err := h.getVerificationCooldown(ctx, newEmail)
@@ -1019,6 +1070,10 @@ func (h *AuthHandler) DeleteMyAccount(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	uid := userID.(uint)
 
+	// Capture email for the security log before the record is deleted.
+	var acct models.User
+	h.db.First(&acct, uid)
+
 	// Delete child doc submissions (files + records)
 	var children []models.ChildDocSubmission
 	h.db.Where("user_id = ?", uid).Find(&children)
@@ -1075,6 +1130,10 @@ func (h *AuthHandler) DeleteMyAccount(c *gin.Context) {
 		}
 	}
 	h.clearAuthCookies(c)
+	h.invalidateUserSessions(c.Request.Context(), uid)
+
+	log.Printf("[SECURITY] account_delete user=%d email=%s ip=%s ua=%q",
+		uid, acct.Email, c.ClientIP(), c.Request.UserAgent())
 
 	c.JSON(http.StatusOK, gin.H{"message": "Аккаунт и все персональные данные удалены"})
 }

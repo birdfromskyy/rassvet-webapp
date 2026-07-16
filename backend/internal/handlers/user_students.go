@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -19,17 +20,42 @@ import (
 var privilegedRoles = map[string]bool{"admin": true, "superadmin": true}
 
 type UserStudentHandler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	rdb *redis.Client
 }
 
-func NewUserStudentHandler(db *gorm.DB) *UserStudentHandler {
-	return &UserStudentHandler{db: db}
+func NewUserStudentHandler(db *gorm.DB, redisClients ...*redis.Client) *UserStudentHandler {
+	h := &UserStudentHandler{db: db}
+	if len(redisClients) > 0 {
+		h.rdb = redisClients[0]
+	}
+	return h
+}
+
+func (h *UserStudentHandler) revokeSessions(c *gin.Context, userID uint) {
+	if h.rdb == nil {
+		return
+	}
+	key := userSessionsKey(userID)
+	if tokens, err := h.rdb.SMembers(c.Request.Context(), key).Result(); err == nil {
+		for _, token := range tokens {
+			_ = h.rdb.Del(c.Request.Context(), refreshKey(token)).Err()
+		}
+	}
+	_ = h.rdb.Del(c.Request.Context(), key).Err()
+	accessKey := userAccessTokensKey(userID)
+	if tokens, err := h.rdb.SMembers(c.Request.Context(), accessKey).Result(); err == nil {
+		for _, token := range tokens {
+			_ = h.rdb.Set(c.Request.Context(), "blacklist:"+token, "1", time.Duration(accessTokenMaxAge)*time.Second).Err()
+		}
+	}
+	_ = h.rdb.Del(c.Request.Context(), accessKey).Err()
 }
 
 // Admin: GET /api/admin/users
 func (h *UserStudentHandler) GetUsers(c *gin.Context) {
 	var users []models.User
-	if err := h.db.Find(&users).Error; err != nil {
+	if err := h.db.Order("id ASC").Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения пользователей"})
 		return
 	}
@@ -226,6 +252,9 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить пользователя"})
 		return
 	}
+	if req.Password != "" {
+		h.revokeSessions(c, user.ID)
+	}
 
 	user.Password = ""
 	c.JSON(http.StatusOK, gin.H{"user": user})
@@ -295,6 +324,28 @@ func (h *UserStudentHandler) DeleteUser(c *gin.Context) {
 		}
 	}
 
+	// Support messages may belong either to the deleted user's own tickets or
+	// to another user's ticket (for example, an administrator reply). Delete
+	// attachments first so neither database records nor private files remain.
+	var supportMessages []models.SupportMessage
+	h.db.Where("sender_id = ? OR ticket_id IN (?)", targetID,
+		h.db.Model(&models.SupportTicket{}).Select("id").Where("user_id = ?", targetID),
+	).Find(&supportMessages)
+	messageIDs := make([]uint, 0, len(supportMessages))
+	for _, message := range supportMessages {
+		messageIDs = append(messageIDs, message.ID)
+	}
+	if len(messageIDs) > 0 {
+		var attachments []models.SupportAttachment
+		h.db.Where("message_id IN ?", messageIDs).Find(&attachments)
+		for _, attachment := range attachments {
+			_ = os.Remove(filepath.Join(supportUploadsDir, attachment.Filename))
+		}
+		h.db.Where("message_id IN ?", messageIDs).Delete(&models.SupportAttachment{})
+		h.db.Where("id IN ?", messageIDs).Delete(&models.SupportMessage{})
+	}
+	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.SupportTicket{})
+
 	// Cascade: remove all related records (hard delete via Unscoped)
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Questionnaire{})
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.Notification{})
@@ -303,9 +354,12 @@ func (h *UserStudentHandler) DeleteUser(c *gin.Context) {
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.UserStudent{})
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.ChildDocSubmission{})
 	h.db.Unscoped().Where("user_id = ?", targetID).Delete(&models.ParentProfile{})
+	// A teacher is shared between accounts; only its link to this account is removed.
+	h.db.Where("user_id = ?", targetID).Delete(&models.TeacherUserLink{})
 
 	// Hard-delete the user so the email can be reused
 	h.db.Unscoped().Delete(&user)
+	h.revokeSessions(c, user.ID)
 
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

@@ -191,7 +191,7 @@ const AdminUsers = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [childrenCounts, setChildrenCounts] = useState({});
-  const [teacherLinkedUserIds, setTeacherLinkedUserIds] = useState(new Set());
+  const [teacherByUserId, setTeacherByUserId] = useState({});
   const [search, setSearch] = useState("");
 
   const [childDialog, setChildDialog] = useState({ open: false, user: null });
@@ -229,7 +229,11 @@ const AdminUsers = () => {
         scheduleService.getTeachers(),
       ]);
       setTeachers(teachersData);
-      setTeacherLinkedUserIds(new Set(teachersData.filter(t => t.user_id).map(t => t.user_id)));
+      setTeacherByUserId(Object.fromEntries(
+        teachersData.flatMap((teacher) =>
+          (teacher.user_links || []).map((link) => [link.user_id, teacher])
+        )
+      ));
 
       setUsers(usersResult.users);
       setStudents(studentsData);
@@ -401,12 +405,14 @@ const AdminUsers = () => {
     if (!selectedTeacher) return;
     setTeacherLinkLoading(true);
     try {
-      await scheduleService.linkTeacherToUser(teacherDialog.user.id, selectedTeacher.id);
+      const result = await scheduleService.linkTeacherToUser(teacherDialog.user.id, selectedTeacher.id);
       toast.success("Преподаватель привязан");
-      const data = await scheduleService.getLinkedTeacher(teacherDialog.user.id);
-      setLinkedTeacher(data.teacher || null);
+      setLinkedTeacher(result.teacher || selectedTeacher);
       setSelectedTeacher(null);
-      setTeacherLinkedUserIds(prev => new Set([...prev, teacherDialog.user.id]));
+      setTeacherByUserId((prev) => ({
+        ...prev,
+        [teacherDialog.user.id]: result.teacher || selectedTeacher,
+      }));
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка привязки");
     } finally {
@@ -421,7 +427,11 @@ const AdminUsers = () => {
       await scheduleService.unlinkTeacherFromUser(teacherDialog.user.id);
       toast.success("Преподаватель отвязан");
       setLinkedTeacher(null);
-      setTeacherLinkedUserIds(prev => { const s = new Set(prev); s.delete(teacherDialog.user.id); return s; });
+      setTeacherByUserId((prev) => {
+        const next = { ...prev };
+        delete next[teacherDialog.user.id];
+        return next;
+      });
     } catch {
       toast.error("Ошибка отвязки");
     } finally {
@@ -527,6 +537,7 @@ const AdminUsers = () => {
                     <TableCell>Email</TableCell>
                     <TableCell>ФИО</TableCell>
                     <TableCell>Роль</TableCell>
+                    <TableCell>Преподаватель</TableCell>
                     <TableCell align="center">Дети</TableCell>
                     <TableCell align="center">Действия</TableCell>
                   </TableRow>
@@ -540,6 +551,9 @@ const AdminUsers = () => {
                       <TableCell>{[u.last_name, u.first_name, u.middle_name].filter(Boolean).join(" ") || "—"}</TableCell>
                       <TableCell>
                         <Chip label={getRoleLabel(u.role)} color={getRoleColor(u.role)} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        {teacherByUserId[u.id]?.full_name || "—"}
                       </TableCell>
                       <TableCell align="center">
                         {(childrenCounts[u.id] || 0) > 0 ? (
@@ -567,10 +581,10 @@ const AdminUsers = () => {
                                 </Badge>
                               </IconButton>
                             </Tooltip>
-                            {u.role !== "user" && (
-                              <Tooltip title="Привязать сотрудника">
+                            {u.role === "teacher" && (
+                              <Tooltip title={teacherByUserId[u.id] ? "Изменить привязку преподавателя" : "Привязать преподавателя"}>
                                 <IconButton size="small" color="secondary" onClick={() => openTeacherDialog(u)}>
-                                  <Badge variant="dot" color="success" invisible={!teacherLinkedUserIds.has(u.id)}>
+                                  <Badge variant="dot" color="success" invisible={!teacherByUserId[u.id]}>
                                     <TeacherLinkIcon fontSize="small" />
                                   </Badge>
                                 </IconButton>
@@ -598,7 +612,7 @@ const AdminUsers = () => {
 
                   {!filteredUsers.length && (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={7} align="center">
                         <Typography color="text.secondary">Пользователи не найдены</Typography>
                       </TableCell>
                     </TableRow>

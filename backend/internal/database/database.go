@@ -44,6 +44,7 @@ func Migrate(db *gorm.DB) {
 		// Schedule module models
 		&models.Subject{},
 		&models.Teacher{},
+		&models.TeacherUserLink{},
 		&models.TeacherSubject{},
 		&models.TeacherRoom{},
 		&models.Room{},
@@ -97,7 +98,6 @@ func Migrate(db *gorm.DB) {
 		&models.SupportTicket{},
 		&models.SupportMessage{},
 		&models.SupportAttachment{},
-
 	)
 
 	if err != nil {

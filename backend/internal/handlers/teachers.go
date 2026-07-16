@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,6 +17,17 @@ type TeacherHandler struct {
 
 func NewTeacherHandler(db *gorm.DB) *TeacherHandler {
 	return &TeacherHandler{db: db}
+}
+
+// findLinkedTeacher is the single source of truth for resolving an employee
+// account to its teacher record. Do not read teachers.user_id here: that
+// legacy column is retained only for rollback of old deployments.
+func findLinkedTeacher(db *gorm.DB, userID uint) (models.Teacher, error) {
+	var link models.TeacherUserLink
+	if err := db.Where("user_id = ?", userID).Preload("Teacher").First(&link).Error; err != nil {
+		return models.Teacher{}, err
+	}
+	return link.Teacher, nil
 }
 
 // GetPublicTeachers returns teachers marked as show_on_site=true, ordered for the public /employees page.
@@ -70,7 +82,7 @@ type UpdateTeacherAvailabilityRequest struct {
 func (h *TeacherHandler) GetTeachers(c *gin.Context) {
 	var teachers []models.Teacher
 
-	query := h.db.Order("id ASC")
+	query := h.db.Preload("UserLinks").Order("id ASC")
 
 	if isActive := c.Query("is_active"); isActive != "" {
 		switch strings.ToLower(isActive) {
@@ -798,12 +810,19 @@ func (h *TeacherHandler) LinkUserToTeacher(c *gin.Context) {
 	}
 
 	uid := uint(userID)
-	if err := h.db.Model(&teacher).Update("user_id", uid).Error; err != nil {
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		// One account may point to only one teacher; replacing it must not
+		// affect any other account already linked to this teacher.
+		if err := tx.Where("user_id = ?", uid).Delete(&models.TeacherUserLink{}).Error; err != nil {
+			return err
+		}
+		return tx.Create(&models.TeacherUserLink{TeacherID: teacher.ID, UserID: uid}).Error
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка привязки"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель привязан к аккаунту"})
+	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель привязан к аккаунту", "teacher": teacher})
 }
 
 func (h *TeacherHandler) UnlinkUserFromTeacher(c *gin.Context) {
@@ -813,13 +832,13 @@ func (h *TeacherHandler) UnlinkUserFromTeacher(c *gin.Context) {
 		return
 	}
 
-	var teacher models.Teacher
-	if err := h.db.Where("user_id = ?", userID).First(&teacher).Error; err != nil {
+	var link models.TeacherUserLink
+	if err := h.db.Where("user_id = ?", userID).First(&link).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Привязанный преподаватель не найден"})
 		return
 	}
 
-	if err := h.db.Model(&teacher).Update("user_id", nil).Error; err != nil {
+	if err := h.db.Delete(&link).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка отвязки"})
 		return
 	}
@@ -834,9 +853,13 @@ func (h *TeacherHandler) GetLinkedTeacher(c *gin.Context) {
 		return
 	}
 
-	var teacher models.Teacher
-	if err := h.db.Where("user_id = ?", userID).First(&teacher).Error; err != nil {
-		c.JSON(http.StatusOK, gin.H{"teacher": nil})
+	teacher, err := findLinkedTeacher(h.db, uint(userID))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusOK, gin.H{"teacher": nil})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения преподавателя"})
 		return
 	}
 

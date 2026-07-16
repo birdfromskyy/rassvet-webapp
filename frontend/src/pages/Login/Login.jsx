@@ -52,6 +52,15 @@ const Login = ({ onLogin }) => {
       if (error.response?.data?.error?.includes("не подтверждён")) {
         toast.error("Email не подтверждён. Проверьте почту.");
         navigate("/verify-email", { state: { email: formData.email } });
+      } else if (!error.response) {
+        // No server response = network error. If this tab has been open a long
+        // time, it's most likely a stale page — tell the user to refresh.
+        const staleForMs = 20 * 60 * 1000;
+        setError(
+          performance.now() > staleForMs
+            ? "Страница устарела. Обновите страницу и попробуйте снова."
+            : "Не удалось подключиться. Проверьте интернет и попробуйте ещё раз.",
+        );
       } else {
         setError(error.response?.data?.error || "Ошибка входа");
       }
