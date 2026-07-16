@@ -7,6 +7,8 @@ import "react-toastify/dist/ReactToastify.css";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound/NotFound";
 import ScrollToTop from "./components/ScrollToTop/ScrollToTop";
+import StaleBanner from "./components/StaleBanner/StaleBanner";
+import usePageFreshness from "./hooks/usePageFreshness";
 import ServicesListPage from "./pages/ServicesListPage/ServicesListPage";
 import Mission from "./pages/Mission/Mission";
 import History from "./pages/History/History";
@@ -80,6 +82,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const stalePage = usePageFreshness();
 
   useEffect(() => {
     authService.getMe()
@@ -121,6 +124,7 @@ function App() {
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, handleLogin, handleLogout, handleUpdateUser }}>
       <AccessibilityPanel />
+      <StaleBanner show={stalePage} />
       <ScrollToTop />
       <Routes>
         <Route path="/forgot-password" element={<ForgotPassword />} />
