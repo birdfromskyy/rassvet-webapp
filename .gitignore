@@ -11,6 +11,7 @@ frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
 CLAUDE.md
+AGENTS.md
 /temp/
 deploy
 Skills
