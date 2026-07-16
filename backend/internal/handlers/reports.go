@@ -54,6 +54,7 @@ type reportLessonRow struct {
 	TeacherName string  `json:"teacher_name"`
 	SubjectName string  `json:"subject_name"`
 	RoomName    string  `json:"room_name"`
+	StudentIDs  []uint  `json:"student_ids"`
 }
 
 func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
@@ -123,6 +124,18 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		if studentID != 0 && !reportSlotHasStudent(slotStudents, studentID) {
 			continue
 		}
+		reportStudents := slotStudents
+		if studentID != 0 {
+			// A filtered student report must include only the selected child in
+			// its summary. The full participant list still belongs to the lesson
+			// row so Excel can place the group lesson on every child's sheet.
+			for _, slotStudent := range slotStudents {
+				if slotStudent.ID == studentID {
+					reportStudents = []models.Student{slotStudent}
+					break
+				}
+			}
+		}
 
 		duration := slotDurationMinutes(slot)
 		hours := reportHours(duration)
@@ -165,6 +178,10 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		if slot.GroupLesson != nil {
 			groupName = slot.GroupLesson.Name
 		}
+		studentIDs := make([]uint, 0, len(slotStudents))
+		for _, slotStudent := range slotStudents {
+			studentIDs = append(studentIDs, slotStudent.ID)
+		}
 		lessons = append(lessons, reportLessonRow{
 			Date:        lessonDate.Format("2006-01-02"),
 			Weekday:     slot.Weekday,
@@ -178,9 +195,10 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			TeacherName: teacherName,
 			SubjectName: subjectName,
 			RoomName:    reportRoomName(slot),
+			StudentIDs:  studentIDs,
 		})
 
-		for _, student := range slotStudents {
+		for _, student := range reportStudents {
 			studentName := student.FullName
 			if studentName == "" {
 				studentName = strconv.Itoa(int(student.ID))

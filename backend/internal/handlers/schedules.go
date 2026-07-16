@@ -17,9 +17,10 @@ import (
 )
 
 type ScheduleHandler struct {
-	db        *gorm.DB
-	generator *services.ScheduleGenerator
-	jobs      *ScheduleGenerationJobManager
+	db                *gorm.DB
+	generator         *services.ScheduleGenerator
+	jobs              *ScheduleGenerationJobManager
+	asyncGenerationMu sync.Mutex
 }
 
 func NewScheduleHandler(db *gorm.DB, generator *services.ScheduleGenerator) *ScheduleHandler {
@@ -241,11 +242,17 @@ func (h *ScheduleHandler) StartGenerateSchedule(c *gin.Context) {
 		return
 	}
 
+	if !h.asyncGenerationMu.TryLock() {
+		c.JSON(http.StatusConflict, gin.H{"error": "Генерация или пересчёт расписания уже выполняется"})
+		return
+	}
+
 	generatedByUserID := currentUserID(c)
 	job := h.jobs.Create("Генерация поставлена в очередь")
 	jobResponse := *job
 
 	go func() {
+		defer h.asyncGenerationMu.Unlock()
 		progress := func(p services.ScheduleGenerationProgress) {
 			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
 				job.Percent = p.Percent
@@ -281,11 +288,17 @@ func (h *ScheduleHandler) StartResetAutoSchedule(c *gin.Context) {
 		return
 	}
 
+	if !h.asyncGenerationMu.TryLock() {
+		c.JSON(http.StatusConflict, gin.H{"error": "Генерация или пересчёт расписания уже выполняется"})
+		return
+	}
+
 	generatedByUserID := currentUserID(c)
 	job := h.jobs.Create("Пересчёт авто-слотов поставлен в очередь")
 	jobResponse := *job
 
 	go func() {
+		defer h.asyncGenerationMu.Unlock()
 		progress := func(p services.ScheduleGenerationProgress) {
 			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
 				job.Percent = p.Percent
@@ -338,6 +351,10 @@ func (h *ScheduleHandler) ApproveSchedule(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения расписания"})
+		return
+	}
+	if err := h.validateScheduleConflicts(uint(scheduleID)); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Расписание содержит конфликт: " + err.Error()})
 		return
 	}
 
@@ -998,6 +1015,18 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 		return
 	}
 
+	tx := h.db.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось начать копирование"})
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
 	for _, s := range prevManualSlots {
 		newSlot := models.ScheduleSlot{
 			ScheduleID:    schedule.ID,
@@ -1015,9 +1044,27 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 			Origin:        models.ScheduleSlotOriginManual,
 			Status:        models.ScheduleSlotStatusScheduled,
 		}
-		if h.db.Create(&newSlot).Error == nil && newSlot.SlotType == models.SlotTypeGroup && newSlot.GroupLessonID != nil {
-			h.populateGroupAttendance(newSlot.ID, *newSlot.GroupLessonID)
+		if err := h.ensureSlotHasNoConflictsWithDB(tx, newSlot, 0); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя скопировать занятие: " + err.Error()})
+			return
 		}
+		if err := tx.Create(&newSlot).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать занятия"})
+			return
+		}
+		if newSlot.SlotType == models.SlotTypeGroup && newSlot.GroupLessonID != nil {
+			if err := h.populateGroupAttendanceWithDB(tx, newSlot.ID, *newSlot.GroupLessonID); err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать состав группы"})
+				return
+			}
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать занятия"})
+		return
 	}
 
 	h.respondWithSchedule(c, &schedule)
@@ -1071,11 +1118,11 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 	}
 
 	configErrorCodes := map[string]bool{
-		models.IssueReasonNoTeacherTime:      true,
-		models.IssueReasonNoStudentTime:      true,
-		models.IssueReasonNoRoom:             true,
+		models.IssueReasonNoTeacherTime:       true,
+		models.IssueReasonNoStudentTime:       true,
+		models.IssueReasonNoRoom:              true,
 		models.IssueReasonStrictRoomNoSubject: true,
-		models.IssueReasonDistributionFailed: true,
+		models.IssueReasonDistributionFailed:  true,
 	}
 	var configErrors, conflictErrors int
 	for _, issue := range issues {
@@ -1101,15 +1148,15 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		"slots":  slots,
 		"issues": issues,
 		"stats": gin.H{
-			"total_requested":  indRequested + grpRequested,
-			"ind_requested":    indRequested,
-			"grp_requested":    grpRequested,
-			"scheduled":        indScheduled,
-			"ind_scheduled":    indScheduled,
-			"grp_scheduled":    grpScheduled,
-			"unplaced":         unplaced,
-			"config_errors":    configErrors,
-			"conflict_errors":  conflictErrors,
+			"total_requested": indRequested + grpRequested,
+			"ind_requested":   indRequested,
+			"grp_requested":   grpRequested,
+			"scheduled":       indScheduled,
+			"ind_scheduled":   indScheduled,
+			"grp_scheduled":   grpScheduled,
+			"unplaced":        unplaced,
+			"config_errors":   configErrors,
+			"conflict_errors": conflictErrors,
 		},
 	})
 }
@@ -1167,17 +1214,37 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 // ========== SLOT EXCLUSIONS (для групповых слотов) ==========
 
 func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, excludeSlotID uint) error {
+	return h.ensureSlotHasNoConflictsWithDB(h.db, slot, excludeSlotID)
+}
+
+// validateScheduleConflicts is deliberately called immediately before approval.
+// Draft schedules can be edited by several administrators between client-side
+// checks, so approval must not trust a previously loaded browser state.
+func (h *ScheduleHandler) validateScheduleConflicts(scheduleID uint) error {
+	var slots []models.ScheduleSlot
+	if err := h.db.Where("schedule_id = ?", scheduleID).Find(&slots).Error; err != nil {
+		return fmt.Errorf("не удалось проверить занятия")
+	}
+	for _, slot := range slots {
+		if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *ScheduleHandler) ensureSlotHasNoConflictsWithDB(db *gorm.DB, slot models.ScheduleSlot, excludeSlotID uint) error {
 	if slot.Status == models.ScheduleSlotStatusCancelled {
 		return nil
 	}
 
-	studentIDs, err := h.getSlotStudentIDs(slot)
+	studentIDs, err := h.getSlotStudentIDsWithDB(db, slot)
 	if err != nil {
 		return err
 	}
 
 	var slots []models.ScheduleSlot
-	if err := h.db.Where("schedule_id = ?", slot.ScheduleID).Find(&slots).Error; err != nil {
+	if err := db.Where("schedule_id = ?", slot.ScheduleID).Find(&slots).Error; err != nil {
 		return fmt.Errorf("failed to load existing slots for conflict check")
 	}
 
@@ -1200,7 +1267,7 @@ func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, exc
 			return fmt.Errorf("room already has a lesson at this time")
 		}
 
-		existingStudentIDs, err := h.getSlotStudentIDs(existing)
+		existingStudentIDs, err := h.getSlotStudentIDsWithDB(db, existing)
 		if err != nil {
 			return err
 		}
@@ -1213,12 +1280,27 @@ func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, exc
 }
 
 func (h *ScheduleHandler) getSlotStudentIDs(slot models.ScheduleSlot) ([]uint, error) {
+	return h.getSlotStudentIDsWithDB(h.db, slot)
+}
+
+func (h *ScheduleHandler) getSlotStudentIDsWithDB(db *gorm.DB, slot models.ScheduleSlot) ([]uint, error) {
 	if slot.SlotType == models.SlotTypeGroup {
+		var attendance []models.GroupLessonAttendance
+		if err := db.Where("schedule_slot_id = ?", slot.ID).Find(&attendance).Error; err != nil {
+			return nil, fmt.Errorf("failed to load group attendance for conflict check")
+		}
+		if len(attendance) > 0 {
+			studentIDs := make([]uint, 0, len(attendance))
+			for _, record := range attendance {
+				studentIDs = append(studentIDs, record.StudentID)
+			}
+			return studentIDs, nil
+		}
 		if slot.GroupLessonID == nil {
 			return nil, nil
 		}
 		var enrollments []models.GroupLessonEnrollment
-		if err := h.db.Where("group_lesson_id = ?", *slot.GroupLessonID).Find(&enrollments).Error; err != nil {
+		if err := db.Where("group_lesson_id = ?", *slot.GroupLessonID).Find(&enrollments).Error; err != nil {
 			return nil, fmt.Errorf("failed to load group enrollments for conflict check")
 		}
 		studentIDs := make([]uint, 0, len(enrollments))
@@ -1282,14 +1364,21 @@ func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherI
 }
 
 func (h *ScheduleHandler) populateGroupAttendance(slotID, groupLessonID uint) {
+	_ = h.populateGroupAttendanceWithDB(h.db, slotID, groupLessonID)
+}
+
+func (h *ScheduleHandler) populateGroupAttendanceWithDB(db *gorm.DB, slotID, groupLessonID uint) error {
 	var enrollments []models.GroupLessonEnrollment
-	if err := h.db.Where("group_lesson_id = ?", groupLessonID).Find(&enrollments).Error; err != nil {
-		return
+	if err := db.Where("group_lesson_id = ?", groupLessonID).Find(&enrollments).Error; err != nil {
+		return err
 	}
 	for _, e := range enrollments {
-		h.db.Create(&models.GroupLessonAttendance{
+		if err := db.Create(&models.GroupLessonAttendance{
 			ScheduleSlotID: slotID,
 			StudentID:      e.StudentID,
-		})
+		}).Error; err != nil {
+			return err
+		}
 	}
+	return nil
 }

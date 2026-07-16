@@ -291,15 +291,19 @@ const AdminReports = () => {
 		addStudentSummary(generalSheet, studentRows)
 		addStudentLessons(generalSheet, lessons)
 
-		const uniqueStudents = [...new Set(studentRows.map(r => r.student_name).filter(Boolean))].sort((a, b) => ruSort(a, b))
-		uniqueStudents.forEach(name => {
+		const studentsByID = new Map()
+		studentRows.forEach(row => {
+			if (row.student_id) studentsByID.set(row.student_id, row.student_name)
+		})
+		const uniqueStudents = [...studentsByID.entries()]
+			.sort(([, a], [, b]) => ruSort(a, b))
+		uniqueStudents.forEach(([studentID, name]) => {
 			const ws = workbook.addWorksheet(safeSheetName(name, usedNames))
 			setupSheet(ws, name, periodLabel, studentCols)
-			addStudentSummary(ws, studentRows.filter(r => r.student_name === name))
-			addStudentLessons(ws, lessons.filter(l => {
-				const label = lessonPersonLabel(l) || ''
-				return label.includes(name) || l.student_name === name
-			}))
+			addStudentSummary(ws, studentRows.filter(r => r.student_id === studentID))
+			addStudentLessons(ws, lessons.filter(l =>
+				Array.isArray(l.student_ids) && l.student_ids.includes(studentID),
+			))
 		})
 		workbook.eachSheet(ws => { ws.views = [{ state: 'frozen', ySplit: 4 }] })
 		const buffer = await workbook.xlsx.writeBuffer()
