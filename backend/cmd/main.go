@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"backend/internal/database"
 	"backend/internal/handlers"
+	"backend/internal/logging"
 	"backend/internal/middleware"
 	"backend/internal/models"
 	"backend/internal/services"
@@ -21,6 +22,10 @@ import (
 )
 
 func main() {
+	// Tee logs to stdout + a rotating file so history survives redeploys
+	// (mount ./logs on a volume to persist). Must run before configuring Gin's logger.
+	logging.Setup("./logs")
+
 	cfg := config.Load()
 
 	db, err := database.Initialize(cfg)
@@ -35,7 +40,19 @@ func main() {
 
 	database.Migrate(db)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(
+		gin.LoggerWithConfig(gin.LoggerConfig{
+			Skip: func(c *gin.Context) bool {
+				// This endpoint is polled continuously by active clients. Suppress
+				// only successful polls; failures remain visible for diagnostics.
+				return c.Request.Method == http.MethodGet &&
+					c.Request.URL.Path == "/api/notifications/unread-count" &&
+					c.Writer.Status() == http.StatusOK
+			},
+		}),
+		gin.Recovery(),
+	)
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{cfg.FrontendURL},
@@ -64,7 +81,7 @@ func main() {
 
 	scheduleGenerator := services.NewScheduleGenerator(db)
 	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
-	userStudentHandler := handlers.NewUserStudentHandler(db)
+	userStudentHandler := handlers.NewUserStudentHandler(db, rdb)
 
 	// Document submissions handler
 	documentHandler := handlers.NewDocumentHandler(db)
@@ -73,9 +90,9 @@ func main() {
 	notificationHandler := handlers.NewNotificationHandler(db)
 
 	// New feature handlers
-	consultationHandler  := handlers.NewConsultationHandler(db)
-	achievementHandler   := handlers.NewAchievementHandler(db)
-	awardHandler         := handlers.NewAwardHandler(db)
+	consultationHandler := handlers.NewConsultationHandler(db)
+	achievementHandler := handlers.NewAchievementHandler(db)
+	awardHandler := handlers.NewAwardHandler(db)
 	questionnaireHandler := handlers.NewQuestionnaireHandler(db, rdb)
 
 	// Shorts (video) handler
@@ -113,13 +130,13 @@ func main() {
 	})
 
 	// Public auth routes (rate limited per IP)
-	r.POST("/api/register",       middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.Register)
-	r.POST("/api/login",          middleware.IPRateLimit(rdb, 15, 5*time.Minute), authHandler.Login)
-	r.POST("/api/verify-email",   middleware.IPRateLimit(rdb, 10, 5*time.Minute), authHandler.VerifyEmail)
-	r.POST("/api/resend-code",    middleware.IPRateLimit(rdb, 5, 5*time.Minute),  authHandler.ResendCode)
-	r.POST("/api/forgot-password",middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.ForgotPassword)
+	r.POST("/api/register", middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.Register)
+	r.POST("/api/login", middleware.IPRateLimit(rdb, 15, 5*time.Minute), authHandler.Login)
+	r.POST("/api/verify-email", middleware.IPRateLimit(rdb, 10, 5*time.Minute), authHandler.VerifyEmail)
+	r.POST("/api/resend-code", middleware.IPRateLimit(rdb, 5, 5*time.Minute), authHandler.ResendCode)
+	r.POST("/api/forgot-password", middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.ForgotPassword)
 	r.POST("/api/reset-password", middleware.IPRateLimit(rdb, 10, 15*time.Minute), authHandler.ResetPassword)
-	r.POST("/api/refresh",        middleware.IPRateLimit(rdb, 30, 5*time.Minute),  authHandler.Refresh)
+	r.POST("/api/refresh", middleware.IPRateLimit(rdb, 30, 5*time.Minute), authHandler.Refresh)
 
 	// Consultation request — public (rate limited: 3 per hour per IP for guests).
 	// OptionalAuthMiddleware attaches user_id when the caller happens to be logged in,
@@ -151,6 +168,7 @@ func main() {
 	// Protected API routes
 	protected := r.Group("/api")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret, rdb))
+	protected.Use(middleware.AuditLog()) // audit mutations + user errors (incl. admin subgroup)
 	{
 		protected.PUT("/profile", authHandler.UpdateProfile)
 		protected.DELETE("/me", authHandler.DeleteMyAccount)
@@ -359,7 +377,6 @@ func main() {
 			admin.PUT("/vacancies/:id", vacancyHandler.Update)
 			admin.DELETE("/vacancies/:id", vacancyHandler.Delete)
 
-
 			// Questionnaires review
 			admin.GET("/questionnaires", questionnaireHandler.AdminList)
 			admin.GET("/questionnaires/:id/file", questionnaireHandler.AdminServeFile)
@@ -433,7 +450,7 @@ func main() {
 		}
 		for {
 			var rows []row
-			db.Raw(`
+			if err := db.Raw(`
 				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
 				       u.first_name AS user_first_name, u.last_name AS user_last_name
 				FROM child_doc_submissions c
@@ -443,8 +460,11 @@ func main() {
 				  AND c.ippsu_expiry_date IS NOT NULL
 				  AND c.ippsu_expiry_date < NOW()
 				  AND c.expiry_notified = false
-			`).Scan(&rows)
+			`).Scan(&rows).Error; err != nil {
+				log.Printf("[JOB] ippsu_check query error: %v", err)
+			}
 
+			notified, jobErrors := 0, 0
 			for _, r := range rows {
 				expiryStr := ""
 				if r.IppsuExpiryDate != nil {
@@ -463,10 +483,16 @@ func main() {
 					"У клиента "+fullName+" истёк срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
 					"/admin/documents",
 				)
-				db.Model(&models.ChildDocSubmission{}).
+				if err := db.Model(&models.ChildDocSubmission{}).
 					Where("id = ?", r.ID).
-					Update("expiry_notified", true)
+					Update("expiry_notified", true).Error; err != nil {
+					jobErrors++
+					continue
+				}
+				notified++
 			}
+
+			log.Printf("[JOB] ippsu_check found=%d notified=%d errors=%d", len(rows), notified, jobErrors)
 
 			select {
 			case <-bgCtx.Done():

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -36,6 +37,8 @@ func IPRateLimit(rdb *redis.Client, maxReq int, window time.Duration) gin.Handle
 			return
 		}
 		if result > int64(maxReq) {
+			log.Printf("[RATELIMIT] block ip=%s route=%s ua=%q count=%d/%d",
+				ip, c.FullPath(), c.Request.UserAgent(), result, maxReq)
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "Слишком много запросов. Попробуйте позже",
 			})
