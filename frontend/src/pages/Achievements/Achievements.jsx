@@ -1,37 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
+import achievementService, { getUploadUrl } from "../../services/achievementService";
 import useReveal from "../../hooks/useReveal";
 import useBrandFont from "../../hooks/useBrandFont";
 import "./Achievements.scss";
 
-/* Achievements page — "Rassvet 2.0" design (Skills/Design2.md).
-   Content is unchanged: the same in-page success stories as before. */
-
-const stories = [
-  {
-    name: "Стокач Лёна",
-    image: "https://placehold.co/700x500",
-    text: [
-      "Есть у нас один мальчик — Лёня. Ходит в наш Центр уже почти 3 года.",
-      "У Лёни ауто трудотерапия. Занятия, на которых дети осваивают обычные бытовые навыки.",
-      "Начинал с самого простого: с поддержки взрослого. Сейчас Лёня становится самостоятельнее и увереннее.",
-    ],
-  },
-  {
-    name: "Чормонов Арлен",
-    image: "https://placehold.co/700x500",
-    secondImage: "https://placehold.co/700x500",
-    text: [
-      "Как маленькому Арлену большой мир открылся.",
-      "После занятий сенсорно-моторной интеграцией Арлен начал допускать физический контакт и стал увереннее взаимодействовать с окружающим миром.",
-      "Работа продолжается, и впереди ещё много простых и сложных задач.",
-    ],
-  },
-];
+const parseDescription = (description) => {
+  try {
+    const parsed = JSON.parse(description || "[]");
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return description ? [description] : [];
+  }
+};
 
 function Achievements() {
   const rootRef = useRef(null);
+  const [stories, setStories] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [lightbox, setLightbox] = useState(null);
 
   useEffect(() => {
@@ -39,7 +26,16 @@ function Achievements() {
   }, []);
 
   useBrandFont();
-  useReveal(rootRef);
+
+  useEffect(() => {
+    achievementService
+      .getPublic()
+      .then(setStories)
+      .catch(() => setStories([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useReveal(rootRef, [loading, stories.length]);
 
   useEffect(() => {
     if (!lightbox) return undefined;
@@ -78,49 +74,63 @@ function Achievements() {
             <h2 className="d2-h2">Наши маленькие герои</h2>
           </div>
 
+          {loading ? (
+            <p className="d2-empty" data-reveal>Загрузка...</p>
+          ) : stories.length === 0 ? (
+            <p className="d2-empty" data-reveal>Истории успеха скоро появятся здесь.</p>
+          ) : (
           <div className="ap-grid">
-            {stories.map((story, index) => (
+            {stories.map((story, index) => {
+              const image = getUploadUrl(story.image_url);
+              const secondImage = getUploadUrl(story.second_image_url);
+              const paragraphs = parseDescription(story.description);
+
+              return (
               <article
                 className={`ap-card${index % 2 === 1 ? " ap-card--reverse" : ""}`}
-                key={story.name}
+                key={story.id}
                 data-reveal
               >
                 <div
                   className={`ap-card__media${
-                    story.secondImage ? " ap-card__media--pair" : ""
+                    secondImage ? " ap-card__media--pair" : ""
                   }`}
                 >
-                  <button
-                    type="button"
-                    className="ap-photo"
-                    onClick={() => setLightbox(story.image)}
-                    title="Нажмите, чтобы увеличить"
-                  >
-                    <img src={story.image} alt={story.name} />
-                  </button>
-                  {story.secondImage && (
+                  {image && (
                     <button
                       type="button"
                       className="ap-photo"
-                      onClick={() => setLightbox(story.secondImage)}
+                      onClick={() => setLightbox(image)}
                       title="Нажмите, чтобы увеличить"
                     >
-                      <img src={story.secondImage} alt="" />
+                      <img src={image} alt={story.child_name} />
+                    </button>
+                  )}
+                  {secondImage && (
+                    <button
+                      type="button"
+                      className="ap-photo"
+                      onClick={() => setLightbox(secondImage)}
+                      title="Нажмите, чтобы увеличить"
+                    >
+                      <img src={secondImage} alt="" />
                     </button>
                   )}
                 </div>
 
                 <div className="ap-card__content">
                   <span className="ap-card__label">История успеха</span>
-                  <h3>{story.name}</h3>
-                  {story.text.map((paragraph, i) => (
+                  <h3>{story.child_name}</h3>
+                  {paragraphs.map((paragraph, i) => (
                     <p key={i}>{paragraph}</p>
                   ))}
-                  <strong>Маленькими шагами к большим возможностям!</strong>
+                  {story.conclusion && <strong>{story.conclusion}</strong>}
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
+          )}
         </div>
       </section>
 

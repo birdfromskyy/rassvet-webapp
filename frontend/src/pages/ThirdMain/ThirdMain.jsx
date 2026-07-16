@@ -4,7 +4,7 @@ import Footer from "../../components/Footer/Footer";
 import Stories from "../../components/Stories/Stories";
 import reviewService from "../../services/reviewService";
 import shortsService from "../../services/shortsService";
-import { serviceCmsService } from "../../services/cmsService";
+import { serviceCmsService, siteSettingService } from "../../services/cmsService";
 import usePageMeta from "../../hooks/usePageMeta";
 import "./ThirdMain.scss";
 
@@ -40,6 +40,19 @@ const SCROLL_STOPS = [...SECTIONS.map((s) => s.id), "tm-footer"];
 const FLIP_LOCK_MS = 1000;
 const WHEEL_THRESHOLD = 10;
 const DESKTOP_QUERY = "(min-width: 993px)";
+const DEFAULT_HOME_VIDEO_URL =
+  "https://vk.com/video_ext.php?oid=-228149734&id=456239094&hash=1a7c1dffa23542b1";
+
+const toHomeVideoEmbedUrl = (url) => {
+  if (!url || url.includes("video_ext.php")) return url || DEFAULT_HOME_VIDEO_URL;
+
+  const match = url.match(/(?:video|clip)(-?\d+)_(\d+)/);
+  if (match) {
+    return `https://vk.com/video_ext.php?oid=${match[1]}&id=${match[2]}&hd=2`;
+  }
+
+  return url;
+};
 
 const parseJson = (str) => {
   try {
@@ -225,6 +238,7 @@ function ThirdMain() {
   const [activeCatId, setActiveCatId] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [hasStories, setHasStories] = useState(true);
+  const [homeVideoUrl, setHomeVideoUrl] = useState(DEFAULT_HOME_VIDEO_URL);
 
   usePageMeta(
     "РАСсвет — центр развития детей с задержками развития",
@@ -264,6 +278,13 @@ function ThirdMain() {
 
   useEffect(() => {
     reviewService.getPublishedReviews().then(setReviews).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    siteSettingService
+      .getAll()
+      .then((settings) => setHomeVideoUrl(toHomeVideoEmbedUrl(settings.home_video_url)))
+      .catch(() => {});
   }, []);
 
   /* Services shown on the home page come from the same CMS source as
@@ -386,7 +407,7 @@ function ThirdMain() {
           <div className="tm-hero__visual" data-reveal data-reveal-delay="1">
             <div className="tm-hero__video-card">
               <iframe
-                src="https://vk.com/video_ext.php?oid=-228149734&id=456239094&hash=1a7c1dffa23542b1"
+                src={homeVideoUrl}
                 title="Видеовизитка Центра"
                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
                 allowFullScreen

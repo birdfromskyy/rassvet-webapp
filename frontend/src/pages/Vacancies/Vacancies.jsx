@@ -1,84 +1,24 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../../components/Header/Header";
 import Footer from "../../components/Footer/Footer";
+import vacancyService from "../../services/vacancyService";
 import useReveal from "../../hooks/useReveal";
 import useBrandFont from "../../hooks/useBrandFont";
 import "./Vacancies.scss";
 
-/* Vacancies page — "Rassvet 2.0" design (Skills/Design2.md).
-   Content unchanged: the same in-page vacancies as before. */
-
-const vacancies = [
-  {
-    title: "Воспитатель на группу кратковременного пребывания",
-    education: [
-      'Среднее профессиональное или высшее образование в рамках укрупненной группы по направлению "Образование и педагогические науки".',
-      "Высшее образование или среднее профессиональное образование и дополнительное профессиональное образование по направлению деятельности в организации.",
-    ],
-    experience: ["Требования к опыту практической работы не предъявляются."],
-    requirements: [
-      "Отсутствие судимости за преступления, состав и виды которых установлены законодательством РФ.",
-      "Наличие медицинской книжки.",
-    ],
-    duties: [
-      "Уход и присмотр за детьми на группе кратковременного пребывания.",
-      "Планирование групповой деятельности.",
-      "Проведение групповых мероприятий.",
-      "Помощь в гигиенических процедурах и выполнении бытовых рутин.",
-      "Сопровождение группы на выездных культурно-досуговых мероприятиях.",
-    ],
-    qualities: [
-      "Аккуратность.",
-      "Ответственность.",
-      "Добросовестность.",
-      "Пунктуальность.",
-      "Стрессоустойчивость.",
-    ],
-    conditions: [
-      "Гибкий график.",
-      "Официальное трудоустройство.",
-      "Бесплатное питание.",
-      "Возможность обучения и повышения квалификации за счёт работодателя.",
-    ],
-    contact: ["+7 (904) 459-31-02", "Оксана Александровна", "MAX"],
-  },
-  {
-    title: "Психолог",
-    education: [
-      "Высшее образование — бакалавриат.",
-      "Высшее образование — бакалавриат непрофильное и дополнительное профессиональное образование по программам профессиональной переподготовки по профилю деятельности.",
-    ],
-    experience: ["Требования к опыту практической работы не предъявляются."],
-    requirements: [
-      "Отсутствие судимости за преступления, состав и виды которых установлены законодательством РФ.",
-      "Наличие медицинской книжки.",
-    ],
-    duties: [
-      "Проведение индивидуальных коррекционно-развивающих занятий с детьми.",
-      "Психологическая диагностика.",
-      "Психологическое консультирование.",
-      "Психологическая коррекция.",
-      "Сопровождение детей на групповых культурно-досуговых мероприятиях.",
-    ],
-    qualities: [
-      "Аккуратность.",
-      "Ответственность.",
-      "Добросовестность.",
-      "Пунктуальность.",
-      "Стрессоустойчивость.",
-    ],
-    conditions: [
-      "Гибкий график.",
-      "Официальное трудоустройство.",
-      "Бесплатное питание.",
-      "Возможность обучения и повышения квалификации за счёт работодателя.",
-    ],
-    contact: ["+7 (904) 459-31-02", "Оксана Александровна", "MAX"],
-  },
-];
+const parseList = (value) => {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return value ? [value] : [];
+  }
+};
 
 function VacancySection({ title, items }) {
+  if (!items?.length) return null;
+
   return (
     <div className="vp-block">
       <h4 className="vp-block__title">{title}</h4>
@@ -93,13 +33,23 @@ function VacancySection({ title, items }) {
 
 function Vacancies() {
   const rootRef = useRef(null);
+  const [vacancies, setVacancies] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     document.title = "Вакансии";
   }, []);
 
   useBrandFont();
-  useReveal(rootRef);
+  useEffect(() => {
+    vacancyService
+      .getPublic()
+      .then(setVacancies)
+      .catch(() => setVacancies([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useReveal(rootRef, [loading, vacancies.length]);
 
   return (
     <div className="vacancies-page" ref={rootRef}>
@@ -128,40 +78,53 @@ function Vacancies() {
             <h2 className="d2-h2">Присоединяйтесь к нам</h2>
           </div>
 
+          {loading ? (
+            <p className="d2-empty" data-reveal>Загрузка...</p>
+          ) : vacancies.length === 0 ? (
+            <p className="d2-empty" data-reveal>Открытых вакансий пока нет.</p>
+          ) : (
           <div className="vp-list">
             {vacancies.map((vacancy) => (
-              <article className="vp-card" key={vacancy.title} data-reveal>
+              <article className="vp-card" key={vacancy.id} data-reveal>
                 <header className="vp-card__head">
                   <span className="vp-card__badge">Вакансия</span>
                   <h3>{vacancy.title}</h3>
                 </header>
 
                 <div className="vp-card__body">
-                  <VacancySection title="Образование" items={vacancy.education} />
-                  <VacancySection title="Опыт" items={vacancy.experience} />
+                  <VacancySection title="Образование" items={parseList(vacancy.education)} />
+                  <VacancySection title="Опыт" items={parseList(vacancy.experience)} />
                   <VacancySection
                     title="Особые требования"
-                    items={vacancy.requirements}
+                    items={parseList(vacancy.requirements)}
                   />
                   <VacancySection
                     title="Должностные обязанности"
-                    items={vacancy.duties}
+                    items={parseList(vacancy.duties)}
                   />
                   <VacancySection
                     title="Пожелания к личным качествам"
-                    items={vacancy.qualities}
+                    items={parseList(vacancy.qualities)}
                   />
                   <VacancySection
                     title="Условия работы"
-                    items={vacancy.conditions}
+                    items={parseList(vacancy.conditions)}
                   />
-                  {vacancy.contact && (
-                    <VacancySection title="Контакты" items={vacancy.contact} />
+                  {(vacancy.contact_phone || vacancy.contact_name || vacancy.contact_messengers) && (
+                    <VacancySection
+                      title="Контакты"
+                      items={[
+                        vacancy.contact_phone,
+                        vacancy.contact_name,
+                        vacancy.contact_messengers,
+                      ].filter(Boolean)}
+                    />
                   )}
                 </div>
               </article>
             ))}
           </div>
+          )}
 
           <div className="vp-cta" data-reveal>
             <div>
