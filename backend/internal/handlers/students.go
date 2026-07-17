@@ -20,15 +20,17 @@ func NewStudentHandler(db *gorm.DB) *StudentHandler {
 }
 
 type CreateStudentRequest struct {
-	FullName    string `json:"full_name" binding:"required"`
-	FundingType string `json:"funding_type"`
-	IsActive    *bool  `json:"is_active"`
+	FullName             string `json:"full_name" binding:"required"`
+	FundingType          string `json:"funding_type"`
+	IsActive             *bool  `json:"is_active"`
+	AllowScheduleWindows *bool  `json:"allow_schedule_windows"`
 }
 
 type UpdateStudentRequest struct {
-	FullName    string `json:"full_name"`
-	FundingType string `json:"funding_type"`
-	IsActive    *bool  `json:"is_active"`
+	FullName             string `json:"full_name"`
+	FundingType          string `json:"funding_type"`
+	IsActive             *bool  `json:"is_active"`
+	AllowScheduleWindows *bool  `json:"allow_schedule_windows"`
 }
 
 type CreateStudentAvailabilityRequest struct {
@@ -92,6 +94,11 @@ func (h *StudentHandler) GetStudents(c *gin.Context) {
 	var students []models.Student
 
 	query := h.db.Order("id ASC")
+	if c.Query("archived") == "true" {
+		query = query.Where("archived_at IS NOT NULL")
+	} else {
+		query = query.Where("archived_at IS NULL")
+	}
 
 	if isActive := c.Query("is_active"); isActive != "" {
 		switch strings.ToLower(isActive) {
@@ -166,14 +173,19 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
-
-	student := models.Student{
-		FullName:    req.FullName,
-		FundingType: req.FundingType,
-		IsActive:    isActive,
+	allowScheduleWindows := false
+	if req.AllowScheduleWindows != nil {
+		allowScheduleWindows = *req.AllowScheduleWindows
 	}
 
-	if err := h.db.Select("FullName", "FundingType", "IsActive").Create(&student).Error; err != nil {
+	student := models.Student{
+		FullName:             req.FullName,
+		FundingType:          req.FundingType,
+		IsActive:             isActive,
+		AllowScheduleWindows: allowScheduleWindows,
+	}
+
+	if err := h.db.Select("FullName", "FundingType", "IsActive", "AllowScheduleWindows").Create(&student).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать ученика"})
 		return
 	}
@@ -235,6 +247,9 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 	if req.IsActive != nil {
 		student.IsActive = *req.IsActive
 	}
+	if req.AllowScheduleWindows != nil {
+		student.AllowScheduleWindows = *req.AllowScheduleWindows
+	}
 
 	if err := h.db.Save(&student).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить ученика"})
@@ -293,6 +308,13 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	now := time.Now()
+	if err := h.db.Model(&student).Update("archived_at", now).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить ученика в архив"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Ученик перемещён в архив"})
+	return
 
 	if !student.IsActive {
 		var activeAssignments int64
@@ -347,6 +369,19 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
+}
+
+func (h *StudentHandler) RestoreStudent(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	if err := h.db.Model(&models.Student{}).Where("id = ? AND archived_at IS NOT NULL", id).Update("archived_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить ученика"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Ученик восстановлен"})
 }
 
 func (h *StudentHandler) GetStudentAvailability(c *gin.Context) {

@@ -40,7 +40,7 @@ import {
 import { toast } from "react-toastify";
 import scheduleService from "../services/scheduleService";
 
-const EMPTY = { name: "", default_duration_min: 50, is_active: true };
+const EMPTY = { name: "", default_duration_min: 50, minimum_teacher_break_minutes: 10, is_active: true };
 
 const AdminSubjects = () => {
   useBrandFont()
@@ -72,6 +72,7 @@ const AdminSubjects = () => {
     setForm({
       name: item.name,
       default_duration_min: item.default_duration_min,
+			minimum_teacher_break_minutes: item.minimum_teacher_break_minutes || 10,
       is_active: item.is_active,
     });
     setDialog({ open: true, item });
@@ -112,10 +113,10 @@ const AdminSubjects = () => {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Удалить предмет безвозвратно?")) return;
+    if (!window.confirm("Переместить предмет в архив? История занятий сохранится.")) return;
     try {
       await scheduleService.deleteSubject(id);
-      toast.success("Предмет удалён");
+      toast.success("Предмет перемещён в архив");
       load();
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка удаления");
@@ -129,7 +130,7 @@ const AdminSubjects = () => {
         <section className="admin-module__hero">
           <div>
             <span className="admin-module__badge">Расписание</span>
-            <h1>Предметы</h1>
+            <h1>Предметы ({subjects.length})</h1>
             <p>
               Управление учебными предметами и дисциплинами центра,
               длительностью занятий и статусом активности.
@@ -176,6 +177,7 @@ const AdminSubjects = () => {
                     <TableCell>ID</TableCell>
                     <TableCell>Название</TableCell>
                     <TableCell>Длительность</TableCell>
+									<TableCell>Мин. перерыв преподавателя</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell align="center">Действия</TableCell>
                   </TableRow>
@@ -190,6 +192,7 @@ const AdminSubjects = () => {
                         <TableCell>{s.id}</TableCell>
                         <TableCell>{s.name}</TableCell>
                         <TableCell>{s.default_duration_min} мин</TableCell>
+										<TableCell>{s.minimum_teacher_break_minutes || 10} мин</TableCell>
                         <TableCell>
                           <Chip
                             label={s.is_active ? "Активен" : "Неактивен"}
@@ -210,7 +213,7 @@ const AdminSubjects = () => {
                               {s.is_active ? <PauseIcon /> : <PlayIcon />}
                             </IconButton>
                           </Tooltip>
-                          <IconButton onClick={() => remove(s.id)} color="error" size="small" title="Удалить">
+                          <IconButton onClick={() => remove(s.id)} color="error" size="small" title="В архив">
                             <DeleteIcon />
                           </IconButton>
                         </TableCell>
@@ -218,7 +221,7 @@ const AdminSubjects = () => {
                     ))}
                   {!subjects.length && (
                     <TableRow>
-                      <TableCell colSpan={5} align="center">
+                      <TableCell colSpan={6} align="center">
                         <Typography color="text.secondary">Предметы не найдены</Typography>
                       </TableCell>
                     </TableRow>
@@ -253,6 +256,17 @@ const AdminSubjects = () => {
                   <MenuItem value={50}>50 минут</MenuItem>
                 </Select>
               </FormControl>
+							<FormControl fullWidth>
+								<InputLabel>Минимальный перерыв преподавателя</InputLabel>
+								<Select
+									value={form.minimum_teacher_break_minutes}
+									label="Минимальный перерыв преподавателя"
+									onChange={(e) => setForm({ ...form, minimum_teacher_break_minutes: e.target.value })}
+								>
+									<MenuItem value={5}>5 минут</MenuItem>
+									<MenuItem value={10}>10 минут</MenuItem>
+								</Select>
+							</FormControl>
               <FormControlLabel
                 control={
                   <Switch

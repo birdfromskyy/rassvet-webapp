@@ -581,7 +581,7 @@ const AdminUsers = () => {
                                 </Badge>
                               </IconButton>
                             </Tooltip>
-                            {u.role === "teacher" && (
+                            {u.role !== "user" && (
                               <Tooltip title={teacherByUserId[u.id] ? "Изменить привязку преподавателя" : "Привязать преподавателя"}>
                                 <IconButton size="small" color="secondary" onClick={() => openTeacherDialog(u)}>
                                   <Badge variant="dot" color="success" invisible={!teacherByUserId[u.id]}>

@@ -3,11 +3,12 @@ package models
 import "time"
 
 type Teacher struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	FullName  string    `json:"full_name" gorm:"type:varchar(255);not null"`
-	IsActive  bool      `json:"is_active" gorm:"not null;default:true"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         uint       `json:"id" gorm:"primaryKey"`
+	FullName   string     `json:"full_name" gorm:"type:varchar(255);not null"`
+	IsActive   bool       `json:"is_active" gorm:"not null;default:true"`
+	ArchivedAt *time.Time `json:"archived_at,omitempty" gorm:"index"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 
 	// Legacy link retained for backwards-compatible data migration. New code
 	// uses TeacherUserLink so one teacher may have several employee accounts.

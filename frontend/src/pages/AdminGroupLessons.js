@@ -48,7 +48,8 @@ import scheduleService from '../services/scheduleService'
 
 const EMPTY_FORM = {
 	name: '',
-	default_teacher_id: '',
+	teacher_ids: [],
+	teacher_hours_mode: 'full',
 	room_name: '',
 	visits_per_week: 1,
 	duration_min: 50,
@@ -105,7 +106,8 @@ const AdminGroupLessons = () => {
 		setEditingGroup(group)
 		setFormData({
 			name: group.name || '',
-			default_teacher_id: group.default_teacher_id || '',
+			teacher_ids: (group.teachers || []).map(link => link.teacher_id),
+			teacher_hours_mode: group.teacher_hours_mode || 'full',
 			room_name: group.room_name || '',
 			visits_per_week: group.visits_per_week || 1,
 			duration_min: group.duration_min || 50,
@@ -118,13 +120,15 @@ const AdminGroupLessons = () => {
 	const handleSave = async () => {
 		if (!formData.name.trim()) { toast.error('Введите название группового занятия'); return }
 		if (!formData.room_name.trim()) { toast.error('Введите кабинет или место проведения'); return }
+		if (!formData.teacher_ids.length) { toast.error('Добавьте хотя бы одного преподавателя'); return }
 		if (Number(formData.visits_per_week) < 1) { toast.error('Занятий в неделю должно быть не меньше 1'); return }
 		if (Number(formData.duration_min) < 1) { toast.error('Длительность должна быть не меньше 1 минуты'); return }
 
 		const payload = {
 			name: formData.name.trim(),
 			subject_id: null,
-			default_teacher_id: formData.default_teacher_id ? Number(formData.default_teacher_id) : null,
+			teacher_ids: formData.teacher_ids.map(Number),
+			teacher_hours_mode: formData.teacher_hours_mode,
 			room_name: formData.room_name.trim(),
 			visits_per_week: Number(formData.visits_per_week),
 			duration_min: Number(formData.duration_min),
@@ -161,7 +165,7 @@ const AdminGroupLessons = () => {
 	const handleDelete = async () => {
 		try {
 			await scheduleService.deleteGroupLesson(deleteConfirm.id)
-			toast.success('Групповое занятие удалено')
+			toast.success('Групповое занятие перемещено в архив')
 			setDeleteConfirm(null)
 			load()
 		} catch (e) {
@@ -216,7 +220,7 @@ const AdminGroupLessons = () => {
 				<section className='admin-module__hero'>
 					<div>
 						<span className='admin-module__badge'>Расписание</span>
-						<h1>Групповые занятия</h1>
+						<h1>Групповые занятия ({groups.length})</h1>
 						<p>Занятия с произвольным названием, преподавателем, кабинетом и составом учеников.</p>
 					</div>
 					<div className='admin-module__actions'>
@@ -254,7 +258,7 @@ const AdminGroupLessons = () => {
 							{groups.map(g => (
 								<TableRow key={g.id} hover>
 									<TableCell><strong>{g.name}</strong></TableCell>
-									<TableCell>{g.default_teacher?.full_name || '-'}</TableCell>
+									<TableCell>{(g.teachers || []).map(link => link.teacher?.full_name).filter(Boolean).join(', ') || '-'}</TableCell>
 									<TableCell>{g.room_name || '-'}</TableCell>
 									<TableCell align='center'>{g.visits_per_week}</TableCell>
 									<TableCell align='center'>{g.duration_min} мин</TableCell>
@@ -284,7 +288,7 @@ const AdminGroupLessons = () => {
 										<Tooltip title='Редактировать'>
 											<IconButton size='small' onClick={() => openEdit(g)}><EditIcon fontSize='small' /></IconButton>
 										</Tooltip>
-										<Tooltip title='Удалить'>
+										<Tooltip title='В архив'>
 											<IconButton size='small' color='error' onClick={() => setDeleteConfirm(g)}><DeleteIcon fontSize='small' /></IconButton>
 										</Tooltip>
 									</TableCell>
@@ -308,17 +312,24 @@ const AdminGroupLessons = () => {
 						value={formData.room_name}
 						onChange={e => setFormData(p => ({ ...p, room_name: e.target.value }))}
 					/>
+					<Autocomplete
+						multiple
+						options={teachers.filter(t => t.is_active)}
+						getOptionLabel={teacher => teacher.full_name || `#${teacher.id}`}
+						isOptionEqualToValue={(left, right) => left.id === right.id}
+						value={teachers.filter(t => formData.teacher_ids.includes(t.id))}
+						onChange={(_, value) => setFormData(p => ({ ...p, teacher_ids: value.map(teacher => teacher.id) }))}
+						renderInput={params => <TextField {...params} label='Преподаватели' required />}
+					/>
 					<FormControl fullWidth>
-						<InputLabel>Преподаватель по умолчанию</InputLabel>
+						<InputLabel>Учёт часов преподавателей</InputLabel>
 						<Select
-							value={formData.default_teacher_id}
-							label='Преподаватель по умолчанию'
-							onChange={e => setFormData(p => ({ ...p, default_teacher_id: e.target.value }))}
+							value={formData.teacher_hours_mode}
+							label='Учёт часов преподавателей'
+							onChange={e => setFormData(p => ({ ...p, teacher_hours_mode: e.target.value }))}
 						>
-							<MenuItem value=''>Не указан</MenuItem>
-							{teachers.filter(t => t.is_active).map(t => (
-								<MenuItem key={t.id} value={t.id}>{t.full_name}</MenuItem>
-							))}
+							<MenuItem value='full'>Полный: каждому полная длительность</MenuItem>
+							<MenuItem value='split'>Раздельный: длительность делится между преподавателями</MenuItem>
 						</Select>
 					</FormControl>
 					<Box display='flex' gap={2}>
@@ -410,13 +421,13 @@ const AdminGroupLessons = () => {
 			</Dialog>
 
 			<Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} PaperProps={{ className: 'admin-module-dialog' }}>
-				<DialogTitle className='admin-module-dialog__title'>Удалить группу?</DialogTitle>
+				<DialogTitle className='admin-module-dialog__title'>Переместить группу в архив?</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
-					<Typography>Удалить группу «{deleteConfirm?.name}»? Это действие нельзя отменить.</Typography>
+					<Typography>Группа «{deleteConfirm?.name}» исчезнет из рабочих списков, но история занятий сохранится.</Typography>
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setDeleteConfirm(null)}>Отмена</Button>
-					<Button variant='contained' color='error' onClick={handleDelete}>Удалить</Button>
+					<Button variant='contained' color='error' onClick={handleDelete}>В архив</Button>
 				</DialogActions>
 			</Dialog>
 		</div>

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -19,21 +20,32 @@ func NewSubjectHandler(db *gorm.DB) *SubjectHandler {
 }
 
 type CreateSubjectRequest struct {
-	Name               string `json:"name" binding:"required"`
-	DefaultDurationMin int    `json:"default_duration_min" binding:"required"`
-	IsActive           *bool  `json:"is_active"`
+	Name                       string `json:"name" binding:"required"`
+	DefaultDurationMin         int    `json:"default_duration_min" binding:"required"`
+	MinimumTeacherBreakMinutes int    `json:"minimum_teacher_break_minutes"`
+	IsActive                   *bool  `json:"is_active"`
 }
 
 type UpdateSubjectRequest struct {
-	Name               string `json:"name"`
-	DefaultDurationMin *int   `json:"default_duration_min"`
-	IsActive           *bool  `json:"is_active"`
+	Name                       string `json:"name"`
+	DefaultDurationMin         *int   `json:"default_duration_min"`
+	MinimumTeacherBreakMinutes *int   `json:"minimum_teacher_break_minutes"`
+	IsActive                   *bool  `json:"is_active"`
+}
+
+func validMinimumTeacherBreak(minutes int) bool {
+	return minutes == 5 || minutes == 10
 }
 
 func (h *SubjectHandler) GetSubjects(c *gin.Context) {
 	var subjects []models.Subject
 
 	query := h.db.Order("id ASC")
+	if c.Query("archived") == "true" {
+		query = query.Where("archived_at IS NOT NULL")
+	} else {
+		query = query.Where("archived_at IS NULL")
+	}
 
 	// Опциональный фильтр по активности: ?is_active=true/false
 	if isActive := c.Query("is_active"); isActive != "" {
@@ -93,6 +105,13 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Длительность занятия по умолчанию должна быть 30 или 50 минут"})
 		return
 	}
+	if req.MinimumTeacherBreakMinutes == 0 {
+		req.MinimumTeacherBreakMinutes = 10
+	}
+	if !validMinimumTeacherBreak(req.MinimumTeacherBreakMinutes) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Минимальный перерыв преподавателя должен быть 5 или 10 минут"})
+		return
+	}
 
 	var existing models.Subject
 	if err := h.db.Where("LOWER(name) = LOWER(?)", req.Name).First(&existing).Error; err == nil {
@@ -109,12 +128,13 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 	}
 
 	subject := models.Subject{
-		Name:               req.Name,
-		DefaultDurationMin: req.DefaultDurationMin,
-		IsActive:           isActive,
+		Name:                       req.Name,
+		DefaultDurationMin:         req.DefaultDurationMin,
+		MinimumTeacherBreakMinutes: req.MinimumTeacherBreakMinutes,
+		IsActive:                   isActive,
 	}
 
-	if err := h.db.Select("Name", "DefaultDurationMin", "IsActive").Create(&subject).Error; err != nil {
+	if err := h.db.Select("Name", "DefaultDurationMin", "MinimumTeacherBreakMinutes", "IsActive").Create(&subject).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать предмет"})
 		return
 	}
@@ -184,6 +204,13 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 		}
 		subject.DefaultDurationMin = *req.DefaultDurationMin
 	}
+	if req.MinimumTeacherBreakMinutes != nil {
+		if !validMinimumTeacherBreak(*req.MinimumTeacherBreakMinutes) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Минимальный перерыв преподавателя должен быть 5 или 10 минут"})
+			return
+		}
+		subject.MinimumTeacherBreakMinutes = *req.MinimumTeacherBreakMinutes
+	}
 
 	if req.IsActive != nil {
 		subject.IsActive = *req.IsActive
@@ -246,6 +273,13 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	now := time.Now()
+	if err := h.db.Model(&subject).Update("archived_at", now).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить предмет в архив"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Предмет перемещён в архив"})
+	return
 
 	if !subject.IsActive {
 		var activeAssignments int64
@@ -316,4 +350,17 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Subject deleted successfully"})
+}
+
+func (h *SubjectHandler) RestoreSubject(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	if err := h.db.Model(&models.Subject{}).Where("id = ? AND archived_at IS NOT NULL", id).Update("archived_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить предмет"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Предмет восстановлен"})
 }

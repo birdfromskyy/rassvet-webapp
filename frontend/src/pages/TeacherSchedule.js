@@ -43,9 +43,22 @@ const getDayDate = (weekStart, weekday) => {
 }
 
 const getSlotSubject = slot => slot.subject?.name || slot.group_lesson?.name || '—'
+const getSlotTeacherLabel = slot => {
+  if (slot.slot_type === 'group' && Array.isArray(slot.teachers) && slot.teachers.length) {
+    return slot.teachers.map(link => link.teacher?.full_name || `#${link.teacher_id}`).join(', ')
+  }
+  return slot.teacher?.full_name || '—'
+}
 const getSlotStudent = slot => {
-  if (slot.slot_type !== 'group') return slot.student?.full_name || '—'
-  const excluded = new Set((slot.exclusions || []).map(ex => ex.student_id))
+	if (slot.slot_type !== 'group') return slot.student?.full_name || '—'
+	if (Array.isArray(slot.group_lesson_attendance) && slot.group_lesson_attendance.length) {
+		return slot.group_lesson_attendance
+			.filter(attendance => attendance.attended !== false)
+			.map(attendance => attendance.student?.full_name)
+			.filter(Boolean)
+			.join(', ') || slot.group_lesson?.name || '—'
+	}
+	const excluded = new Set((slot.exclusions || []).map(ex => ex.student_id))
   return (slot.group_lesson?.enrollments || [])
     .filter(enr => !excluded.has(enr.student_id))
     .map(enr => enr.student?.full_name)
@@ -237,7 +250,7 @@ const TeacherSchedule = ({ user }) => {
                       </div>
                       <div className="schedule__slot-cell">
                         <small>Преподаватель</small>
-                        {slot.teacher?.full_name || '—'}
+						{getSlotTeacherLabel(slot)}
                       </div>
                       <div className="schedule__slot-cell">
                         <small>Кабинет</small>

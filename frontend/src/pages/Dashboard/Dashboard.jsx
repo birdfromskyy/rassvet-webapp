@@ -43,6 +43,17 @@ const getSlotSubject = (slot) =>
 
 const getSlotStudentLabel = (slot) => {
   if (slot.slot_type !== "group") return slot.student?.full_name || "—";
+  if (Array.isArray(slot.group_lesson_attendance) && slot.group_lesson_attendance.length) {
+    return (
+      slot.group_lesson_attendance
+        .filter((attendance) => attendance.attended !== false)
+        .map((attendance) => attendance.student?.full_name)
+        .filter(Boolean)
+        .join(", ") ||
+      slot.group_lesson?.name ||
+      "—"
+    );
+  }
   return (
     (slot.group_lesson?.enrollments || [])
       .map((enr) => enr.student?.full_name)
@@ -51,6 +62,15 @@ const getSlotStudentLabel = (slot) => {
     slot.group_lesson?.name ||
     "—"
   );
+};
+
+const getSlotTeacherLabel = (slot) => {
+  if (slot.slot_type === "group" && Array.isArray(slot.teachers) && slot.teachers.length) {
+    return slot.teachers
+      .map((link) => link.teacher?.full_name || `#${link.teacher_id}`)
+      .join(", ");
+  }
+  return slot.teacher?.full_name || "—";
 };
 
 const getDuration = (start, end) => {
@@ -77,7 +97,7 @@ const SlotItem = ({ slot, asTeacher }) => (
         <span className="dashboard-schedule__label">
           {asTeacher ? "Предмет: " : "Преподаватель: "}
         </span>
-        {asTeacher ? getSlotSubject(slot) : slot.teacher?.full_name || "—"}
+		{asTeacher ? getSlotSubject(slot) : getSlotTeacherLabel(slot)}
       </p>
     </div>
   </article>

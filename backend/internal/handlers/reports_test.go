@@ -61,6 +61,44 @@ func TestStudentReport_GroupLessonIncludesOnlySelectedStudentInSummary(t *testin
 	assert.ElementsMatch(t, []uint{selected.ID, peer.ID}, report.Lessons[0].StudentIDs)
 }
 
+func TestTeacherReport_GroupLessonSplitRoundsEachTeacherCredit(t *testing.T) {
+	e := newTestEnv(t)
+	e.seedUser(t, "admin@test.ru", "Passw0rd", "admin", true)
+	first := &models.Teacher{FullName: "Жуковская", IsActive: true}
+	second := &models.Teacher{FullName: "Зубова", IsActive: true}
+	third := &models.Teacher{FullName: "Стрелов", IsActive: true}
+	subject := &models.Subject{Name: "Музыкальное занятие", DefaultDurationMin: 50, MinimumTeacherBreakMinutes: 10, IsActive: true}
+	require.NoError(t, e.db.Create(first).Error)
+	require.NoError(t, e.db.Create(second).Error)
+	require.NoError(t, e.db.Create(third).Error)
+	require.NoError(t, e.db.Create(subject).Error)
+
+	weekStart := time.Date(2026, time.July, 6, 0, 0, 0, 0, time.UTC)
+	schedule := &models.Schedule{WeekStartDate: weekStart, WeekEndDate: weekStart.AddDate(0, 0, 6), Status: models.ScheduleStatusApproved}
+	require.NoError(t, e.db.Create(schedule).Error)
+	mode := models.TeacherHoursModeSplit
+	slot := &models.ScheduleSlot{ScheduleID: schedule.ID, SlotType: models.SlotTypeGroup, TeacherID: first.ID, SubjectID: &subject.ID, Weekday: 2, StartTime: "10:00", EndTime: "11:00", Origin: models.ScheduleSlotOriginManual, Status: models.ScheduleSlotStatusScheduled, TeacherHoursMode: &mode}
+	require.NoError(t, e.db.Create(slot).Error)
+	require.NoError(t, e.db.Create([]models.ScheduleSlotTeacher{
+		{ScheduleSlotID: slot.ID, TeacherID: first.ID},
+		{ScheduleSlotID: slot.ID, TeacherID: second.ID},
+		{ScheduleSlotID: slot.ID, TeacherID: third.ID},
+	}).Error)
+
+	cookies := e.login(t, "admin@test.ru", "Passw0rd")
+	w := e.do(http.MethodGet, "/api/admin/reports/monthly?start_date=2026-07-07&end_date=2026-07-07", "", cookies)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var report struct {
+		Teachers []monthlyTeacherReportRow `json:"teachers"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &report))
+	require.Len(t, report.Teachers, 3)
+	for _, row := range report.Teachers {
+		assert.Equal(t, 1, row.Lessons)
+		assert.Equal(t, 0.5, row.Hours, "60 / 3 = 20 minutes rounds to 0.5 hours per teacher")
+	}
+}
+
 func itoa(id uint) string {
 	return fmt.Sprintf("%d", id)
 }

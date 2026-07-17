@@ -3,12 +3,14 @@ package models
 import "time"
 
 type Subject struct {
-	ID                 uint      `json:"id" gorm:"primaryKey"`
-	Name               string    `json:"name" gorm:"type:varchar(255);not null;uniqueIndex"`
-	DefaultDurationMin int       `json:"default_duration_min" gorm:"not null"`
-	IsActive           bool      `json:"is_active" gorm:"not null;default:true"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                         uint       `json:"id" gorm:"primaryKey"`
+	Name                       string     `json:"name" gorm:"type:varchar(255);not null;uniqueIndex"`
+	DefaultDurationMin         int        `json:"default_duration_min" gorm:"not null"`
+	MinimumTeacherBreakMinutes int        `json:"minimum_teacher_break_minutes" gorm:"not null;default:10"`
+	IsActive                   bool       `json:"is_active" gorm:"not null;default:true"`
+	ArchivedAt                 *time.Time `json:"archived_at,omitempty" gorm:"index"`
+	CreatedAt                  time.Time  `json:"created_at"`
+	UpdatedAt                  time.Time  `json:"updated_at"`
 
 	TeacherSubjects []TeacherSubject `json:"teacher_subjects,omitempty" gorm:"foreignKey:SubjectID"`
 	RoomSubjects    []RoomSubject    `json:"room_subjects,omitempty" gorm:"foreignKey:SubjectID"`

@@ -243,7 +243,7 @@ func (g *ScheduleGenerator) packTeacherDay(
 		if err != nil {
 			return nil, err
 		}
-		ctx.ExistingSlots = append(ctx.ExistingSlots, *slot)
+		ctx.ExistingSlots = append(ctx.ExistingSlots, generatedSlotForContext(slot, task))
 		used[p.taskIdx] = true
 	}
 
@@ -261,7 +261,7 @@ func (g *ScheduleGenerator) packTeacherDay(
 func (g *ScheduleGenerator) teacherDayAnchors(teacherID uint, weekday int, slots []models.ScheduleSlot) [][2]int {
 	var anchors [][2]int
 	for _, slot := range slots {
-		if slot.TeacherID != teacherID || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
+		if !slotHasTeacher(slot, teacherID) || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
 			continue
 		}
 		start, end := hhmmToMinutes(slot.StartTime), hhmmToMinutes(slot.EndTime)
@@ -349,8 +349,8 @@ func (g *ScheduleGenerator) simulateDayChain(
 	ctx *GenerationContext,
 ) *packDayPlan {
 	maxGap := g.teacherGapMinutes
-	if maxGap < DefaultBreakMinutes {
-		maxGap = DefaultBreakMinutes
+	if maxGap < MinimumConfiguredGapMinutes {
+		maxGap = MinimumConfiguredGapMinutes
 	}
 
 	sim := make([]models.ScheduleSlot, len(ctx.ExistingSlots), len(ctx.ExistingSlots)+len(dayTaskIdx))
@@ -477,6 +477,9 @@ func (g *ScheduleGenerator) packTaskLess(
 	if deadlines[a] != deadlines[b] {
 		return deadlines[a] < deadlines[b]
 	}
+	if ta.AllowScheduleWindows != tb.AllowScheduleWindows {
+		return !ta.AllowScheduleWindows
+	}
 	if ta.FundingType != tb.FundingType {
 		return ta.FundingType == models.FundingTypePaid
 	}
@@ -502,8 +505,6 @@ func (g *ScheduleGenerator) canPlaceTaskAt(
 	endMin := startMin + task.DurationMin
 	startHHMM := minutesToHHMM(startMin)
 	endHHMM := minutesToHHMM(endMin)
-	bufferedStart, bufferedEnd := g.validator.ApplyBreakBuffer(startHHMM, endHHMM, DefaultBreakMinutes)
-
 	if !g.validator.IsTeacherAvailable(task.TeacherID, weekday, startHHMM, endHHMM, ctx.TeacherAvailability) {
 		return 0, false
 	}
@@ -516,13 +517,16 @@ func (g *ScheduleGenerator) canPlaceTaskAt(
 	if g.validator.ViolatesSameSubjectConsecutiveRule(task.StudentID, task.SubjectID, weekday, startHHMM, endHHMM, sim, ctx.GroupLessonEnrollments) {
 		return 0, false
 	}
-	if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, sim, ctx.GroupLessonEnrollments) {
+	if g.violatesMinimumBreak(task, weekday, startHHMM, endHHMM, sim, ctx) {
 		return 0, false
 	}
-	if g.validator.HasTeacherConflict(task.TeacherID, weekday, bufferedStart, bufferedEnd, sim) {
+	if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, sim, ctx.GroupLessonEnrollments, ctx.StudentAllowsWindows[task.StudentID]) {
 		return 0, false
 	}
-	if g.validator.HasStudentConflict(task.StudentID, weekday, bufferedStart, bufferedEnd, sim, ctx.GroupLessonEnrollments) {
+	if g.validator.HasTeacherConflict(task.TeacherID, weekday, startHHMM, endHHMM, sim) {
+		return 0, false
+	}
+	if g.validator.HasStudentConflict(task.StudentID, weekday, startHHMM, endHHMM, sim, ctx.GroupLessonEnrollments) {
 		return 0, false
 	}
 
@@ -530,7 +534,7 @@ func (g *ScheduleGenerator) canPlaceTaskAt(
 		if !g.validator.IsRoomAllowedForSubject(roomID, task.SubjectID, ctx.RoomSubjects) {
 			continue
 		}
-		if g.validator.HasRoomConflict(roomID, weekday, bufferedStart, bufferedEnd, sim) {
+		if g.validator.HasRoomConflict(roomID, weekday, startHHMM, endHHMM, sim) {
 			continue
 		}
 		return roomID, true

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -36,6 +37,11 @@ func (h *RoomHandler) GetRooms(c *gin.Context) {
 	var rooms []models.Room
 
 	query := h.db.Order("id ASC")
+	if c.Query("archived") == "true" {
+		query = query.Where("archived_at IS NOT NULL")
+	} else {
+		query = query.Where("archived_at IS NULL")
+	}
 
 	if isActive := c.Query("is_active"); isActive != "" {
 		switch strings.ToLower(isActive) {
@@ -231,6 +237,13 @@ func (h *RoomHandler) DeleteRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения кабинета"})
 		return
 	}
+	now := time.Now()
+	if err := h.db.Model(&room).Update("archived_at", now).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить кабинет в архив"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Кабинет перемещён в архив"})
+	return
 
 	if !room.IsActive {
 		err := h.db.Transaction(func(tx *gorm.DB) error {
@@ -264,6 +277,19 @@ func (h *RoomHandler) DeleteRoom(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Room deleted successfully"})
+}
+
+func (h *RoomHandler) RestoreRoom(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	if err := h.db.Model(&models.Room{}).Where("id = ? AND archived_at IS NOT NULL", id).Update("archived_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить кабинет"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Кабинет восстановлен"})
 }
 
 func (h *RoomHandler) GetRoomSubjects(c *gin.Context) {

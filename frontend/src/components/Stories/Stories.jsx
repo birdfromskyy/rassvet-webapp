@@ -10,11 +10,11 @@ const toVkEmbed = (url) => {
   if (videoMatch) return `https://vk.com/video_ext.php?oid=-${videoMatch[1]}&id=${videoMatch[2]}&hd=2`;
   const clipMatch = url.match(/clip-?(\d+)_(\d+)/);
   if (clipMatch) return `https://vk.com/video_ext.php?oid=-${clipMatch[1]}&id=${clipMatch[2]}&hd=2`;
-  if (url.includes("vk.com") || url.includes("vkvideo")) return url;
+  if (url.includes("vk.com") || url.includes("vk.ru") || url.includes("vkvideo")) return url;
   return null;
 };
 
-const isVk = (url) => !!(url && (url.includes("vk.com") || url.includes("vkvideo")));
+const isVk = (url) => !!(url && (url.includes("vk.com") || url.includes("vk.ru") || url.includes("vkvideo")));
 
 const PER_PAGE = 6;
 

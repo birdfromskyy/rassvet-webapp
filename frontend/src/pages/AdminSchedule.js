@@ -95,6 +95,17 @@ const STATUS_LABELS = {
 	approved: 'Утверждено',
 	archived: 'Архив',
 }
+
+const getSlotTeacherEntries = slot => {
+	if (slot?.slot_type === 'group' && Array.isArray(slot.teachers) && slot.teachers.length) {
+		return slot.teachers.map(link => link.teacher || { id: link.teacher_id })
+	}
+	return slot?.teacher ? [slot.teacher] : (slot?.teacher_id ? [{ id: slot.teacher_id }] : [])
+}
+
+const getSlotTeacherLabel = slot => getSlotTeacherEntries(slot)
+	.map(teacher => teacher.full_name || `ID ${teacher.id}`)
+	.join(', ') || '—'
 const SLOT_STATUS_COLORS = {
 	scheduled: 'default',
 	conducted: 'success',
@@ -113,6 +124,8 @@ const EMPTY_SLOT_FORM = {
 	assignment_id: '',
 	group_lesson_id: '',
 	teacher_id: '',
+	teacher_ids: [],
+	teacher_hours_mode: 'full',
 	room_id: '',
 	room_name: '',
 	weekday: 1,
@@ -126,7 +139,10 @@ const EMPTY_EDIT_FORM = {
 	start_time: '09:00',
 	end_time: '09:50',
 	room_id: '',
+	room_name: '',
 	status: 'scheduled',
+	teacher_ids: [],
+	teacher_hours_mode: 'full',
 	ignore_student_windows: false,
 }
 
@@ -211,6 +227,7 @@ const AdminSchedule = () => {
 	// Create slot dialog
 	const [createDialog, setCreateDialog] = useState(false)
 	const [slotForm, setSlotForm] = useState(EMPTY_SLOT_FORM)
+	const [groupDurationConfirm, setGroupDurationConfirm] = useState({ open: false, expected: 0, actual: 0, start: '', end: '' })
 
 	// Edit slot dialog
 	const [editDialog, setEditDialog] = useState({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
@@ -376,6 +393,14 @@ const AdminSchedule = () => {
 	}
 
 	const doGenerate = async () => {
+		if (maxGapMinutes < 10) {
+			toast.error('Минимальное значение для «Макс. перерыв у ученика» — 10 мин.')
+			return
+		}
+		if (teacherGapMinutes < 10) {
+			toast.error('Минимальное значение для «Макс. перерыв у преподавателя» — 10 мин.')
+			return
+		}
 		setGenerating(true)
 		setGenerationProgress({ percent: 0, message: 'Запуск генерации...' })
 		try {
@@ -423,7 +448,7 @@ const AdminSchedule = () => {
 				const bStart = timeToMinutes(b.start_time)
 				const bEnd = timeToMinutes(b.end_time)
 				if (!(aStart < bEnd && aEnd > bStart)) continue
-				const sameTeacher = a.teacher_id === b.teacher_id
+			const sameTeacher = getSlotTeacherIds(a).some(id => getSlotTeacherIds(b).includes(id))
 				const sameRoom = a.room_id && b.room_id && a.room_id === b.room_id
 				const studentA = getSlotStudentIds(a)
 				const studentB = getSlotStudentIds(b)
@@ -462,6 +487,10 @@ const AdminSchedule = () => {
 	}
 
 	const doResetAuto = async () => {
+		if (maxGapMinutes < 10 || teacherGapMinutes < 10) {
+			toast.error('Для генерации «Макс. перерыв у ученика» и «Макс. перерыв у преподавателя» должны быть не меньше 10 мин.')
+			return
+		}
 		setGenerating(true)
 		setGenerationProgress({ percent: 0, message: 'Запуск пересчёта...' })
 		try {
@@ -602,9 +631,11 @@ const AdminSchedule = () => {
 		const slotsByTeacher = {}
 		for (const slot of scheduleData.slots) {
 			if (slot.status === 'cancelled') continue
-			const name = slot.teacher?.full_name || `ID ${slot.teacher_id}`
-			if (!slotsByTeacher[name]) slotsByTeacher[name] = []
-			slotsByTeacher[name].push(slot)
+			for (const teacher of getSlotTeacherEntries(slot)) {
+				const name = teacher.full_name || `ID ${teacher.id}`
+				if (!slotsByTeacher[name]) slotsByTeacher[name] = []
+				slotsByTeacher[name].push(slot)
+			}
 		}
 		if (!Object.keys(slotsByTeacher).length) {
 			toast.error('Нет слотов для экспорта')
@@ -793,7 +824,7 @@ const AdminSchedule = () => {
 					`${slot.start_time}-${slot.end_time}`,
 					slot.slot_type === 'group' ? 'Групповое' : 'Индив.',
 					slot.subject?.name || '-',
-					slot.teacher?.full_name || '-',
+					getSlotTeacherLabel(slot),
 					slot.room_name || slot.room?.name || '-',
 				])
 				row.eachCell(cell => {
@@ -838,7 +869,8 @@ const AdminSchedule = () => {
 				? {
 					slot_type: 'group',
 					group_lesson_id: Number(slotForm.group_lesson_id),
-					teacher_id: Number(slotForm.teacher_id || groupLesson.default_teacher_id),
+					teacher_ids: (slotForm.teacher_ids.length ? slotForm.teacher_ids : (groupLesson.teachers || []).map(link => link.teacher_id)).map(Number),
+					teacher_hours_mode: slotForm.teacher_hours_mode || groupLesson.teacher_hours_mode || 'full',
 					room_name: slotForm.room_name || groupLesson.room_name,
 					weekday: Number(slotForm.weekday),
 					start_time: slotForm.start_time,
@@ -867,25 +899,37 @@ const AdminSchedule = () => {
 		}
 	}
 
-	const createSlot = async () => {
+	const createSlot = async (skipGroupDurationConfirm = false) => {
 		if (slotForm.slot_type === 'group') {
 			const groupLesson = groupLessons.find(g => g.id === Number(slotForm.group_lesson_id))
 			if (!groupLesson) {
-				toast.error('?????? ?? ???????')
+				toast.error('Выберите групповое занятие')
 				return
 			}
-			const teacherId = Number(slotForm.teacher_id || groupLesson.default_teacher_id)
-			if (!teacherId) {
-				toast.error('???????? ?????????????')
+			const teacherIds = slotForm.teacher_ids.length ? slotForm.teacher_ids : (groupLesson.teachers || []).map(link => link.teacher_id)
+			if (!teacherIds.length) {
+				toast.error('Выберите хотя бы одного преподавателя')
 				return
 			}
 			if (!String(slotForm.room_name || groupLesson.room_name || '').trim()) {
-				toast.error('??????? ??????? ??? ????? ??????????')
+				toast.error('Укажите кабинет или место проведения')
+				return
+			}
+			const actualDuration = timeToMinutes(slotForm.end_time) - timeToMinutes(slotForm.start_time)
+			const expectedDuration = Number(groupLesson.duration_min)
+			if (!skipGroupDurationConfirm && expectedDuration > 0 && actualDuration > 0 && actualDuration !== expectedDuration) {
+				setGroupDurationConfirm({
+					open: true,
+					expected: expectedDuration,
+					actual: actualDuration,
+					start: slotForm.start_time,
+					end: slotForm.end_time,
+				})
 				return
 			}
 			const conflicts = findConflictingSlots(
 				Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
-				null, teacherId,
+				null, teacherIds,
 				(groupLesson.enrollments || []).map(enr => enr.student_id),
 			)
 			if (conflicts.length > 0) {
@@ -903,7 +947,7 @@ const AdminSchedule = () => {
 			return
 		}
 		if (!slotForm.room_id) {
-			toast.error('???????? ?????????? ? ???????')
+			toast.error('Выберите кабинет для занятия')
 			return
 		}
 		const conflicts = findConflictingSlots(
@@ -926,7 +970,10 @@ const AdminSchedule = () => {
 			start_time: slot.start_time,
 			end_time: slot.end_time,
 			room_id: slot.room_id,
+			room_name: slot.room_name || slot.group_lesson?.room_name || '',
 			status: slot.status,
+			teacher_ids: getSlotTeacherIds(slot),
+			teacher_hours_mode: slot.teacher_hours_mode || slot.group_lesson?.teacher_hours_mode || 'full',
 			ignore_student_windows: slot.group_lesson?.ignore_student_windows || false,
 		})
 		setAddGroupStudentId('')
@@ -944,10 +991,14 @@ const AdminSchedule = () => {
 	const doSaveEditSlot = async (force = false) => {
 		try {
 			const slot = editDialog.slot
+			const { teacher_hours_mode, teacher_ids, ...basePayload } = editForm
+			const payload = slot.slot_type === 'group'
+				? { ...basePayload, teacher_ids, teacher_hours_mode }
+				: basePayload
 			if (slot.slot_type === 'group' && slot.group_lesson && editForm.ignore_student_windows !== slot.group_lesson.ignore_student_windows) {
 				await scheduleService.updateGroupLesson(slot.group_lesson.id, { ignore_student_windows: editForm.ignore_student_windows })
 			}
-			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, editForm, force)
+			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, payload, force)
 			toast.success('Слот обновлён')
 			setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
 			loadSchedule()
@@ -962,8 +1013,8 @@ const AdminSchedule = () => {
 			editForm.weekday,
 			editForm.start_time,
 			editForm.end_time,
-			editForm.room_id,
-			slot?.teacher_id,
+			slot?.slot_type === 'group' ? null : editForm.room_id,
+			slot?.slot_type === 'group' ? editForm.teacher_ids : getSlotTeacherIds(slot),
 			getSlotStudentIds(slot),
 			slot?.id,
 		)
@@ -1097,14 +1148,24 @@ const AdminSchedule = () => {
 
 	const getSlotStudentIds = slot => {
 		if (slot.slot_type === 'group') {
+			if (Array.isArray(slot.group_lesson_attendance) && slot.group_lesson_attendance.length) {
+				return slot.group_lesson_attendance
+					.filter(attendance => attendance.attended !== false)
+					.map(attendance => attendance.student_id)
+			}
 			return getActiveGroupEnrollments(slot).map(enr => enr.student_id)
 		}
 		return slot.student_id ? [slot.student_id] : []
 	}
 
-	const findConflictingSlots = (weekday, startTime, endTime, roomId, teacherId, studentIds = [], excludeSlotId = null) => {
+	const getSlotTeacherIds = slot => {
+		return getSlotTeacherEntries(slot).map(teacher => teacher.id)
+	}
+
+	const findConflictingSlots = (weekday, startTime, endTime, roomId, teacherIds = [], studentIds = [], excludeSlotId = null) => {
 		if (!scheduleData?.slots) return []
 		const checkedStudentIds = new Set(Array.isArray(studentIds) ? studentIds : [studentIds].filter(Boolean))
+		const checkedTeacherIds = new Set(Array.isArray(teacherIds) ? teacherIds.map(Number) : [Number(teacherIds)].filter(Boolean))
 		const start = timeToMinutes(startTime)
 		const end = timeToMinutes(endTime)
 		return scheduleData.slots.filter(s => {
@@ -1116,7 +1177,7 @@ const AdminSchedule = () => {
 			// Only flag conflicts for matching room, teacher, or student
 			const hasStudentConflict = getSlotStudentIds(s).some(id => checkedStudentIds.has(id))
 			const hasRoomConflict = roomId && s.room_id === roomId
-			return hasRoomConflict || s.teacher_id === teacherId || hasStudentConflict
+			return hasRoomConflict || getSlotTeacherIds(s).some(id => checkedTeacherIds.has(id)) || hasStudentConflict
 		})
 	}
 
@@ -1158,7 +1219,7 @@ const AdminSchedule = () => {
 		const time = `${s.start_time}–${s.end_time}`
 		const day = WEEKDAY_NAMES[s.weekday] || s.weekday
 		if (s.slot_type === 'group') {
-			return `${day} ${time}: ${s.group_lesson?.name || 'Группа'} (${s.teacher?.full_name || '—'}, ${s.room?.name || '—'})`
+			return `${day} ${time}: ${s.group_lesson?.name || 'Группа'} (${getSlotTeacherLabel(s)}, ${s.room_name || s.room?.name || '—'})`
 		}
 		return `${day} ${time}: ${s.student?.full_name || '—'} → ${s.teacher?.full_name || '—'} (${s.subject?.name || '—'}, ${s.room?.name || '—'})`
 	}
@@ -1202,7 +1263,7 @@ const AdminSchedule = () => {
 					if (slot.student_id !== id) continue
 				}
 			}
-			if (filterTeacherId && slot.teacher_id !== Number(filterTeacherId)) continue
+			if (filterTeacherId && !getSlotTeacherIds(slot).includes(Number(filterTeacherId))) continue
 			if (filterRoomId && slot.room_id !== Number(filterRoomId)) continue
 			if (filterFundingType) {
 				if (filterFundingType === 'group') {
@@ -1224,6 +1285,7 @@ const AdminSchedule = () => {
 	const schedule = scheduleData?.schedule
 	const stats = scheduleData?.stats
 	const issues = scheduleData?.issues || []
+	const zeroScheduledStudents = scheduleData?.zero_scheduled_students || []
 	const isDraft = schedule?.status === 'draft'
 	const isApproved = schedule?.status === 'approved'
 	const canAddSlot = isDraft || isApproved
@@ -1269,18 +1331,18 @@ const AdminSchedule = () => {
 
 				{/* Generation settings */}
 				<div className='admin-schedule-settings'>
-					<span className='admin-schedule-settings__label'>Макс. окно у ученика:</span>
+					<span className='admin-schedule-settings__label'>Макс. перерыв у ученика:</span>
 					<input
 						type='number'
 						className='admin-schedule-settings__input'
 						value={maxGapMinutes}
-						min={5}
+						min={10}
 						max={120}
 						step={5}
 						onChange={e => {
 							const val = Number(e.target.value)
 							setMaxGapMinutes(val)
-							if (val >= 5) saveMaxGapMinutes(val)
+							if (val >= 10) saveMaxGapMinutes(val)
 						}}
 					/>
 					<span className='admin-schedule-settings__label'>мин.</span>
@@ -1288,18 +1350,18 @@ const AdminSchedule = () => {
 
 					<span className='admin-schedule-settings__sep' />
 
-					<span className='admin-schedule-settings__label'>Перерыв у преподавателя:</span>
+					<span className='admin-schedule-settings__label'>Макс. перерыв у преподавателя:</span>
 					<input
 						type='number'
 						className='admin-schedule-settings__input'
 						value={teacherGapMinutes}
-						min={5}
+						min={10}
 						max={60}
 						step={5}
 						onChange={e => {
 							const val = Number(e.target.value)
 							setTeacherGapMinutes(val)
-							if (val >= 5) saveTeacherGapMinutes(val)
+							if (val >= 10) saveTeacherGapMinutes(val)
 						}}
 					/>
 					<span className='admin-schedule-settings__label'>мин.</span>
@@ -1395,6 +1457,7 @@ const AdminSchedule = () => {
 								variant='outlined'
 								color='error'
 								onClick={openDeleteManualDialog}
+								disabled={generating}
 							>
 								Очистить ручные
 							</Button>
@@ -1656,7 +1719,9 @@ const AdminSchedule = () => {
 														}
 													</TableCell>
 													<TableCell>
-														{slot.teacher?.full_name || slot.teacher_id}
+										{(slot.teachers || []).length
+											? slot.teachers.map(link => link.teacher?.full_name || link.teacher_id).join(', ')
+											: (slot.teacher?.full_name || slot.teacher_id)}
 													</TableCell>
 													<TableCell>
 														{slot.subject?.name || slot.subject_id}
@@ -1963,6 +2028,35 @@ const AdminSchedule = () => {
 					)
 				})()}
 
+				{!loading && zeroScheduledStudents.length > 0 && (
+					<Box sx={{ mt: 2 }}>
+						<Typography variant='h6' sx={{ mb: 1 }}>Ученики без проставленных занятий</Typography>
+						<Alert severity='warning' sx={{ mb: 1.5 }}>
+							У этих активных учеников есть назначения, но в данной неделе нет ни одного индивидуального занятия.
+						</Alert>
+						<TableContainer>
+							<Table size='small'>
+								<TableHead>
+									<TableRow>
+										<TableCell>Ученик</TableCell>
+										<TableCell align='center'>Активных назначений</TableCell>
+										<TableCell align='center'>Запрошено занятий в неделю</TableCell>
+									</TableRow>
+								</TableHead>
+								<TableBody>
+									{zeroScheduledStudents.map(student => (
+										<TableRow key={student.student_id}>
+											<TableCell>{student.student_name || `#${student.student_id}`}</TableCell>
+											<TableCell align='center'>{student.assignments}</TableCell>
+											<TableCell align='center'>{student.requested_visits}</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</TableContainer>
+					</Box>
+				)}
+
 			{/* Create Slot Dialog */}
 			<Dialog
 				open={createDialog}
@@ -2027,14 +2121,13 @@ const AdminSchedule = () => {
 									const [h, m] = slotForm.start_time.split(':').map(Number)
 									const endMin = h * 60 + m + (dur || 50)
 									const endTime = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`
-									const teacherId = value?.default_teacher_id
-										?? value?.default_teacher?.id
-										?? ''
 									setSlotForm({
 										...slotForm,
 										group_lesson_id: value?.id || '',
 										subject_id: value?.subject_id || '',
-										teacher_id: teacherId,
+										teacher_id: (value?.teachers || [])[0]?.teacher_id || value?.default_teacher_id || '',
+										teacher_ids: (value?.teachers || []).map(link => link.teacher_id),
+										teacher_hours_mode: value?.teacher_hours_mode || 'full',
 										room_name: value?.room_name || '',
 										ignore_student_windows: value?.ignore_student_windows || false,
 										end_time: value ? endTime : slotForm.end_time,
@@ -2044,18 +2137,20 @@ const AdminSchedule = () => {
 										<TextField {...params} label='Группа' required />
 									)}
 								/>
-								<FormControl fullWidth required>
-									<InputLabel>Преподаватель</InputLabel>
-									<Select
-										value={slotForm.teacher_id}
-										label='Преподаватель'
-										onChange={e => setSlotForm({ ...slotForm, teacher_id: e.target.value })}
-									>
-										{teachers.filter(t => t.is_active).map(t => (
-											<MenuItem key={t.id} value={t.id}>
-												{t.full_name}
-											</MenuItem>
-										))}
+								<Autocomplete
+									multiple
+									options={teachers.filter(t => t.is_active)}
+									getOptionLabel={teacher => teacher.full_name || `#${teacher.id}`}
+									isOptionEqualToValue={(left, right) => left.id === right.id}
+									value={teachers.filter(t => slotForm.teacher_ids.includes(t.id))}
+									onChange={(_, value) => setSlotForm({ ...slotForm, teacher_ids: value.map(teacher => teacher.id) })}
+									renderInput={params => <TextField {...params} label='Преподаватели' required />}
+								/>
+								<FormControl fullWidth>
+									<InputLabel>Учёт часов преподавателей</InputLabel>
+									<Select value={slotForm.teacher_hours_mode} label='Учёт часов преподавателей' onChange={e => setSlotForm({ ...slotForm, teacher_hours_mode: e.target.value })}>
+										<MenuItem value='full'>Полный</MenuItem>
+										<MenuItem value='split'>Раздельный</MenuItem>
 									</Select>
 								</FormControl>
 								<FormControlLabel
@@ -2128,9 +2223,33 @@ const AdminSchedule = () => {
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>
 					<Button onClick={() => setCreateDialog(false)}>Отмена</Button>
-					<Button onClick={createSlot} variant='contained'>
+					<Button onClick={() => createSlot()} variant='contained'>
 						Добавить
 					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Group duration confirmation */}
+			<Dialog
+				open={groupDurationConfirm.open}
+				onClose={() => setGroupDurationConfirm(prev => ({ ...prev, open: false }))}
+				maxWidth='xs'
+				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
+			>
+				<DialogTitle className='admin-module-dialog__title'>Подтверждение создания занятия</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
+					<Typography>
+						Вы указали занятие с {groupDurationConfirm.start} до {groupDurationConfirm.end} ({groupDurationConfirm.actual} мин),
+						хотя групповое занятие рассчитано на {groupDurationConfirm.expected} мин. Вы уверены?
+					</Typography>
+				</DialogContent>
+				<DialogActions className='admin-module-dialog__actions'>
+					<Button onClick={() => setGroupDurationConfirm(prev => ({ ...prev, open: false }))}>Отмена</Button>
+					<Button variant='contained' onClick={() => {
+						setGroupDurationConfirm(prev => ({ ...prev, open: false }))
+						createSlot(true)
+					}}>Да, создать</Button>
 				</DialogActions>
 			</Dialog>
 
@@ -2183,22 +2302,32 @@ const AdminSchedule = () => {
 								fullWidth
 							/>
 						</Box>
-						<FormControl fullWidth>
-							<InputLabel>Кабинет</InputLabel>
-							<Select
-								value={editForm.room_id}
-								label='Кабинет'
-								onChange={e =>
-									setEditForm({ ...editForm, room_id: e.target.value })
-								}
-							>
-								{rooms.map(r => (
-									<MenuItem key={r.id} value={r.id}>
-										{r.name}
-									</MenuItem>
-								))}
-							</Select>
-						</FormControl>
+						{editDialog.slot?.slot_type === 'group' ? (
+							<TextField
+								label='Кабинет / место проведения'
+								value={editForm.room_name}
+								onChange={e => setEditForm(prev => ({ ...prev, room_name: e.target.value }))}
+								fullWidth
+								required
+							/>
+						) : (
+							<FormControl fullWidth>
+								<InputLabel>Кабинет</InputLabel>
+								<Select
+									value={editForm.room_id}
+									label='Кабинет'
+									onChange={e =>
+										setEditForm({ ...editForm, room_id: e.target.value })
+									}
+								>
+									{rooms.map(r => (
+										<MenuItem key={r.id} value={r.id}>
+											{r.name}
+										</MenuItem>
+									))}
+								</Select>
+							</FormControl>
+						)}
 						<FormControl fullWidth>
 							<InputLabel>Статус</InputLabel>
 							<Select
@@ -2214,6 +2343,26 @@ const AdminSchedule = () => {
 								<MenuItem value='cancelled'>Отменено</MenuItem>
 							</Select>
 						</FormControl>
+						{editDialog.slot?.slot_type === 'group' && (
+							<>
+								<Autocomplete
+									multiple
+									options={teachers.filter(t => t.is_active)}
+									getOptionLabel={teacher => teacher.full_name || `#${teacher.id}`}
+									isOptionEqualToValue={(left, right) => left.id === right.id}
+									value={teachers.filter(t => editForm.teacher_ids.includes(t.id))}
+									onChange={(_, value) => setEditForm(prev => ({ ...prev, teacher_ids: value.map(teacher => teacher.id) }))}
+									renderInput={params => <TextField {...params} label='Преподаватели' required />}
+								/>
+								<FormControl fullWidth>
+									<InputLabel>Учёт часов преподавателей</InputLabel>
+									<Select value={editForm.teacher_hours_mode} label='Учёт часов преподавателей' onChange={e => setEditForm(prev => ({ ...prev, teacher_hours_mode: e.target.value }))}>
+										<MenuItem value='full'>Полный</MenuItem>
+										<MenuItem value='split'>Раздельный</MenuItem>
+									</Select>
+								</FormControl>
+							</>
+						)}
 
 						{/* Group slot: attendance-based session management */}
 						{editDialog.slot?.slot_type === 'group' && (

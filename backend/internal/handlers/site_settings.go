@@ -2,11 +2,24 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+func validateScheduleGapSetting(key, value string) error {
+	if key != "max_student_gap_minutes" && key != "teacher_gap_minutes" {
+		return nil
+	}
+	minutes, err := strconv.Atoi(value)
+	if err != nil || minutes < 10 || minutes%5 != 0 {
+		return fmt.Errorf("Значение настройки расписания должно быть не меньше 10 минут и кратно 5")
+	}
+	return nil
+}
 
 type SiteSettingHandler struct {
 	db *gorm.DB
@@ -49,6 +62,10 @@ func (h *SiteSettingHandler) Upsert(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateScheduleGapSetting(req.Key, req.Value); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var setting models.SiteSetting
 	result := h.db.Where("key = ?", req.Key).First(&setting)
@@ -70,6 +87,12 @@ func (h *SiteSettingHandler) UpsertBulk(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	for key, value := range req {
+		if err := validateScheduleGapSetting(key, value); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	for key, value := range req {

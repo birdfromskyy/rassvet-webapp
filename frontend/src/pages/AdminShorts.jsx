@@ -90,10 +90,10 @@ export default function AdminShorts() {
       toast.error("Укажите ссылку на видео");
       return;
     }
-    const isVk = url.includes("vk.com") || url.includes("vkvideo.ru");
+    const isVk = url.includes("vk.com") || url.includes("vk.ru") || url.includes("vkvideo.ru");
     const isMp4 = /\.mp4(\?|$)/i.test(url);
     if (!isVk && !isMp4) {
-      toast.error("Поддерживаются только ссылки VK (vk.com/...) или прямые mp4-ссылки");
+      toast.error("Поддерживаются только ссылки VK (vk.com/... или vk.ru/...) или прямые mp4-ссылки");
       return;
     }
 
@@ -333,7 +333,7 @@ export default function AdminShorts() {
                 }))
               }
               fullWidth
-              placeholder="https://vk.com/clip-12345_67890"
+              placeholder="https://vk.ru/clip-12345_67890"
               helperText="VK Клип, VK Видео или прямая mp4-ссылка"
             />
 

@@ -239,6 +239,7 @@ func main() {
 			admin.PUT("/subjects/:id", subjectHandler.UpdateSubject)
 			admin.PATCH("/subjects/:id/deactivate", subjectHandler.DeactivateSubject)
 			admin.DELETE("/subjects/:id", subjectHandler.DeleteSubject)
+			admin.PATCH("/subjects/:id/restore", subjectHandler.RestoreSubject)
 
 			// Rooms
 			admin.GET("/rooms", roomHandler.GetRooms)
@@ -247,6 +248,7 @@ func main() {
 			admin.PUT("/rooms/:id", roomHandler.UpdateRoom)
 			admin.PATCH("/rooms/:id/deactivate", roomHandler.DeactivateRoom)
 			admin.DELETE("/rooms/:id", roomHandler.DeleteRoom)
+			admin.PATCH("/rooms/:id/restore", roomHandler.RestoreRoom)
 			admin.GET("/rooms/:id/subjects", roomHandler.GetRoomSubjects)
 			admin.PUT("/rooms/:id/subjects", roomHandler.UpdateRoomSubjects)
 
@@ -257,6 +259,7 @@ func main() {
 			admin.PUT("/students/:id", studentHandler.UpdateStudent)
 			admin.PATCH("/students/:id/deactivate", studentHandler.DeactivateStudent)
 			admin.DELETE("/students/:id", studentHandler.DeleteStudent)
+			admin.PATCH("/students/:id/restore", studentHandler.RestoreStudent)
 			admin.GET("/students/:id/availability", studentHandler.GetStudentAvailability)
 			admin.POST("/students/:id/availability", studentHandler.CreateStudentAvailability)
 			admin.PUT("/students/:id/availability/:availabilityId", studentHandler.UpdateStudentAvailability)
@@ -270,6 +273,7 @@ func main() {
 			admin.PATCH("/teachers/:id/deactivate", teacherHandler.DeactivateTeacher)
 			admin.PATCH("/teachers/:id/activate", teacherHandler.ActivateTeacher)
 			admin.DELETE("/teachers/:id", teacherHandler.DeleteTeacher)
+			admin.PATCH("/teachers/:id/restore", teacherHandler.RestoreTeacher)
 			admin.GET("/teachers/:id/subjects", teacherHandler.GetTeacherSubjects)
 			admin.PUT("/teachers/:id/subjects", teacherHandler.UpdateTeacherSubjects)
 			admin.GET("/teachers/:id/availability", teacherHandler.GetTeacherAvailability)
@@ -286,6 +290,7 @@ func main() {
 			admin.POST("/assignments", assignmentHandler.CreateAssignment)
 			admin.PUT("/assignments/:id", assignmentHandler.UpdateAssignment)
 			admin.DELETE("/assignments/:id", assignmentHandler.DeleteAssignment)
+			admin.PATCH("/assignments/:id/restore", assignmentHandler.RestoreAssignment)
 
 			// Schedules
 			admin.GET("/schedules", scheduleHandler.GetScheduleByWeek)
@@ -318,6 +323,7 @@ func main() {
 			admin.POST("/group-lessons", groupLessonHandler.CreateGroupLesson)
 			admin.PUT("/group-lessons/:id", groupLessonHandler.UpdateGroupLesson)
 			admin.DELETE("/group-lessons/:id", groupLessonHandler.DeleteGroupLesson)
+			admin.PATCH("/group-lessons/:id/restore", groupLessonHandler.RestoreGroupLesson)
 			admin.GET("/group-lessons/:id/enrollments", groupLessonHandler.GetEnrollments)
 			admin.POST("/group-lessons/:id/enrollments", groupLessonHandler.AddEnrollment)
 			admin.DELETE("/group-lessons/:id/enrollments/:studentId", groupLessonHandler.RemoveEnrollment)

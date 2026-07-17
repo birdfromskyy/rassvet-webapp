@@ -52,7 +52,7 @@ const WEEKDAY_FULL = {
   7: "Воскресенье",
 };
 
-const EMPTY_STUDENT = { full_name: "", is_active: true };
+const EMPTY_STUDENT = { full_name: "", is_active: true, allow_schedule_windows: false };
 const EMPTY_AVAIL = { weekday: 1, start_time: "09:00", end_time: "18:00" };
 
 const AdminStudents = () => {
@@ -88,7 +88,7 @@ const AdminStudents = () => {
   };
 
   const openEdit = (item) => {
-    setForm({ full_name: item.full_name, is_active: item.is_active });
+    setForm({ full_name: item.full_name, is_active: item.is_active, allow_schedule_windows: Boolean(item.allow_schedule_windows) });
     setEditDialog({ open: true, item });
   };
 
@@ -97,7 +97,7 @@ const AdminStudents = () => {
   const saveStudent = async () => {
     if (!form.full_name.trim()) { toast.error("Введите ФИО ученика"); return; }
     try {
-      const data = { full_name: form.full_name.trim(), is_active: form.is_active };
+      const data = { full_name: form.full_name.trim(), is_active: form.is_active, allow_schedule_windows: form.allow_schedule_windows };
       if (editDialog.item) {
         await scheduleService.updateStudent(editDialog.item.id, data);
         toast.success("Ученик обновлён");
@@ -128,10 +128,10 @@ const AdminStudents = () => {
   };
 
   const removeStudent = async (id) => {
-    if (!window.confirm("Удалить ученика безвозвратно?")) return;
+    if (!window.confirm("Переместить ученика в архив? История занятий сохранится.")) return;
     try {
       await scheduleService.deleteStudent(id);
-      toast.success("Ученик удалён");
+      toast.success("Ученик перемещён в архив");
       load();
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка удаления");
@@ -200,7 +200,7 @@ const AdminStudents = () => {
         <section className="admin-module__hero">
           <div>
             <span className="admin-module__badge">Расписание</span>
-            <h1>Ученики</h1>
+            <h1>Ученики ({students.length})</h1>
             <p>
               Управление учениками, их доступностью по дням и временным
               окнам для корректного формирования расписания.
@@ -246,6 +246,7 @@ const AdminStudents = () => {
                   <TableRow>
                     <TableCell>ID</TableCell>
                     <TableCell>ФИО</TableCell>
+									<TableCell>Окна</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell align="center">Действия</TableCell>
                   </TableRow>
@@ -260,6 +261,7 @@ const AdminStudents = () => {
                       <TableRow key={s.id}>
                         <TableCell>{s.id}</TableCell>
                         <TableCell>{s.full_name}</TableCell>
+										<TableCell>{s.allow_schedule_windows ? 'Разрешены' : 'Не разрешены'}</TableCell>
                         <TableCell>
                           <Chip
                             label={s.is_active ? "Активен" : "Неактивен"}
@@ -283,7 +285,7 @@ const AdminStudents = () => {
                               {s.is_active ? <PauseIcon /> : <PlayIcon />}
                             </IconButton>
                           </Tooltip>
-                          <IconButton onClick={() => removeStudent(s.id)} size="small" color="error" title="Удалить">
+                          <IconButton onClick={() => removeStudent(s.id)} size="small" color="error" title="В архив">
                             <DeleteIcon />
                           </IconButton>
                         </TableCell>
@@ -291,7 +293,7 @@ const AdminStudents = () => {
                     ))}
                   {!students.length && (
                     <TableRow>
-                      <TableCell colSpan={4} align="center">
+                      <TableCell colSpan={5} align="center">
                         <Typography color="text.secondary">Ученики не найдены</Typography>
                       </TableCell>
                     </TableRow>
@@ -325,6 +327,15 @@ const AdminStudents = () => {
                 }
                 label="Активен"
               />
+							<FormControlLabel
+								control={
+									<Switch
+										checked={Boolean(form.allow_schedule_windows)}
+										onChange={(e) => setForm({ ...form, allow_schedule_windows: e.target.checked })}
+									/>
+								}
+								label="Можно ставить длинные окна между занятиями"
+							/>
             </Box>
           </DialogContent>
           <DialogActions className="admin-module-dialog__actions">

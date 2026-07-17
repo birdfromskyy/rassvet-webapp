@@ -172,6 +172,6 @@ PostgreSQL 15, база `reviews_db`. GORM AutoMigrate при каждом за�
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 ```
 
-Nginx на хосте проксирует `/api/*` и `/uploads/*` на backend-контейнер, остальное — на frontend-контейнер. SSL через Let's Encrypt. Бэкапы БД ежедневно в 03:00, хранятся 7 дней.
+Nginx на хосте проксирует `/api/*` и `/uploads/*` на backend-контейнер, остальное — на frontend-контейнер. SSL через Let's Encrypt. Бэкапы БД ежедневно в 03:00, хранятся 45 дней.
 
 Продакшн-сборка фронтенда собирается без source maps (`GENERATE_SOURCEMAP=false`) — исходный код не отдаётся в DevTools браузера.

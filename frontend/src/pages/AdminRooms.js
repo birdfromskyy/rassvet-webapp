@@ -145,10 +145,10 @@ const AdminRooms = () => {
   };
 
   const removeRoom = async (id) => {
-    if (!window.confirm("Удалить кабинет безвозвратно?")) return;
+    if (!window.confirm("Переместить кабинет в архив? История занятий сохранится.")) return;
     try {
       await scheduleService.deleteRoom(id);
-      toast.success("Кабинет удалён");
+      toast.success("Кабинет перемещён в архив");
       loadAll();
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка удаления");
@@ -162,7 +162,7 @@ const AdminRooms = () => {
         <section className="admin-module__hero">
           <div>
             <span className="admin-module__badge">Расписание</span>
-            <h1>Кабинеты</h1>
+            <h1>Кабинеты ({rooms.length})</h1>
             <p>
               Управление учебными кабинетами центра, их статусом и
               перечнем предметов, доступных в каждом из них.
@@ -244,7 +244,7 @@ const AdminRooms = () => {
                               {r.is_active ? <PauseIcon /> : <PlayIcon />}
                             </IconButton>
                           </Tooltip>
-                          <IconButton onClick={() => removeRoom(r.id)} size="small" color="error" title="Удалить">
+                          <IconButton onClick={() => removeRoom(r.id)} size="small" color="error" title="В архив">
                             <DeleteIcon />
                           </IconButton>
                         </TableCell>

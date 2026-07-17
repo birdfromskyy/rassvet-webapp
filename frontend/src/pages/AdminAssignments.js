@@ -176,11 +176,11 @@ const AdminAssignments = () => {
 	}
 
 	const deleteAssignment = async a => {
-		if (!window.confirm(`Удалить назначение? Если к нему привязаны слоты расписания — удаление не сработает.`))
+		if (!window.confirm('Переместить назначение в архив? История занятий сохранится.'))
 			return
 		try {
 			await scheduleService.deleteAssignment(a.id)
-			toast.success('Назначение удалено')
+			toast.success('Назначение перемещено в архив')
 			loadAssignments()
 		} catch (e) {
 			toast.error(e.response?.data?.error || 'Ошибка удаления (возможно, есть связанные слоты)')
@@ -211,7 +211,7 @@ const AdminAssignments = () => {
 				<section className='admin-module__hero'>
 					<div>
 						<span className='admin-module__badge'>Расписание</span>
-						<h1>Назначения</h1>
+						<h1>Назначения ({assignments.length})</h1>
 						<p>Связки ученик — преподаватель — предмет для формирования расписания занятий.</p>
 					</div>
 					<div className='admin-module__actions'>
@@ -391,7 +391,7 @@ const AdminAssignments = () => {
 													{a.status === 'active' ? <PauseIcon /> : <PlayIcon />}
 												</IconButton>
 											</Tooltip>
-											<Tooltip title='Удалить назначение'>
+											<Tooltip title='В архив'>
 												<IconButton
 													onClick={() => deleteAssignment(a)}
 													size='small'

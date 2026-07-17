@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -55,6 +56,7 @@ type reportLessonRow struct {
 	SubjectName string  `json:"subject_name"`
 	RoomName    string  `json:"room_name"`
 	StudentIDs  []uint  `json:"student_ids"`
+	TeacherIDs  []uint  `json:"teacher_ids"`
 }
 
 func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
@@ -97,11 +99,15 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		Preload("GroupLesson.Enrollments.Student").
 		Preload("GroupLessonAttendance").
 		Preload("GroupLessonAttendance.Student").
+		Preload("Teachers.Teacher").
 		Where("schedules.status = ?", models.ScheduleStatusApproved).
 		Where("schedule_slots.status <> ?", models.ScheduleSlotStatusCancelled).
 		Where("schedules.week_start_date < ? AND schedules.week_end_date >= ?", queryEnd, startDate)
 	if teacherID != 0 {
-		query = query.Where("schedule_slots.teacher_id = ?", teacherID)
+		query = query.Where(`schedule_slots.teacher_id = ? OR EXISTS (
+			SELECT 1 FROM schedule_slot_teachers sst
+			WHERE sst.schedule_slot_id = schedule_slots.id AND sst.teacher_id = ?
+		)`, teacherID, teacherID)
 	}
 	if err := query.
 		Order("schedules.week_start_date ASC, schedule_slots.weekday ASC, schedule_slots.start_time ASC").
@@ -142,29 +148,36 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		subjectID := reportSubjectID(slot)
 		subjectName := reportSubjectName(slot)
 
-		teacherName := slot.Teacher.FullName
-		if teacherName == "" {
-			teacherName = strconv.Itoa(int(slot.TeacherID))
-		}
-		tKey := strconv.Itoa(int(slot.TeacherID)) + ":" + strconv.Itoa(int(subjectID)) + ":" + subjectName
-		tRow := teacherRows[tKey]
-		if tRow == nil {
-			tRow = &monthlyTeacherReportRow{
-				TeacherID:   slot.TeacherID,
-				TeacherName: teacherName,
-				SubjectID:   subjectID,
-				SubjectName: subjectName,
+		slotTeachers := slotReportTeachers(slot)
+		teacherNames := make([]string, 0, len(slotTeachers))
+		teacherIDs := make([]uint, 0, len(slotTeachers))
+		teacherCredit := reportTeacherHours(slot, duration, len(slotTeachers))
+		for _, teacher := range slotTeachers {
+			teacherIDs = append(teacherIDs, teacher.ID)
+			teacherName := teacher.FullName
+			if teacherName == "" {
+				teacherName = strconv.Itoa(int(teacher.ID))
 			}
-			teacherRows[tKey] = tRow
+			teacherNames = append(teacherNames, teacherName)
+			if teacherID != 0 && teacher.ID != teacherID {
+				continue
+			}
+			tKey := strconv.Itoa(int(teacher.ID)) + ":" + strconv.Itoa(int(subjectID)) + ":" + subjectName
+			tRow := teacherRows[tKey]
+			if tRow == nil {
+				tRow = &monthlyTeacherReportRow{TeacherID: teacher.ID, TeacherName: teacherName, SubjectID: subjectID, SubjectName: subjectName}
+				teacherRows[tKey] = tRow
+			}
+			tRow.Lessons++
+			tRow.Hours += teacherCredit
+			switch duration {
+			case 30:
+				tRow.Duration30++
+			case 50:
+				tRow.Duration50++
+			}
 		}
-		tRow.Lessons++
-		tRow.Hours += hours
-		switch duration {
-		case 30:
-			tRow.Duration30++
-		case 50:
-			tRow.Duration50++
-		}
+		teacherName := strings.Join(teacherNames, ", ")
 
 		switch duration {
 		case 30:
@@ -196,6 +209,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			SubjectName: subjectName,
 			RoomName:    reportRoomName(slot),
 			StudentIDs:  studentIDs,
+			TeacherIDs:  teacherIDs,
 		})
 
 		for _, student := range reportStudents {
@@ -307,10 +321,40 @@ func slotDurationMinutes(slot models.ScheduleSlot) int {
 }
 
 func reportHours(durationMin int) float64 {
-	if durationMin <= 0 {
+	return reportHoursForMinutes(float64(durationMin))
+}
+
+func reportHoursForMinutes(minutes float64) float64 {
+	if minutes <= 0 {
 		return 0
 	}
-	return math.Ceil(float64(durationMin)/30.0) * 0.5
+	return math.Ceil(minutes/30.0) * 0.5
+}
+
+func reportTeacherHours(slot models.ScheduleSlot, durationMin int, teacherCount int) float64 {
+	if slot.SlotType == models.SlotTypeGroup && slot.TeacherHoursMode != nil && *slot.TeacherHoursMode == models.TeacherHoursModeSplit && teacherCount > 0 {
+		return reportHoursForMinutes(float64(durationMin) / float64(teacherCount))
+	}
+	return reportHours(durationMin)
+}
+
+func slotReportTeachers(slot models.ScheduleSlot) []models.Teacher {
+	if slot.SlotType == models.SlotTypeGroup && len(slot.Teachers) > 0 {
+		teachers := make([]models.Teacher, 0, len(slot.Teachers))
+		for _, link := range slot.Teachers {
+			teacher := link.Teacher
+			if teacher.ID == 0 {
+				teacher.ID = link.TeacherID
+			}
+			teachers = append(teachers, teacher)
+		}
+		return teachers
+	}
+	teacher := slot.Teacher
+	if teacher.ID == 0 {
+		teacher.ID = slot.TeacherID
+	}
+	return []models.Teacher{teacher}
 }
 
 func slotReportStudents(slot models.ScheduleSlot) []models.Student {

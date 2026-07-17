@@ -234,10 +234,10 @@ const AdminTeachers = () => {
   };
 
   const removeTeacher = async (id) => {
-    if (!window.confirm("Удалить сотрудника безвозвратно?")) return;
+    if (!window.confirm("Переместить сотрудника в архив? История занятий сохранится.")) return;
     try {
       await scheduleService.deleteTeacher(id);
-      toast.success("Сотрудник удалён");
+      toast.success("Сотрудник перемещён в архив");
       loadAll();
     } catch (e) {
       toast.error(e.response?.data?.error || "Ошибка удаления");
@@ -377,7 +377,7 @@ const AdminTeachers = () => {
           <div>
             <span className="admin-module__badge">Справочник</span>
 
-            <h1>{MODULE_TITLE}</h1>
+            <h1>{MODULE_TITLE} ({teachers.length})</h1>
 
             <p>
               Управление карточками сотрудников, фотографиями, квалификацией,
@@ -516,7 +516,7 @@ const AdminTeachers = () => {
                             onClick={() => removeTeacher(t.id)}
                             size="small"
                             color="error"
-                            title="Удалить"
+                            title="В архив"
                           >
                             <DeleteIcon />
                           </IconButton>

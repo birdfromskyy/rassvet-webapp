@@ -19,6 +19,7 @@ import (
 var generationMu sync.Mutex
 
 const DefaultBreakMinutes = 0
+const MinimumConfiguredGapMinutes = 10
 const IdealStudentGapMinutes = 10
 const MaxStudentGapMinutes = 30
 const TeacherGapMinutes = 10
@@ -62,8 +63,8 @@ func (g *ScheduleGenerator) loadSettings() {
 		}
 		return def
 	}
-	g.maxStudentGapMinutes = readInt("max_student_gap_minutes", MaxStudentGapMinutes)
-	g.teacherGapMinutes = readInt("teacher_gap_minutes", TeacherGapMinutes)
+	g.maxStudentGapMinutes = max(readInt("max_student_gap_minutes", MaxStudentGapMinutes), MinimumConfiguredGapMinutes)
+	g.teacherGapMinutes = max(readInt("teacher_gap_minutes", TeacherGapMinutes), MinimumConfiguredGapMinutes)
 	log.Printf("[GEN] loadSettings RESULT: maxStudentGap=%d teacherGap=%d", g.maxStudentGapMinutes, g.teacherGapMinutes)
 }
 
@@ -73,11 +74,11 @@ type gapCombo struct {
 }
 
 func buildGapValues(max int) []int {
-	if max <= 5 {
-		return []int{max}
+	if max <= MinimumConfiguredGapMinutes {
+		return []int{MinimumConfiguredGapMinutes}
 	}
 	var values []int
-	for v := 5; v < max; v += 5 {
+	for v := MinimumConfiguredGapMinutes; v < max; v += 5 {
 		values = append(values, v)
 	}
 	return append(values, max)
@@ -102,19 +103,21 @@ type teacherStudentKey struct {
 }
 
 type GenerationContext struct {
-	Schedule                models.Schedule
-	Assignments             []models.Assignment
-	TeacherAvailability     []models.TeacherAvailability
-	StudentAvailability     []models.StudentAvailability
-	RoomSubjects            []models.RoomSubject
-	TeacherRooms            []models.TeacherRoom
-	GroupLessons            []models.GroupLesson
-	GroupLessonEnrollments  []models.GroupLessonEnrollment
-	ExistingSlots           []models.ScheduleSlot
-	StrictTeacherRoomMap    map[uint][]uint       // teacherID -> []roomID (строгие)
-	PreferredTeacherRoomMap map[uint][]uint       // teacherID -> []roomID (предпочтительные)
-	StrictTeacherIDs        map[uint]bool         // teacherID -> true если есть хоть один строгий кабинет
-	WindowMinutesCache      map[teacherStudentKey]int // кэш пересечений окон teacher+student
+	Schedule                   models.Schedule
+	Assignments                []models.Assignment
+	TeacherAvailability        []models.TeacherAvailability
+	StudentAvailability        []models.StudentAvailability
+	RoomSubjects               []models.RoomSubject
+	TeacherRooms               []models.TeacherRoom
+	GroupLessons               []models.GroupLesson
+	GroupLessonEnrollments     []models.GroupLessonEnrollment
+	ExistingSlots              []models.ScheduleSlot
+	StrictTeacherRoomMap       map[uint][]uint           // teacherID -> []roomID (строгие)
+	PreferredTeacherRoomMap    map[uint][]uint           // teacherID -> []roomID (предпочтительные)
+	StrictTeacherIDs           map[uint]bool             // teacherID -> true если есть хоть один строгий кабинет
+	WindowMinutesCache         map[teacherStudentKey]int // кэш пересечений окон teacher+student
+	StudentAllowsWindows       map[uint]bool
+	SubjectMinimumTeacherBreak map[uint]int
 }
 
 type WeeklyTask struct {
@@ -123,16 +126,18 @@ type WeeklyTask struct {
 	TeacherID    uint
 	SubjectID    uint
 
-	StudentName            string
-	TeacherName            string
-	SubjectName            string
-	FundingType            string
-	VisitsPerWeek          int
-	DurationMin            int
-	TaskIndex              int
-	HasStrictRoom          bool
-	AvailableWindowMinutes int // total intersection of teacher+student windows across all weekdays
-	TeacherTotalTasks      int // total number of tasks for this teacher in the current run
+	StudentName                string
+	TeacherName                string
+	SubjectName                string
+	FundingType                string
+	VisitsPerWeek              int
+	DurationMin                int
+	TaskIndex                  int
+	HasStrictRoom              bool
+	AvailableWindowMinutes     int // total intersection of teacher+student windows across all weekdays
+	TeacherTotalTasks          int // total number of tasks for this teacher in the current run
+	MinimumTeacherBreakMinutes int
+	AllowScheduleWindows       bool
 }
 
 type CandidateSlot struct {
@@ -367,7 +372,7 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 	}
 
 	var existingSlots []models.ScheduleSlot
-	if err := g.db.Where("schedule_id = ?", schedule.ID).Preload("GroupLesson").Find(&existingSlots).Error; err != nil {
+	if err := g.db.Where("schedule_id = ?", schedule.ID).Preload("GroupLesson").Preload("GroupLessonAttendance").Preload("Teachers").Preload("Subject").Find(&existingSlots).Error; err != nil {
 		return nil, fmt.Errorf("failed to load existing schedule slots: %w", err)
 	}
 
@@ -386,20 +391,45 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 	}
 
 	return &GenerationContext{
-		Schedule:                schedule,
-		Assignments:             assignments,
-		TeacherAvailability:     teacherAvailability,
-		StudentAvailability:     studentAvailability,
-		RoomSubjects:            roomSubjects,
-		TeacherRooms:            teacherRooms,
-		GroupLessons:            groupLessons,
-		GroupLessonEnrollments:  groupEnrollments,
-		ExistingSlots:           existingSlots,
-		StrictTeacherRoomMap:    strictMap,
-		PreferredTeacherRoomMap: preferredMap,
-		StrictTeacherIDs:        strictTeacherIDs,
-		WindowMinutesCache:      make(map[teacherStudentKey]int),
+		Schedule:                   schedule,
+		Assignments:                assignments,
+		TeacherAvailability:        teacherAvailability,
+		StudentAvailability:        studentAvailability,
+		RoomSubjects:               roomSubjects,
+		TeacherRooms:               teacherRooms,
+		GroupLessons:               groupLessons,
+		GroupLessonEnrollments:     groupEnrollments,
+		ExistingSlots:              existingSlots,
+		StrictTeacherRoomMap:       strictMap,
+		PreferredTeacherRoomMap:    preferredMap,
+		StrictTeacherIDs:           strictTeacherIDs,
+		WindowMinutesCache:         make(map[teacherStudentKey]int),
+		StudentAllowsWindows:       buildStudentWindowPolicy(assignments),
+		SubjectMinimumTeacherBreak: buildSubjectMinimumBreaks(assignments),
 	}, nil
+}
+
+func buildStudentWindowPolicy(assignments []models.Assignment) map[uint]bool {
+	result := make(map[uint]bool, len(assignments))
+	for _, assignment := range assignments {
+		result[assignment.StudentID] = assignment.Student.AllowScheduleWindows
+	}
+	return result
+}
+
+func buildSubjectMinimumBreaks(assignments []models.Assignment) map[uint]int {
+	result := make(map[uint]int)
+	for _, assignment := range assignments {
+		result[assignment.SubjectID] = minimumTeacherBreak(assignment.Subject)
+	}
+	return result
+}
+
+func minimumTeacherBreak(subject models.Subject) int {
+	if subject.MinimumTeacherBreakMinutes == 5 {
+		return 5
+	}
+	return 10
 }
 
 func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, progress ScheduleGenerationProgressFunc) error {
@@ -599,11 +629,11 @@ func (g *ScheduleGenerator) RunGenerationStrategy(
 	scheduledCount := g.countScheduledSlots(ctx.ExistingSlots)
 	autoSlots := g.copyAutoSlots(ctx.ExistingSlots)
 	return generationRunResult{
-		Strategy:      strategy,
-		UnplacedTasks: unplacedTasks,
-		AutoSlots:     autoSlots,
+		Strategy:       strategy,
+		UnplacedTasks:  unplacedTasks,
+		AutoSlots:      autoSlots,
 		ScheduledCount: scheduledCount,
-		QualityScore:  g.scoreGeneratedSchedule(ctx, scheduledCount, unplacedTasks),
+		QualityScore:   g.scoreGeneratedSchedule(ctx, scheduledCount, unplacedTasks),
 	}, nil
 }
 
@@ -631,6 +661,9 @@ func (g *ScheduleGenerator) runIndividualTaskPipeline(
 		// Retry order: teachers with the most total tasks first so their chains
 		// can grow using new anchors, then tightest windows within each teacher.
 		sort.SliceStable(unplaced, func(i, j int) bool {
+			if unplaced[i].AllowScheduleWindows != unplaced[j].AllowScheduleWindows {
+				return !unplaced[i].AllowScheduleWindows
+			}
 			if unplaced[i].TeacherTotalTasks != unplaced[j].TeacherTotalTasks {
 				return unplaced[i].TeacherTotalTasks > unplaced[j].TeacherTotalTasks
 			}
@@ -684,7 +717,7 @@ func (g *ScheduleGenerator) PlaceWeeklyTasks(
 		if err != nil {
 			return nil, err
 		}
-		ctx.ExistingSlots = append(ctx.ExistingSlots, *slot)
+		ctx.ExistingSlots = append(ctx.ExistingSlots, generatedSlotForContext(slot, task))
 	}
 
 	return unplaced, nil
@@ -799,7 +832,7 @@ func (g *ScheduleGenerator) collectRepairSwapSlots(task WeeklyTask, weekday int,
 		if slot.SlotType != models.SlotTypeIndividual || slot.AssignmentID == nil {
 			continue
 		}
-		if slot.TeacherID != task.TeacherID || slot.Weekday != weekday {
+		if !slotHasTeacher(slot, task.TeacherID) || slot.Weekday != weekday {
 			continue
 		}
 		slots = append(slots, slot)
@@ -842,19 +875,21 @@ func (g *ScheduleGenerator) weeklyTaskFromAssignmentID(assignmentID uint, ctx *G
 		hasStrictRoom := ctx.StrictTeacherIDs[assignment.TeacherID]
 		windowMinutes := g.computeAvailableWindowMinutes(assignment.TeacherID, assignment.StudentID, ctx)
 		return WeeklyTask{
-			AssignmentID:           assignment.ID,
-			StudentID:              assignment.StudentID,
-			TeacherID:              assignment.TeacherID,
-			SubjectID:              assignment.SubjectID,
-			StudentName:            assignment.Student.FullName,
-			TeacherName:            assignment.Teacher.FullName,
-			SubjectName:            assignment.Subject.Name,
-			FundingType:            assignment.FundingType,
-			VisitsPerWeek:          1,
-			DurationMin:            durationMin,
-			TaskIndex:              1,
-			HasStrictRoom:          hasStrictRoom,
-			AvailableWindowMinutes: windowMinutes,
+			AssignmentID:               assignment.ID,
+			StudentID:                  assignment.StudentID,
+			TeacherID:                  assignment.TeacherID,
+			SubjectID:                  assignment.SubjectID,
+			StudentName:                assignment.Student.FullName,
+			TeacherName:                assignment.Teacher.FullName,
+			SubjectName:                assignment.Subject.Name,
+			FundingType:                assignment.FundingType,
+			VisitsPerWeek:              1,
+			DurationMin:                durationMin,
+			TaskIndex:                  1,
+			HasStrictRoom:              hasStrictRoom,
+			AvailableWindowMinutes:     windowMinutes,
+			MinimumTeacherBreakMinutes: minimumTeacherBreak(assignment.Subject),
+			AllowScheduleWindows:       assignment.Student.AllowScheduleWindows,
 		}, true
 	}
 	return WeeklyTask{}, false
@@ -997,18 +1032,20 @@ func (g *ScheduleGenerator) ExpandTasks(
 
 	for i := 0; i < visitsPerWeek; i++ {
 		tasks = append(tasks, WeeklyTask{
-			AssignmentID:  assignment.ID,
-			StudentID:     assignment.StudentID,
-			TeacherID:     assignment.TeacherID,
-			SubjectID:     assignment.SubjectID,
-			StudentName:   assignment.Student.FullName,
-			TeacherName:   assignment.Teacher.FullName,
-			SubjectName:   assignment.Subject.Name,
-			FundingType:   assignment.FundingType,
-			VisitsPerWeek: visitsPerWeek,
-			DurationMin:   durationMin,
-			TaskIndex:     i + 1,
-			HasStrictRoom: hasStrictRoom,
+			AssignmentID:               assignment.ID,
+			StudentID:                  assignment.StudentID,
+			TeacherID:                  assignment.TeacherID,
+			SubjectID:                  assignment.SubjectID,
+			StudentName:                assignment.Student.FullName,
+			TeacherName:                assignment.Teacher.FullName,
+			SubjectName:                assignment.Subject.Name,
+			FundingType:                assignment.FundingType,
+			VisitsPerWeek:              visitsPerWeek,
+			DurationMin:                durationMin,
+			TaskIndex:                  i + 1,
+			HasStrictRoom:              hasStrictRoom,
+			MinimumTeacherBreakMinutes: minimumTeacherBreak(assignment.Subject),
+			AllowScheduleWindows:       assignment.Student.AllowScheduleWindows,
 		})
 	}
 
@@ -1017,6 +1054,12 @@ func (g *ScheduleGenerator) ExpandTasks(
 
 func (g *ScheduleGenerator) SortTasksByStrategy(tasks []WeeklyTask, strategy string) {
 	sort.SliceStable(tasks, func(i, j int) bool {
+		// Children who cannot wait in the centre are placed first. Children
+		// allowed to have windows stay valid, but do not consume scarce
+		// contiguous slots needed by the rest.
+		if tasks[i].AllowScheduleWindows != tasks[j].AllowScheduleWindows {
+			return !tasks[i].AllowScheduleWindows
+		}
 		if tasks[i].FundingType != tasks[j].FundingType {
 			return tasks[i].FundingType == models.FundingTypePaid
 		}
@@ -1134,8 +1177,6 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 					startHHMM := minutesToHHMM(slotStart)
 					endHHMM := minutesToHHMM(slotEnd)
 
-					bufferedStart, bufferedEnd := g.validator.ApplyBreakBuffer(startHHMM, endHHMM, DefaultBreakMinutes)
-
 					if !g.validator.IsTeacherAvailable(task.TeacherID, weekday, startHHMM, endHHMM, ctx.TeacherAvailability) {
 						continue
 					}
@@ -1148,7 +1189,10 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 					if g.validator.ViolatesSameSubjectConsecutiveRule(task.StudentID, task.SubjectID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
 						continue
 					}
-					if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
+					if g.violatesMinimumBreak(task, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx) {
+						continue
+					}
+					if g.createsLargeStudentGap(task.StudentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments, ctx.StudentAllowsWindows[task.StudentID]) {
 						continue
 					}
 					if !g.hasValidTeacherGap(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
@@ -1159,13 +1203,13 @@ func (g *ScheduleGenerator) GetCandidateSlots(task WeeklyTask, ctx *GenerationCo
 						if !g.validator.IsRoomAllowedForSubject(roomID, task.SubjectID, ctx.RoomSubjects) {
 							continue
 						}
-						if g.validator.HasTeacherConflict(task.TeacherID, weekday, bufferedStart, bufferedEnd, ctx.ExistingSlots) {
+						if g.validator.HasTeacherConflict(task.TeacherID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 							continue
 						}
-						if g.validator.HasStudentConflict(task.StudentID, weekday, bufferedStart, bufferedEnd, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
+						if g.validator.HasStudentConflict(task.StudentID, weekday, startHHMM, endHHMM, ctx.ExistingSlots, ctx.GroupLessonEnrollments) {
 							continue
 						}
-						if g.validator.HasRoomConflict(roomID, weekday, bufferedStart, bufferedEnd, ctx.ExistingSlots) {
+						if g.validator.HasRoomConflict(roomID, weekday, startHHMM, endHHMM, ctx.ExistingSlots) {
 							continue
 						}
 
@@ -1197,7 +1241,7 @@ func (g *ScheduleGenerator) ScoreCandidate(candidate CandidateSlot, task WeeklyT
 	for _, slot := range ctx.ExistingSlots {
 		studentMatch := false
 		if slot.SlotType == models.SlotTypeGroup {
-			if slot.GroupLessonID != nil && isStudentEnrolledInGroup(task.StudentID, *slot.GroupLessonID, ctx.GroupLessonEnrollments) {
+			if slotHasStudent(slot, task.StudentID, ctx.GroupLessonEnrollments) {
 				// Don't score proximity to group slots that ignore student windows —
 				// individual lessons are independent of them.
 				if slot.GroupLesson != nil && slot.GroupLesson.IgnoreStudentWindows {
@@ -1227,7 +1271,7 @@ func (g *ScheduleGenerator) ScoreCandidate(candidate CandidateSlot, task WeeklyT
 
 	// Уплотнение: бонус за примыкание к занятиям преподавателя
 	for _, slot := range ctx.ExistingSlots {
-		if slot.TeacherID == candidate.TeacherID && slot.Weekday == candidate.Weekday {
+		if slotHasTeacher(slot, candidate.TeacherID) && slot.Weekday == candidate.Weekday {
 			gap := gapMinutes(slot.EndTime, candidate.StartTime)
 			reverseGap := gapMinutes(candidate.EndTime, slot.StartTime)
 
@@ -1235,7 +1279,7 @@ func (g *ScheduleGenerator) ScoreCandidate(candidate CandidateSlot, task WeeklyT
 			if tMax < DefaultBreakMinutes {
 				tMax = DefaultBreakMinutes
 			}
-			if (gap >= DefaultBreakMinutes && gap <= tMax) || (reverseGap >= DefaultBreakMinutes && reverseGap <= tMax) {
+			if (gap >= 0 && gap <= tMax) || (reverseGap >= 0 && reverseGap <= tMax) {
 				score += 120
 			} else {
 				score -= 80
@@ -1368,7 +1412,7 @@ func (g *ScheduleGenerator) studentDayIntervals(studentID uint, weekday int, ctx
 
 		studentMatch := false
 		if slot.SlotType == models.SlotTypeGroup {
-			if slot.GroupLessonID != nil && isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, ctx.GroupLessonEnrollments) {
+			if slotHasStudent(slot, studentID, ctx.GroupLessonEnrollments) {
 				studentMatch = true
 			}
 		} else if slot.StudentID != nil && *slot.StudentID == studentID {
@@ -1396,7 +1440,13 @@ func (g *ScheduleGenerator) totalTeacherGapPenalty(ctx *GenerationContext) int {
 	teacherIDs := make(map[uint]bool)
 	for _, slot := range ctx.ExistingSlots {
 		if slot.Status != models.ScheduleSlotStatusCancelled {
-			teacherIDs[slot.TeacherID] = true
+			if slot.SlotType == models.SlotTypeGroup && len(slot.Teachers) > 0 {
+				for _, link := range slot.Teachers {
+					teacherIDs[link.TeacherID] = true
+				}
+			} else {
+				teacherIDs[slot.TeacherID] = true
+			}
 		}
 	}
 
@@ -1411,7 +1461,7 @@ func (g *ScheduleGenerator) totalTeacherGapPenalty(ctx *GenerationContext) int {
 func (g *ScheduleGenerator) teacherGapPenalty(teacherID uint, weekday int, ctx *GenerationContext) int {
 	var intervals [][2]int
 	for _, slot := range ctx.ExistingSlots {
-		if slot.TeacherID != teacherID || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
+		if !slotHasTeacher(slot, teacherID) || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
 			continue
 		}
 		start := hhmmToMinutes(slot.StartTime)
@@ -1452,13 +1502,13 @@ func (g *ScheduleGenerator) hasValidTeacherGap(
 	}
 	hasTeacherSlotToday := false
 	for _, slot := range existingSlots {
-		if slot.TeacherID != teacherID || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
+		if !slotHasTeacher(slot, teacherID) || slot.Weekday != weekday || slot.Status == models.ScheduleSlotStatusCancelled {
 			continue
 		}
 		hasTeacherSlotToday = true
 		gap := gapMinutes(slot.EndTime, startTime)
 		reverseGap := gapMinutes(endTime, slot.StartTime)
-		if (gap >= DefaultBreakMinutes && gap <= maxGap) || (reverseGap >= DefaultBreakMinutes && reverseGap <= maxGap) {
+		if (gap >= 0 && gap <= maxGap) || (reverseGap >= 0 && reverseGap <= maxGap) {
 			return true
 		}
 	}
@@ -1472,7 +1522,11 @@ func (g *ScheduleGenerator) createsLargeStudentGap(
 	endTime string,
 	existingSlots []models.ScheduleSlot,
 	enrollments []models.GroupLessonEnrollment,
+	allowWindows bool,
 ) bool {
+	if allowWindows {
+		return false
+	}
 	type interval struct {
 		start int
 		end   int
@@ -1492,7 +1546,7 @@ func (g *ScheduleGenerator) createsLargeStudentGap(
 
 		studentMatch := false
 		if slot.SlotType == models.SlotTypeGroup {
-			if slot.GroupLessonID != nil && isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
+			if slotHasStudent(slot, studentID, enrollments) {
 				// Group slots placed outside student windows must not constrain
 				// individual lesson gap — they are independent of student schedule.
 				if slot.GroupLesson != nil && slot.GroupLesson.IgnoreStudentWindows {
@@ -1622,12 +1676,27 @@ func (g *ScheduleGenerator) BackupAutoSlots(scheduleID uint) error {
 }
 
 func (g *ScheduleGenerator) CleanupAutoSlots(scheduleID uint) error {
-	if err := g.db.
-		Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
-		Delete(&models.ScheduleSlot{}).Error; err != nil {
-		return fmt.Errorf("failed to cleanup auto slots: %w", err)
-	}
-	return nil
+	return g.db.Transaction(func(tx *gorm.DB) error {
+		var slotIDs []uint
+		if err := tx.Model(&models.ScheduleSlot{}).
+			Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
+			Pluck("id", &slotIDs).Error; err != nil {
+			return fmt.Errorf("failed to load auto slots for cleanup: %w", err)
+		}
+		if len(slotIDs) == 0 {
+			return nil
+		}
+		if err := tx.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.ScheduleSlotTeacher{}).Error; err != nil {
+			return fmt.Errorf("failed to clear auto slot teachers: %w", err)
+		}
+		if err := tx.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.GroupLessonAttendance{}).Error; err != nil {
+			return fmt.Errorf("failed to clear auto slot attendance: %w", err)
+		}
+		if err := tx.Where("id IN ?", slotIDs).Delete(&models.ScheduleSlot{}).Error; err != nil {
+			return fmt.Errorf("failed to cleanup auto slots: %w", err)
+		}
+		return nil
+	})
 }
 
 func (g *ScheduleGenerator) CleanupGenerationIssues(scheduleID uint) error {
@@ -1745,6 +1814,7 @@ func (g *ScheduleGenerator) buildScheduleResponse(scheduleID uint) (*ScheduleRes
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
+		Preload("Teachers.Teacher").
 		Where("schedule_id = ?", schedule.ID).
 		Order("weekday ASC, start_time ASC, id ASC").
 		Find(&slots).Error; err != nil {

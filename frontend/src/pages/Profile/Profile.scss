@@ -124,6 +124,30 @@
   outline: none;
 }
 
+.profile__password-wrap {
+  position: relative;
+}
+
+.profile__password-wrap input {
+  padding-right: 54px;
+}
+
+.profile__password-eye {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #074462;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .profile__field input:focus {
   border-color: #074462;
 }

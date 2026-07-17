@@ -147,11 +147,11 @@ func (g *ScheduleGenerator) singleMovableBlocker(
 			continue
 		}
 
-		conflict := slot.TeacherID == task.TeacherID ||
+		conflict := slotHasTeacher(slot, task.TeacherID) ||
 			(slot.RoomID != nil && *slot.RoomID == roomID)
 		if !conflict {
 			if slot.SlotType == models.SlotTypeGroup {
-				conflict = slot.GroupLessonID != nil && isStudentEnrolledInGroup(task.StudentID, *slot.GroupLessonID, ctx.GroupLessonEnrollments)
+				conflict = slotHasStudent(slot, task.StudentID, ctx.GroupLessonEnrollments)
 			} else {
 				conflict = slot.StudentID != nil && *slot.StudentID == task.StudentID
 			}
@@ -248,13 +248,13 @@ func (g *ScheduleGenerator) applyRelocation(
 	if err != nil {
 		return false, err
 	}
-	ctx.ExistingSlots = append(ctx.ExistingSlots, *savedTask)
+	ctx.ExistingSlots = append(ctx.ExistingSlots, generatedSlotForContext(savedTask, task))
 
 	savedBlocker, err := g.SaveGeneratedSlot(scheduleID, bestForBlocker)
 	if err != nil {
 		return false, err
 	}
-	ctx.ExistingSlots = append(ctx.ExistingSlots, *savedBlocker)
+	ctx.ExistingSlots = append(ctx.ExistingSlots, generatedSlotForContext(savedBlocker, blockerTask))
 
 	log.Printf("[GEN] relocation: task a=%d placed wd=%d %s; blocker a=%d moved to wd=%d %s",
 		task.AssignmentID, cand.weekday, taskSlot.StartTime,
@@ -272,12 +272,12 @@ func (g *ScheduleGenerator) dayChainsValid(
 	ctx *GenerationContext,
 ) bool {
 	maxTeacherGap := g.teacherGapMinutes
-	if maxTeacherGap < DefaultBreakMinutes {
-		maxTeacherGap = DefaultBreakMinutes
+	if maxTeacherGap < MinimumConfiguredGapMinutes {
+		maxTeacherGap = MinimumConfiguredGapMinutes
 	}
 	var teacherIntervals [][2]int
 	for _, s := range slots {
-		if s.TeacherID != teacherID || s.Weekday != weekday || s.Status == models.ScheduleSlotStatusCancelled {
+		if !slotHasTeacher(s, teacherID) || s.Weekday != weekday || s.Status == models.ScheduleSlotStatusCancelled {
 			continue
 		}
 		start, end := hhmmToMinutes(s.StartTime), hhmmToMinutes(s.EndTime)
@@ -292,6 +292,9 @@ func (g *ScheduleGenerator) dayChainsValid(
 	if studentID == nil {
 		return true
 	}
+	if ctx.StudentAllowsWindows[*studentID] {
+		return true
+	}
 	var studentIntervals [][2]int
 	for _, s := range slots {
 		if s.Weekday != weekday || s.Status == models.ScheduleSlotStatusCancelled {
@@ -299,7 +302,7 @@ func (g *ScheduleGenerator) dayChainsValid(
 		}
 		match := false
 		if s.SlotType == models.SlotTypeGroup {
-			if s.GroupLessonID != nil && isStudentEnrolledInGroup(*studentID, *s.GroupLessonID, ctx.GroupLessonEnrollments) {
+			if slotHasStudent(s, *studentID, ctx.GroupLessonEnrollments) {
 				if s.GroupLesson != nil && s.GroupLesson.IgnoreStudentWindows {
 					continue
 				}
@@ -344,6 +347,7 @@ func buildSimSlot(scheduleID uint, task WeeklyTask, weekday, startMin int, roomI
 		EndTime:      minutesToHHMM(startMin + task.DurationMin),
 		Origin:       models.ScheduleSlotOriginAuto,
 		Status:       models.ScheduleSlotStatusScheduled,
+		Subject:      &models.Subject{ID: task.SubjectID, MinimumTeacherBreakMinutes: task.MinimumTeacherBreakMinutes},
 	}
 }
 

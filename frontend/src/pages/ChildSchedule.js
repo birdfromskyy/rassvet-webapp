@@ -41,6 +41,13 @@ const getDayDate = (weekStart, weekday) => {
   return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
+const getSlotTeacherLabel = slot => {
+  if (slot.slot_type === 'group' && Array.isArray(slot.teachers) && slot.teachers.length) {
+    return slot.teachers.map(link => link.teacher?.full_name || `#${link.teacher_id}`).join(', ')
+  }
+  return slot.teacher?.full_name || '—'
+}
+
 const ChildSchedule = ({ user }) => {
   useBrandFont()
   const [children, setChildren] = useState([])
@@ -217,7 +224,7 @@ const ChildSchedule = ({ user }) => {
                           </div>
                           <div className="schedule__slot-cell">
                             <small>Преподаватель</small>
-                            {slot.teacher?.full_name || '—'}
+							{getSlotTeacherLabel(slot)}
                           </div>
                           <div className="schedule__slot-cell">
                             <small>Кабинет</small>

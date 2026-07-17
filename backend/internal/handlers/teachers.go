@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -83,6 +84,11 @@ func (h *TeacherHandler) GetTeachers(c *gin.Context) {
 	var teachers []models.Teacher
 
 	query := h.db.Preload("UserLinks").Order("id ASC")
+	if c.Query("archived") == "true" {
+		query = query.Where("archived_at IS NOT NULL")
+	} else {
+		query = query.Where("archived_at IS NULL")
+	}
 
 	if isActive := c.Query("is_active"); isActive != "" {
 		switch strings.ToLower(isActive) {
@@ -314,6 +320,13 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	now := time.Now()
+	if err := h.db.Model(&teacher).Update("archived_at", now).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить преподавателя в архив"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель перемещён в архив"})
+	return
 
 	var activeAssignments int64
 	if err := h.db.Model(&models.Assignment{}).
@@ -324,6 +337,23 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 	}
 	if activeAssignments > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить преподавателя: есть активные назначения. Сначала поставьте их на паузу."})
+		return
+	}
+
+	// A co-teacher is part of an immutable group/slot snapshot. Deleting that
+	// teacher implicitly would either erase historical participants or leave an
+	// invalid group without a teacher, so require an explicit reassignment first.
+	var groupLinks, slotLinks int64
+	if err := h.db.Model(&models.GroupLessonTeacher{}).Where("teacher_id = ?", teacher.ID).Count(&groupLinks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
+	if err := h.db.Model(&models.ScheduleSlotTeacher{}).Where("teacher_id = ?", teacher.ID).Count(&slotLinks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
+	if groupLinks > 0 || slotLinks > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить преподавателя: он указан в групповых занятиях или расписании. Сначала замените его там."})
 		return
 	}
 
@@ -357,6 +387,19 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Teacher deleted successfully"})
+}
+
+func (h *TeacherHandler) RestoreTeacher(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	if err := h.db.Model(&models.Teacher{}).Where("id = ? AND archived_at IS NOT NULL", id).Update("archived_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить преподавателя"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель восстановлен"})
 }
 
 func (h *TeacherHandler) GetTeacherSubjects(c *gin.Context) {

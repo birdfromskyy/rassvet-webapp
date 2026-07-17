@@ -20,13 +20,13 @@ func NewAssignmentHandler(db *gorm.DB) *AssignmentHandler {
 }
 
 type CreateAssignmentRequest struct {
-	StudentID       uint    `json:"student_id" binding:"required"`
-	TeacherID       uint    `json:"teacher_id" binding:"required"`
-	SubjectID       uint    `json:"subject_id" binding:"required"`
-	FundingType     string  `json:"funding_type"`
-	VisitsPerWeek   int     `json:"visits_per_week" binding:"required"`
-	DurationMin     int     `json:"duration_min" binding:"required"`
-	Status          string `json:"status"`
+	StudentID     uint   `json:"student_id" binding:"required"`
+	TeacherID     uint   `json:"teacher_id" binding:"required"`
+	SubjectID     uint   `json:"subject_id" binding:"required"`
+	FundingType   string `json:"funding_type"`
+	VisitsPerWeek int    `json:"visits_per_week" binding:"required"`
+	DurationMin   int    `json:"duration_min" binding:"required"`
+	Status        string `json:"status"`
 }
 
 type UpdateAssignmentRequest struct {
@@ -71,6 +71,11 @@ func (h *AssignmentHandler) GetAssignments(c *gin.Context) {
 		Preload("Teacher.Availability").
 		Preload("Subject").
 		Order("id ASC")
+	if c.Query("archived") == "true" {
+		query = query.Where("assignments.archived_at IS NOT NULL")
+	} else {
+		query = query.Where("assignments.archived_at IS NULL")
+	}
 
 	if teacherID := c.Query("teacher_id"); teacherID != "" {
 		id, err := strconv.Atoi(teacherID)
@@ -224,6 +229,10 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки ученика"})
 		return
 	}
+	if student.ArchivedAt != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Ученик находится в архиве"})
+		return
+	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, req.TeacherID).Error; err != nil {
@@ -234,6 +243,10 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки преподавателя"})
 		return
 	}
+	if teacher.ArchivedAt != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Преподаватель находится в архиве"})
+		return
+	}
 
 	var subject models.Subject
 	if err := h.db.First(&subject, req.SubjectID).Error; err != nil {
@@ -242,6 +255,10 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка проверки предмета"})
+		return
+	}
+	if subject.ArchivedAt != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Предмет находится в архиве"})
 		return
 	}
 
@@ -263,6 +280,19 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		req.TeacherID,
 		req.SubjectID,
 	).First(&existing).Error; err == nil {
+		if existing.ArchivedAt != nil {
+			existing.ArchivedAt = nil
+			existing.FundingType = fundingType
+			existing.VisitsPerWeek = req.VisitsPerWeek
+			existing.DurationMin = req.DurationMin
+			existing.Status = status
+			if err := h.db.Save(&existing).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить назначение"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"message": "Архивное назначение восстановлено", "assignment": existing})
+			return
+		}
 		c.JSON(http.StatusConflict, gin.H{"error": "Запись с такими данными уже существует"})
 		return
 	} else if err != nil && err != gorm.ErrRecordNotFound {
@@ -484,6 +514,13 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	now := time.Now()
+	if err := h.db.Model(&assignment).Update("archived_at", now).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить назначение в архив"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Назначение перемещено в архив"})
+	return
 
 	if assignment.Status == models.AssignmentStatusPaused {
 		err := h.db.Transaction(func(tx *gorm.DB) error {
@@ -520,3 +557,15 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 	})
 }
 
+func (h *AssignmentHandler) RestoreAssignment(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID"})
+		return
+	}
+	if err := h.db.Model(&models.Assignment{}).Where("id = ? AND archived_at IS NOT NULL", id).Update("archived_at", nil).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить назначение"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Назначение восстановлено"})
+}

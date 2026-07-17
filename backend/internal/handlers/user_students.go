@@ -127,17 +127,20 @@ func (h *UserStudentHandler) CreateUser(c *gin.Context) {
 	}
 
 	isVerified := true
+	now := time.Now()
 	user := models.User{
-		Email:      req.Email,
-		Password:   string(hashedPassword),
-		FirstName:  req.FirstName,
-		LastName:   req.LastName,
-		MiddleName: req.MiddleName,
-		Role:       models.UserRole(role),
-		IsVerified: isVerified,
+		Email:          req.Email,
+		Password:       string(hashedPassword),
+		FirstName:      req.FirstName,
+		LastName:       req.LastName,
+		MiddleName:     req.MiddleName,
+		Role:           models.UserRole(role),
+		IsVerified:     isVerified,
+		ConsentGivenAt: &now,
+		ConsentVersion: currentConsentVersion,
 	}
 
-	if err := h.db.Select("Email", "Password", "FirstName", "LastName", "MiddleName", "Role", "IsVerified").Create(&user).Error; err != nil {
+	if err := h.db.Select("Email", "Password", "FirstName", "LastName", "MiddleName", "Role", "IsVerified", "ConsentGivenAt", "ConsentVersion").Create(&user).Error; err != nil {
 		if strings.Contains(err.Error(), "23505") || strings.Contains(err.Error(), "duplicate") || strings.Contains(err.Error(), "unique") {
 			c.JSON(http.StatusConflict, gin.H{"error": "Пользователь с таким email уже существует"})
 			return
@@ -516,6 +519,8 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 		Preload("Assignment").
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
+		Preload("GroupLessonAttendance").
+		Preload("Teachers.Teacher").
 		Where("schedule_id = ? AND status != ?", schedule.ID, models.ScheduleSlotStatusCancelled).
 		Order("weekday ASC, start_time ASC").
 		Find(&allSlots).Error; err != nil {
@@ -528,17 +533,8 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 	for _, slot := range allSlots {
 		if slot.SlotType == models.SlotTypeIndividual && slot.StudentID != nil && *slot.StudentID == uint(studentID) {
 			filteredSlots = append(filteredSlots, slot)
-		} else if slot.SlotType == models.SlotTypeGroup && slot.GroupLesson != nil {
-			enrolled := false
-			for _, e := range slot.GroupLesson.Enrollments {
-				if e.StudentID == uint(studentID) {
-					enrolled = true
-					break
-				}
-			}
-			if enrolled {
-				filteredSlots = append(filteredSlots, slot)
-			}
+		} else if slot.SlotType == models.SlotTypeGroup && slotHasPublishedStudent(slot, uint(studentID)) {
+			filteredSlots = append(filteredSlots, slot)
 		}
 	}
 
@@ -618,10 +614,16 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 		Preload("GroupLesson").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
+		Preload("GroupLessonAttendance").
+		Preload("GroupLessonAttendance.Student").
+		Preload("Teachers.Teacher").
 		Where("schedule_id = ? AND status != ?", schedule.ID, models.ScheduleSlotStatusCancelled)
 
 	if teacherID != 0 {
-		query = query.Where("teacher_id = ?", teacherID)
+		query = query.Where(`schedule_slots.teacher_id = ? OR EXISTS (
+			SELECT 1 FROM schedule_slot_teachers sst
+			WHERE sst.schedule_slot_id = schedule_slots.id AND sst.teacher_id = ?
+		)`, teacherID, teacherID)
 	}
 
 	if err := query.Order("weekday ASC, start_time ASC, id ASC").Find(&slots).Error; err != nil {
@@ -636,17 +638,10 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 				filtered = append(filtered, slot)
 				continue
 			}
-			if slot.SlotType != models.SlotTypeGroup || slot.GroupLesson == nil {
+			if slot.SlotType != models.SlotTypeGroup {
 				continue
 			}
-			enrolled := false
-			for _, e := range slot.GroupLesson.Enrollments {
-				if e.StudentID == studentID {
-					enrolled = true
-					break
-				}
-			}
-			if !enrolled {
+			if !slotHasPublishedStudent(slot, studentID) {
 				continue
 			}
 			filtered = append(filtered, slot)
@@ -666,6 +661,29 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	})
 }
 
+// slotHasPublishedStudent uses the per-session participant snapshot whenever
+// one exists. Older slots keep the template-enrollment fallback; an explicitly
+// absent child never sees the group lesson in a personal schedule.
+func slotHasPublishedStudent(slot models.ScheduleSlot, studentID uint) bool {
+	if len(slot.GroupLessonAttendance) > 0 {
+		for _, attendance := range slot.GroupLessonAttendance {
+			if attendance.StudentID == studentID {
+				return attendance.Attended == nil || *attendance.Attended
+			}
+		}
+		return false
+	}
+	if slot.GroupLesson == nil {
+		return false
+	}
+	for _, enrollment := range slot.GroupLesson.Enrollments {
+		if enrollment.StudentID == studentID {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *UserStudentHandler) GetTeacherScheduleOptions(c *gin.Context) {
 	role, _ := c.Get("role")
 	if role != string(models.RoleTeacher) && !models.IsAdminRole(role.(string)) {
@@ -677,6 +695,24 @@ func (h *UserStudentHandler) GetTeacherScheduleOptions(c *gin.Context) {
 	if err := h.db.Where("is_active = ?", true).Order("full_name ASC").Find(&teachers).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка преподавателей"})
 		return
+	}
+	// The schedule owner must stay selectable even when their teacher record is
+	// paused. Otherwise the client has no name for the linked teacher and falls
+	// back to the user's own name instead.
+	userID := extractUserID(c)
+	if userID != 0 {
+		if linkedTeacher, err := findLinkedTeacher(h.db, userID); err == nil {
+			found := false
+			for _, teacher := range teachers {
+				if teacher.ID == linkedTeacher.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				teachers = append(teachers, linkedTeacher)
+			}
+		}
 	}
 
 	var students []models.Student

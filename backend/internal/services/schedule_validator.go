@@ -74,7 +74,7 @@ func (v *ScheduleValidator) HasTeacherConflict(
 	existingSlots []models.ScheduleSlot,
 ) bool {
 	for _, slot := range existingSlots {
-		if slot.TeacherID != teacherID {
+		if !slotHasTeacher(slot, teacherID) {
 			continue
 		}
 		if slot.Weekday != weekday {
@@ -108,11 +108,7 @@ func (v *ScheduleValidator) HasStudentConflict(
 		}
 
 		if slot.SlotType == models.SlotTypeGroup {
-			// Ученик участвует в групповом занятии, если он записан в группу
-			if slot.GroupLessonID == nil {
-				continue
-			}
-			if !isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
+			if !slotHasStudent(slot, studentID, enrollments) {
 				continue
 			}
 		} else {
@@ -193,10 +189,7 @@ func (v *ScheduleValidator) ViolatesSameSubjectConsecutiveRule(
 		}
 
 		if slot.SlotType == models.SlotTypeGroup {
-			if slot.GroupLessonID == nil {
-				continue
-			}
-			if !isStudentEnrolledInGroup(studentID, *slot.GroupLessonID, enrollments) {
+			if !slotHasStudent(slot, studentID, enrollments) {
 				continue
 			}
 		} else {
