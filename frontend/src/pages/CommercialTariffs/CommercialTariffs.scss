@@ -1,0 +1,213 @@
+@use "../../styles/design2" as *;
+
+.commercial-tariffs-page {
+  @include design2-base;
+
+  .ct-section {
+    background: $paper;
+  }
+
+  .ct-heading {
+    margin-bottom: clamp(24px, 4vw, 42px);
+
+    .d2-head {
+      margin: 0;
+    }
+  }
+
+  .ct-table-wrap {
+    overflow: visible;
+  }
+
+  .ct-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+    color: $content;
+
+    th {
+      padding: 0 22px 10px;
+      color: $muted;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-align: left;
+      text-transform: uppercase;
+
+      &:first-child {
+        width: 72px;
+        text-align: center;
+      }
+
+      &:nth-child(3) {
+        width: 190px;
+      }
+
+      &:last-child {
+        width: 170px;
+        text-align: right;
+      }
+    }
+
+    td {
+      padding: 19px 22px;
+      border-top: 1px solid $border;
+      border-bottom: 1px solid $border;
+      background: #fff;
+      font-size: 15px;
+      line-height: 1.45;
+      vertical-align: middle;
+    }
+
+    tbody tr {
+      filter: drop-shadow(0 8px 18px rgba(7, 68, 98, 0.045));
+      transition: filter 0.22s ease, transform 0.22s ease;
+
+      &:hover {
+        filter: drop-shadow(0 14px 24px rgba(7, 68, 98, 0.1));
+        transform: translateY(-2px);
+
+        td {
+          background: rgba(244, 223, 0, 0.14);
+          border-color: rgba(244, 223, 0, 0.72);
+        }
+      }
+
+      td:first-child {
+        border-left: 1px solid $border;
+        border-radius: 19px 0 0 19px;
+      }
+
+      td:last-child {
+        border-right: 1px solid $border;
+        border-radius: 0 19px 19px 0;
+      }
+    }
+  }
+
+  .ct-table__number {
+    color: $ink;
+    font-size: 14px;
+    font-weight: 800;
+    text-align: center;
+
+    span {
+      display: inline-block;
+      min-width: 20px;
+      padding-bottom: 5px;
+      border-bottom: 3px solid $yellow;
+    }
+  }
+
+  .ct-table__service {
+    color: $ink;
+    font-weight: 400;
+  }
+
+  .ct-table__volume {
+    color: $muted;
+    white-space: normal;
+
+    span {
+      display: inline;
+    }
+  }
+
+  .ct-table__price {
+    color: $ink;
+    font-size: 17px;
+    font-weight: 800;
+    text-align: right;
+    white-space: nowrap;
+
+    span {
+      display: inline;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .ct-table,
+    .ct-table tbody,
+    .ct-table tr,
+    .ct-table td {
+      display: block;
+      width: 100%;
+    }
+
+    .ct-table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+
+    .ct-table tbody {
+      display: grid;
+      gap: 14px;
+    }
+
+    .ct-table tbody tr {
+      position: relative;
+      overflow: hidden;
+      padding: 16px 18px;
+      border: 1px solid $border;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(7, 68, 98, 0.05);
+    }
+
+    .ct-table tbody tr:hover {
+      background: #fff;
+    }
+
+    .ct-table td {
+      min-height: 0;
+      padding: 5px 0 5px 112px;
+      border: 0;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    .ct-table td::before {
+      position: absolute;
+      left: 18px;
+      width: 86px;
+      color: $muted;
+      content: attr(data-label);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .ct-table__number {
+      padding-left: 112px !important;
+      color: $muted;
+      font-size: 14px;
+      text-align: left;
+
+      span {
+        min-width: 20px;
+        padding-bottom: 3px;
+        border-bottom: 2px solid $yellow;
+      }
+    }
+
+    .ct-table__volume {
+      white-space: normal;
+    }
+
+    .ct-table__price {
+      margin-top: 4px;
+      color: $ink;
+      font-size: 16px !important;
+      text-align: left;
+
+      span {
+        display: inline;
+      }
+    }
+  }
+}

@@ -77,6 +77,8 @@ import AccessibilityPanel from "./components/AccessibilityPanel/AccessibilityPan
 import PrivacyPolicy from "./pages/PrivacyPolicy/PrivacyPolicy";
 import AdminPrivacyPolicy from "./pages/AdminPrivacyPolicy/AdminPrivacyPolicy";
 import Vacancies from "./pages/Vacancies/Vacancies";
+import CommercialTariffs from "./pages/CommercialTariffs/CommercialTariffs";
+import AdminCommercialTariffs from "./pages/AdminCommercialTariffs";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -234,6 +236,7 @@ function App() {
               path="/admin/schedule/group-lessons"
               element={<AdminGroupLessons />}
             />
+            <Route path="/admin/schedule/tariffs" element={<AdminCommercialTariffs />} />
             <Route path="/admin/schedule/weekly" element={<AdminSchedule />} />
             <Route path="/admin/schedule/reports" element={<AdminReports />} />
             <Route path="/admin/users" element={<AdminUsers />} />
@@ -279,6 +282,7 @@ function App() {
             <Route path="/admin/cms/history" element={<AdminHistory />} />
             <Route path="/admin/cms/fin-zones" element={<AdminFinZones />} />
             <Route path="/admin/cms/services" element={<AdminServices />} />
+            <Route path="/admin/cms/commercial-tariffs" element={<Navigate to="/admin/schedule/tariffs" replace />} />
             <Route path="/admin/cms/settings" element={<AdminSiteSettings />} />
             <Route path="/admin/cms/achievements" element={<AdminAchievements />} />
             <Route path="/admin/cms/awards" element={<AdminAwards />} />
@@ -303,6 +307,7 @@ function App() {
         <Route path="/structure" element={<Structure />} />
         <Route path="/rating" element={<Rating />} />
         <Route path="/services-description" element={<ServicesDescription />} />
+        <Route path="/commercial-tariffs" element={<CommercialTariffs />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/donation" element={<Donation />} />
         <Route path="/vacancies" element={<Vacancies />} />

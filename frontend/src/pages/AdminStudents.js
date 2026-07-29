@@ -38,6 +38,7 @@ import {
   Pause as PauseIcon,
   PlayArrow as PlayIcon,
   Search as SearchIcon,
+  FactCheck as ValidityIcon,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import scheduleService from "../services/scheduleService";
@@ -50,6 +51,26 @@ const WEEKDAY_FULL = {
   5: "Пятница",
   6: "Суббота",
   7: "Воскресенье",
+};
+
+const validityCountColor = (count) => {
+  const value = Number(count) || 0;
+  if (value === 0) return "error.main";
+  if (value === 3) return "success.main";
+  return "warning.dark";
+};
+
+const validityState = (value) => {
+  if (!value) return { color: "text.secondary", label: "Дата не указана" };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const date = new Date(`${value}T00:00:00`);
+  const remainingDays = Math.ceil((date - today) / 86400000);
+
+  if (remainingDays < 0) return { color: "error.main", label: "Срок истёк" };
+  if (remainingDays <= 7) return { color: "warning.dark", label: `Осталось ${remainingDays} дн.` };
+  return { color: "success.main", label: "Действует" };
 };
 
 const EMPTY_STUDENT = { full_name: "", is_active: true, allow_schedule_windows: false };
@@ -69,6 +90,12 @@ const AdminStudents = () => {
   const [availList, setAvailList] = useState([]);
   const [availForm, setAvailForm] = useState(EMPTY_AVAIL);
   const [availEditId, setAvailEditId] = useState(null);
+  const [validityDialog, setValidityDialog] = useState({ open: false, student: null });
+  const [validityDates, setValidityDates] = useState({
+    ippsu: "",
+    adaptive_physical_culture: "",
+    massage: "",
+  });
 
   useEffect(() => { load(); }, []);
 
@@ -193,6 +220,50 @@ const AdminStudents = () => {
     }
   };
 
+  const openValidities = async (student) => {
+    try {
+      const rows = await scheduleService.getStudentServiceValidities(student.id);
+      setValidityDates({
+        ippsu: rows.find((r) => r.service_type === "ippsu")?.valid_until?.slice(0, 10) || "",
+        adaptive_physical_culture: rows.find((r) => r.service_type === "adaptive_physical_culture")?.valid_until?.slice(0, 10) || "",
+        massage: rows.find((r) => r.service_type === "massage")?.valid_until?.slice(0, 10) || "",
+      });
+      setValidityDialog({ open: true, student });
+    } catch {
+      toast.error("Ошибка загрузки сроков услуг");
+    }
+  };
+
+  const saveValidity = async (serviceType) => {
+    const validUntil = validityDates[serviceType];
+    if (!validUntil) {
+      toast.error("Выберите дату");
+      return;
+    }
+    try {
+      await scheduleService.saveStudentServiceValidity(validityDialog.student.id, {
+        service_type: serviceType,
+        valid_until: validUntil,
+      });
+			await load();
+      toast.success("Срок сохранён");
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Ошибка сохранения срока");
+    }
+  };
+
+  const deleteValidity = async (serviceType) => {
+    if (!validityDates[serviceType]) return;
+    try {
+      await scheduleService.deleteStudentServiceValidity(validityDialog.student.id, serviceType);
+      setValidityDates({ ...validityDates, [serviceType]: "" });
+			await load();
+      toast.success("Срок удалён");
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Ошибка удаления срока");
+    }
+  };
+
   return (
     <main className="admin-module">
       <div className="admin-module__container">
@@ -276,6 +347,16 @@ const AdminStudents = () => {
                           <IconButton onClick={() => openAvail(s)} size="small" color="secondary" title="Доступность">
                             <AvailIcon />
                           </IconButton>
+                          <Tooltip title="Сроки: ИППСУ, адаптивная физкультура, массаж">
+                            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", verticalAlign: "middle", gap: 0.15, ml: 0.25, height: 32 }}>
+                              <IconButton onClick={() => openValidities(s)} size="small" color="primary" aria-label="Сроки ИППСУ и услуг" sx={{ p: 0.5 }}>
+                                <ValidityIcon />
+                              </IconButton>
+                              <Typography component="span" variant="caption" sx={{ fontWeight: 800, lineHeight: 1, color: validityCountColor(s.validity_count), minWidth: 22 }}>
+                                {s.validity_count || 0}/3
+                              </Typography>
+                            </Box>
+                          </Tooltip>
                           <Tooltip title={s.is_active ? "Деактивировать" : "Активировать"}>
                             <IconButton
                               onClick={() => toggleStudentActive(s)}
@@ -433,6 +514,47 @@ const AdminStudents = () => {
           </DialogContent>
           <DialogActions className="admin-module-dialog__actions">
             <Button onClick={closeAvail}>Закрыть</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Service validity dialog: informational dates only, never schedule constraints. */}
+        <Dialog open={validityDialog.open} onClose={() => setValidityDialog({ open: false, student: null })} maxWidth="sm" fullWidth PaperProps={{ className: "admin-module-dialog" }}>
+          <DialogTitle className="admin-module-dialog__title">
+            Сроки услуг: {validityDialog.student?.full_name}
+          </DialogTitle>
+          <DialogContent className="admin-module-dialog__content">
+            <Typography color="text.secondary" sx={{ mt: 1, mb: 2 }}>
+              Эти даты используются только для уведомлений родителю и администрации. На расписание они не влияют.
+            </Typography>
+            {[
+              ["ippsu", "ИППСУ"],
+              ["adaptive_physical_culture", "Адаптивная физкультура"],
+              ["massage", "Массаж"],
+            ].map(([serviceType, label]) => {
+              const state = validityState(validityDates[serviceType]);
+              return (
+                <Box key={serviceType} display="flex" gap={1} alignItems="center" sx={{ mb: 1.5 }} flexWrap="wrap">
+                  <TextField
+                    label={label}
+                    type="date"
+                    value={validityDates[serviceType]}
+                    onChange={(e) => setValidityDates({ ...validityDates, [serviceType]: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{
+                      minWidth: 240,
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: state.color },
+                      "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: state.color },
+                    }}
+                  />
+                  <Chip label={state.label} size="small" sx={{ color: state.color, fontWeight: 700 }} />
+                  <Button variant="contained" size="small" onClick={() => saveValidity(serviceType)}>Сохранить</Button>
+                  <Button size="small" color="error" disabled={!validityDates[serviceType]} onClick={() => deleteValidity(serviceType)}>Убрать</Button>
+                </Box>
+              );
+            })}
+          </DialogContent>
+          <DialogActions className="admin-module-dialog__actions">
+            <Button onClick={() => setValidityDialog({ open: false, student: null })}>Закрыть</Button>
           </DialogActions>
         </Dialog>
 

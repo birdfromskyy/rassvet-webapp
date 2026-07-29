@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"net/http"
 	"strconv"
@@ -148,6 +149,7 @@ func (h *SubjectHandler) CreateSubject(c *gin.Context) {
 		}
 		subject.IsActive = false
 	}
+	logging.AdminMutation(c, "schedule.subject.create", nil, subjectAuditSnapshot(subject))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Subject created successfully",
@@ -177,6 +179,7 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := subjectAuditSnapshot(subject)
 
 	if req.Name != "" {
 		req.Name = strings.TrimSpace(req.Name)
@@ -220,6 +223,7 @@ func (h *SubjectHandler) UpdateSubject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить предмет"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.subject.update", before, subjectAuditSnapshot(subject))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Subject updated successfully",
@@ -243,6 +247,7 @@ func (h *SubjectHandler) DeactivateSubject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := subjectAuditSnapshot(subject)
 
 	subject.IsActive = false
 
@@ -250,6 +255,7 @@ func (h *SubjectHandler) DeactivateSubject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.subject.deactivate", before, subjectAuditSnapshot(subject))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Subject deactivated successfully",
@@ -273,83 +279,14 @@ func (h *SubjectHandler) DeleteSubject(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := subjectAuditSnapshot(subject)
 	now := time.Now()
 	if err := h.db.Model(&subject).Update("archived_at", now).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить предмет в архив"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.subject.archive", before, nil)
 	c.JSON(http.StatusOK, gin.H{"message": "Предмет перемещён в архив"})
-	return
-
-	if !subject.IsActive {
-		var activeAssignments int64
-		if err := h.db.Model(&models.Assignment{}).
-			Where("subject_id = ? AND status = ?", subject.ID, models.AssignmentStatusActive).
-			Count(&activeAssignments).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-			return
-		}
-		if activeAssignments > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть активные назначения. Сначала поставьте их на паузу."})
-			return
-		}
-
-		var activeGroups int64
-		if err := h.db.Model(&models.GroupLesson{}).
-			Where("subject_id = ? AND status = ?", subject.ID, models.GroupLessonStatusActive).
-			Count(&activeGroups).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-			return
-		}
-		if activeGroups > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть активные группы. Сначала поставьте их на паузу."})
-			return
-		}
-
-		err := h.db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.Assignment{}).Error; err != nil {
-				return err
-			}
-			groupIDs := tx.Model(&models.GroupLesson{}).Select("id").Where("subject_id = ?", subject.ID)
-			if err := tx.Where("group_lesson_id IN (?)", groupIDs).Delete(&models.GroupLessonEnrollment{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.GroupLesson{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.TeacherSubject{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("subject_id = ?", subject.ID).Delete(&models.RoomSubject{}).Error; err != nil {
-				return err
-			}
-			return tx.Delete(&subject).Error
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "Subject deleted successfully"})
-		return
-	}
-
-	if err := h.db.Delete(&subject).Error; err != nil {
-		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить предмет: есть связанные назначения. Сначала деактивируйте."})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить предмет"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Subject deleted successfully"})
 }
 
 func (h *SubjectHandler) RestoreSubject(c *gin.Context) {

@@ -34,6 +34,7 @@ const searchPages = [
   { title: "Структура организации", path: "/structure" },
   { title: "Перечень услуг", path: "/services-list" },
   { title: "Описание услуг", path: "/services-description" },
+  { title: "Тарифы на коммерческие услуги", path: "/commercial-tariffs" },
   { title: "Алгоритм получения услуг", path: "/service-algorithm" },
   { title: "Контакты", path: "/contacts" },
   { title: "Новости", path: "/news" },
@@ -83,6 +84,7 @@ const buildDropdowns = (isLoggedIn) => [
     links: [
       { title: "Перечень соц. услуг", path: "/services-list" },
       { title: "Описание услуг", path: "/services-description" },
+      { title: "Тарифы на коммерческие услуги", path: "/commercial-tariffs" },
     ],
   },
   {

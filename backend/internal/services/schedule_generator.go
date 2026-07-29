@@ -254,6 +254,9 @@ func (g *ScheduleGenerator) GenerateScheduleWithProgress(
 	if err := g.GenerateBestAutoSchedule(schedule, progress); err != nil {
 		return nil, err
 	}
+	if err := g.SaveZeroScheduledStudentIssues(schedule.ID); err != nil {
+		return nil, err
+	}
 
 	reportGenerationProgress(progress, 98, "Сохранение результата", "")
 	now := time.Now()
@@ -306,6 +309,9 @@ func (g *ScheduleGenerator) ResetAutoScheduleWithProgress(
 	if err := g.GenerateBestAutoSchedule(&schedule, progress); err != nil {
 		return nil, err
 	}
+	if err := g.SaveZeroScheduledStudentIssues(schedule.ID); err != nil {
+		return nil, err
+	}
 
 	reportGenerationProgress(progress, 98, "Сохранение результата", "")
 	now := time.Now()
@@ -329,6 +335,7 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
 		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
 		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Where("assignments.archived_at IS NULL").
 		Find(&assignments).Error; err != nil {
 		return nil, fmt.Errorf("failed to load assignments: %w", err)
 	}
@@ -357,9 +364,10 @@ func (g *ScheduleGenerator) LoadGenerationContext(schedule models.Schedule) (*Ge
 	if err := g.db.
 		Joins("JOIN teachers ON teachers.id = COALESCE(group_lessons.default_teacher_id, 0) AND teachers.is_active = true OR group_lessons.default_teacher_id IS NULL").
 		Where("group_lessons.status = ?", models.GroupLessonStatusActive).
+		Where("group_lessons.archived_at IS NULL").
 		Find(&groupLessons).Error; err != nil {
 		// Fallback: simple query without teacher join
-		if err2 := g.db.Where("status = ?", models.GroupLessonStatusActive).Find(&groupLessons).Error; err2 != nil {
+		if err2 := g.db.Where("status = ? AND archived_at IS NULL", models.GroupLessonStatusActive).Find(&groupLessons).Error; err2 != nil {
 			return nil, fmt.Errorf("failed to load group lessons: %w", err2)
 		}
 	}
@@ -575,7 +583,6 @@ func (g *ScheduleGenerator) GenerateBestAutoSchedule(schedule *models.Schedule, 
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -1708,6 +1715,42 @@ func (g *ScheduleGenerator) CleanupGenerationIssues(scheduleID uint) error {
 	return nil
 }
 
+// RefreshCurrentDiagnostics rebuilds only the explanatory diagnostics for the
+// schedule's current state. It never creates, updates or deletes schedule
+// slots, so an administrator may use it after manual edits without changing
+// the generated timetable.
+func (g *ScheduleGenerator) RefreshCurrentDiagnostics(scheduleID uint) error {
+	if !generationMu.TryLock() {
+		return fmt.Errorf("генерация расписания уже выполняется — обновите диагностику после её завершения")
+	}
+	defer generationMu.Unlock()
+
+	var schedule models.Schedule
+	if err := g.db.First(&schedule, scheduleID).Error; err != nil {
+		return fmt.Errorf("failed to fetch schedule for diagnostics: %w", err)
+	}
+	if err := g.CleanupGenerationIssues(scheduleID); err != nil {
+		return err
+	}
+	ctx, err := g.LoadGenerationContext(schedule)
+	if err != nil {
+		return err
+	}
+
+	// BuildWeeklyTasks subtracts the slots already present in the schedule.
+	// What remains is precisely the current deficit for every assignment.
+	for _, task := range g.BuildWeeklyTasks(ctx.Assignments, ctx) {
+		message := "Занятие не поставлено в расписание. Выполните генерацию или добавьте его вручную."
+		if len(g.GetCandidateSlots(task, ctx)) == 0 {
+			message = g.DiagnoseNoCandidates(task, ctx)
+		}
+		if err := g.SaveGenerationIssue(scheduleID, task, "CURRENT_UNSCHEDULED", message); err != nil {
+			return err
+		}
+	}
+	return g.SaveZeroScheduledStudentIssues(scheduleID)
+}
+
 func (g *ScheduleGenerator) SaveGeneratedSlot(scheduleID uint, candidate CandidateSlot) (*models.ScheduleSlot, error) {
 	assignmentID := candidate.AssignmentID
 	studentID := candidate.StudentID
@@ -1756,6 +1799,71 @@ func (g *ScheduleGenerator) SaveGenerationIssue(scheduleID uint, task WeeklyTask
 		return fmt.Errorf("failed to save generation issue: %w", err)
 	}
 
+	return nil
+}
+
+// SaveZeroScheduledStudentIssues stores the post-generation diagnostic once,
+// alongside the generator issues. Manual edits never change these rows: the
+// API derives their current resolved state from the actual slots instead.
+func (g *ScheduleGenerator) SaveZeroScheduledStudentIssues(scheduleID uint) error {
+	var slots []models.ScheduleSlot
+	if err := g.db.
+		Where("schedule_id = ? AND slot_type = ? AND status <> ?", scheduleID, models.SlotTypeIndividual, models.ScheduleSlotStatusCancelled).
+		Find(&slots).Error; err != nil {
+		return fmt.Errorf("failed to load slots for zero-student diagnostics: %w", err)
+	}
+
+	scheduledStudentIDs := make(map[uint]struct{})
+	for _, slot := range slots {
+		if slot.StudentID != nil {
+			scheduledStudentIDs[*slot.StudentID] = struct{}{}
+		}
+	}
+
+	var assignments []models.Assignment
+	if err := g.db.
+		Preload("Student").
+		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
+		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
+		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Where("assignments.archived_at IS NULL").
+		Order("students.full_name ASC, assignments.id ASC").
+		Find(&assignments).Error; err != nil {
+		return fmt.Errorf("failed to load assignments for zero-student diagnostics: %w", err)
+	}
+
+	type diagnostic struct {
+		student     models.Student
+		assignments int
+		visits      int
+	}
+	byStudent := make(map[uint]*diagnostic)
+	for _, assignment := range assignments {
+		if _, scheduled := scheduledStudentIDs[assignment.StudentID]; scheduled {
+			continue
+		}
+		row := byStudent[assignment.StudentID]
+		if row == nil {
+			row = &diagnostic{student: assignment.Student}
+			byStudent[assignment.StudentID] = row
+		}
+		row.assignments++
+		row.visits += assignment.VisitsPerWeek
+	}
+
+	for studentID, row := range byStudent {
+		issue := models.ScheduleGenerationIssue{
+			ScheduleID:       scheduleID,
+			StudentID:        &studentID,
+			ReasonCode:       models.IssueReasonNoStudentLessons,
+			Message:          "У ученика нет ни одного индивидуального занятия после генерации",
+			AssignmentsCount: row.assignments,
+			RequestedVisits:  row.visits,
+		}
+		if err := g.db.Create(&issue).Error; err != nil {
+			return fmt.Errorf("failed to save zero-student diagnostic: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -1839,6 +1947,7 @@ func (g *ScheduleGenerator) buildScheduleResponse(scheduleID uint) (*ScheduleRes
 		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
 		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
 		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Where("assignments.archived_at IS NULL").
 		Find(&assignments).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch assignments for stats: %w", err)
 	}

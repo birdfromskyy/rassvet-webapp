@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"net/http"
 	"strconv"
@@ -93,19 +94,23 @@ func normalizeOptionalString(value *string) *string {
 func (h *StudentHandler) GetStudents(c *gin.Context) {
 	var students []models.Student
 
-	query := h.db.Order("id ASC")
+	query := h.db.Model(&models.Student{}).
+		Select("students.*, COUNT(student_service_validities.id) AS validity_count").
+		Joins("LEFT JOIN student_service_validities ON student_service_validities.student_id = students.id").
+		Group("students.id").
+		Order("students.id ASC")
 	if c.Query("archived") == "true" {
-		query = query.Where("archived_at IS NOT NULL")
+		query = query.Where("students.archived_at IS NOT NULL")
 	} else {
-		query = query.Where("archived_at IS NULL")
+		query = query.Where("students.archived_at IS NULL")
 	}
 
 	if isActive := c.Query("is_active"); isActive != "" {
 		switch strings.ToLower(isActive) {
 		case "true":
-			query = query.Where("is_active = ?", true)
+			query = query.Where("students.is_active = ?", true)
 		case "false":
-			query = query.Where("is_active = ?", false)
+			query = query.Where("students.is_active = ?", false)
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректное значение параметра is_active"})
 			return
@@ -117,7 +122,7 @@ func (h *StudentHandler) GetStudents(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный тип финансирования"})
 			return
 		}
-		query = query.Where("funding_type = ?", fundingType)
+		query = query.Where("students.funding_type = ?", fundingType)
 	}
 
 	if err := query.Find(&students).Error; err != nil {
@@ -197,6 +202,7 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 		}
 		student.IsActive = false
 	}
+	logging.AdminMutation(c, "schedule.student.create", nil, studentAuditSnapshot(student))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Student created successfully",
@@ -226,6 +232,7 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := studentAuditSnapshot(student)
 
 	if req.FullName != "" {
 		req.FullName = strings.TrimSpace(req.FullName)
@@ -255,6 +262,7 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить ученика"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.student.update", before, studentAuditSnapshot(student))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Student updated successfully",
@@ -278,6 +286,7 @@ func (h *StudentHandler) DeactivateStudent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := studentAuditSnapshot(student)
 
 	student.IsActive = false
 
@@ -285,6 +294,7 @@ func (h *StudentHandler) DeactivateStudent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.student.deactivate", before, studentAuditSnapshot(student))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Student deactivated successfully",
@@ -308,67 +318,14 @@ func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := studentAuditSnapshot(student)
 	now := time.Now()
 	if err := h.db.Model(&student).Update("archived_at", now).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить ученика в архив"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.student.archive", before, nil)
 	c.JSON(http.StatusOK, gin.H{"message": "Ученик перемещён в архив"})
-	return
-
-	if !student.IsActive {
-		var activeAssignments int64
-		if err := h.db.Model(&models.Assignment{}).
-			Where("student_id = ? AND status = ?", student.ID, models.AssignmentStatusActive).
-			Count(&activeAssignments).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-			return
-		}
-		if activeAssignments > 0 {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить ученика: есть активные назначения. Сначала поставьте их на паузу."})
-			return
-		}
-
-		err := h.db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("student_id = ?", student.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("student_id = ?", student.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("student_id = ?", student.ID).Delete(&models.StudentAvailability{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("student_id = ?", student.ID).Delete(&models.UserStudent{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("student_id = ?", student.ID).Delete(&models.GroupLessonEnrollment{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("student_id = ?", student.ID).Delete(&models.Assignment{}).Error; err != nil {
-				return err
-			}
-			return tx.Delete(&student).Error
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
-		return
-	}
-
-	if err := h.db.Delete(&student).Error; err != nil {
-		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить ученика: есть связанные назначения или слоты. Сначала деактивируйте."})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить ученика"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Student deleted successfully"})
 }
 
 func (h *StudentHandler) RestoreStudent(c *gin.Context) {

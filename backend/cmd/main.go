@@ -42,15 +42,10 @@ func main() {
 
 	r := gin.New()
 	r.Use(
-		gin.LoggerWithConfig(gin.LoggerConfig{
-			Skip: func(c *gin.Context) bool {
-				// This endpoint is polled continuously by active clients. Suppress
-				// only successful polls; failures remain visible for diagnostics.
-				return c.Request.Method == http.MethodGet &&
-					c.Request.URL.Path == "/api/notifications/unread-count" &&
-					c.Writer.Status() == http.StatusOK
-			},
-		}),
+		logging.AccessLog(),
+		// Public endpoints remain public, but a valid session is attached when
+		// present so access logs identify the signed-in caller consistently.
+		middleware.OptionalAuthMiddleware(cfg.JWTSecret, rdb),
 		gin.Recovery(),
 	)
 
@@ -74,6 +69,7 @@ func main() {
 	subjectHandler := handlers.NewSubjectHandler(db)
 	roomHandler := handlers.NewRoomHandler(db)
 	studentHandler := handlers.NewStudentHandler(db)
+	studentServiceValidityHandler := handlers.NewStudentServiceValidityHandler(db)
 	teacherHandler := handlers.NewTeacherHandler(db)
 	assignmentHandler := handlers.NewAssignmentHandler(db)
 	groupLessonHandler := handlers.NewGroupLessonHandler(db)
@@ -112,6 +108,8 @@ func main() {
 	historyHandler := handlers.NewHistoryHandler(db)
 	articleHandler := handlers.NewArticleHandler(db)
 	serviceCmsHandler := handlers.NewServiceCmsHandler(db)
+	commercialTariffHandler := handlers.NewCommercialTariffHandler(db)
+	reportTariffRuleHandler := handlers.NewReportTariffRuleHandler(db)
 	finZoneHandler := handlers.NewFinZoneHandler(db)
 	siteSettingHandler := handlers.NewSiteSettingHandler(db)
 
@@ -160,6 +158,7 @@ func main() {
 	r.GET("/api/articles/categories", articleHandler.GetCategories)
 	r.GET("/api/articles/:slug", articleHandler.GetArticleBySlug)
 	r.GET("/api/services", serviceCmsHandler.GetServices)
+	r.GET("/api/commercial-tariffs", commercialTariffHandler.GetCommercialTariffs)
 	r.GET("/api/fin-zones", finZoneHandler.GetFinZones)
 	r.GET("/api/site-settings", siteSettingHandler.GetAll)
 	r.GET("/api/site-settings/:key", siteSettingHandler.GetByKey)
@@ -168,7 +167,6 @@ func main() {
 	// Protected API routes
 	protected := r.Group("/api")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret, rdb))
-	protected.Use(middleware.AuditLog()) // audit mutations + user errors (incl. admin subgroup)
 	{
 		protected.PUT("/profile", authHandler.UpdateProfile)
 		protected.DELETE("/me", authHandler.DeleteMyAccount)
@@ -222,6 +220,17 @@ func main() {
 			admin.PUT("/services/:id", serviceCmsHandler.UpdateService)
 			admin.DELETE("/services/:id", serviceCmsHandler.DeleteService)
 
+			// Commercial tariffs
+			admin.GET("/commercial-tariffs", commercialTariffHandler.GetAllCommercialTariffs)
+			admin.POST("/commercial-tariffs", commercialTariffHandler.CreateCommercialTariff)
+			admin.PUT("/commercial-tariffs/:id", commercialTariffHandler.UpdateCommercialTariff)
+			admin.DELETE("/commercial-tariffs/:id", commercialTariffHandler.DeleteCommercialTariff)
+			admin.GET("/report-tariff-rules", reportTariffRuleHandler.GetAll)
+			admin.POST("/report-tariff-rules/preview", reportTariffRuleHandler.PreviewSlotCoverage)
+			admin.POST("/report-tariff-rules", reportTariffRuleHandler.Create)
+			admin.PUT("/report-tariff-rules/:id", reportTariffRuleHandler.Update)
+			admin.DELETE("/report-tariff-rules/:id", reportTariffRuleHandler.Delete)
+
 			// CMS — Fin zones (/fin_activities)
 			admin.GET("/fin-zones", finZoneHandler.GetAllFinZones)
 			admin.POST("/fin-zones", finZoneHandler.CreateFinZone)
@@ -264,6 +273,9 @@ func main() {
 			admin.POST("/students/:id/availability", studentHandler.CreateStudentAvailability)
 			admin.PUT("/students/:id/availability/:availabilityId", studentHandler.UpdateStudentAvailability)
 			admin.DELETE("/students/:id/availability/:availabilityId", studentHandler.DeleteStudentAvailability)
+			admin.GET("/students/:id/service-validities", studentServiceValidityHandler.GetByStudent)
+			admin.PUT("/students/:id/service-validities", studentServiceValidityHandler.Upsert)
+			admin.DELETE("/students/:id/service-validities/:serviceType", studentServiceValidityHandler.Delete)
 
 			// Teachers
 			admin.GET("/teachers", teacherHandler.GetTeachers)
@@ -313,6 +325,7 @@ func main() {
 			admin.PATCH("/schedules/:id/slots/:slotId/attendance/:studentId", scheduleHandler.UpdateAttendance)
 			admin.DELETE("/schedules/:id/slots/:slotId/attendance/:studentId", scheduleHandler.RemoveSlotStudent)
 			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
+			admin.POST("/schedules/:id/refresh-diagnostics", scheduleHandler.RefreshDiagnostics)
 			admin.POST("/schedules/:id/clear-manual", scheduleHandler.ClearManualSlots)
 			admin.POST("/schedules/:id/copy-manual-from-prev-week", scheduleHandler.CopyManualSlotsFromPrevWeek)
 			admin.PATCH("/schedules/:id/slots/bulk-origin", scheduleHandler.BulkUpdateSlotsOrigin)
@@ -499,6 +512,79 @@ func main() {
 			}
 
 			log.Printf("[JOB] ippsu_check found=%d notified=%d errors=%d", len(rows), notified, jobErrors)
+
+			// Service validity is deliberately independent from child_doc_submissions:
+			// an administrator chooses the child, and the parent only receives an
+			// informational reminder. It never blocks the schedule or its editing.
+			type serviceValidityRow struct {
+				ID          uint
+				StudentID   uint
+				StudentName string
+				ServiceType string
+				ValidUntil  time.Time
+			}
+			var serviceRows []serviceValidityRow
+			if err := db.Raw(`
+				SELECT v.id, v.student_id, s.full_name AS student_name,
+				       v.service_type, v.valid_until
+				FROM student_service_validities v
+				JOIN students s ON s.id = v.student_id
+				WHERE v.notified_at IS NULL
+				  AND v.valid_until < NOW()
+			`).Scan(&serviceRows).Error; err != nil {
+				log.Printf("[JOB] student_service_validity_check query error: %v", err)
+			}
+
+			serviceNotified, serviceErrors := 0, 0
+			for _, row := range serviceRows {
+				serviceName := "ИППСУ"
+				if row.ServiceType == models.StudentServiceAdaptivePhysicalCulture {
+					serviceName = "Адаптивная физкультура"
+				} else if row.ServiceType == models.StudentServiceMassage {
+					serviceName = "Массаж"
+				}
+				expiryDate := row.ValidUntil.Format("02.01.2006")
+
+				var parentIDs []uint
+				if err := db.Model(&models.UserStudent{}).
+					Where("student_id = ?", row.StudentID).
+					Pluck("user_id", &parentIDs).Error; err != nil {
+					serviceErrors++
+					log.Printf("[JOB] student_service_validity parents error validity_id=%d: %v", row.ID, err)
+					continue
+				}
+				for _, parentID := range parentIDs {
+					title := "Истёк срок: " + serviceName
+					body := "Срок действия услуги «" + serviceName + "» для ребёнка «" + row.StudentName +
+						"» истёк " + expiryDate + ". Пожалуйста, обратитесь к администрации центра."
+					if row.ServiceType == models.StudentServiceIppsu {
+						title = "Истёк срок ИППСУ"
+						body = "Срок действия ИППСУ для ребёнка «" + row.StudentName + "» истёк " + expiryDate + ". Пожалуйста, обратитесь к администрации центра."
+					}
+					handlers.CreateNotification(db, parentID, "", title, body, "/dashboard")
+				}
+				adminTitle := "Истёк срок: " + serviceName
+				adminBody := "У ученика «" + row.StudentName + "» истёк срок действия услуги «" + serviceName +
+					"» (" + expiryDate + ")."
+				if row.ServiceType == models.StudentServiceIppsu {
+					adminTitle = "Истёк срок ИППСУ"
+					adminBody = "У ученика «" + row.StudentName + "» истёк срок действия ИППСУ (" + expiryDate + ")."
+				}
+				handlers.CreateNotification(db, 0, "admin",
+					adminTitle,
+					adminBody,
+					"/admin/schedule/students",
+				)
+				now := time.Now()
+				if err := db.Model(&models.StudentServiceValidity{}).
+					Where("id = ?", row.ID).
+					Update("notified_at", now).Error; err != nil {
+					serviceErrors++
+					continue
+				}
+				serviceNotified++
+			}
+			log.Printf("[JOB] student_service_validity_check found=%d notified=%d errors=%d", len(serviceRows), serviceNotified, serviceErrors)
 
 			select {
 			case <-bgCtx.Done():

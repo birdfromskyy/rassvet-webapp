@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"fmt"
 	"net/http"
@@ -180,6 +181,7 @@ func (h *GroupLessonHandler) CreateGroupLesson(c *gin.Context) {
 	}
 
 	h.db.Preload("Subject").Preload("DefaultTeacher").Preload("Teachers.Teacher").First(&lesson, lesson.ID)
+	logging.AdminMutation(c, "schedule.group_lesson.create", nil, groupLessonAuditSnapshot(lesson))
 
 	c.JSON(http.StatusCreated, gin.H{"message": "Группа создана", "group_lesson": lesson})
 }
@@ -192,7 +194,7 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 	}
 
 	var lesson models.GroupLesson
-	if err := h.db.First(&lesson, id).Error; err != nil {
+	if err := h.db.Preload("Teachers").First(&lesson, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Группа не найдена"})
 			return
@@ -200,6 +202,7 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить группу"})
 		return
 	}
+	before := groupLessonAuditSnapshot(lesson)
 
 	var req UpdateGroupLessonRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -276,6 +279,7 @@ func (h *GroupLessonHandler) UpdateGroupLesson(c *gin.Context) {
 	}
 
 	h.db.Preload("Subject").Preload("DefaultTeacher").Preload("Teachers.Teacher").Preload("Enrollments.Student").First(&lesson, lesson.ID)
+	logging.AdminMutation(c, "schedule.group_lesson.update", before, groupLessonAuditSnapshot(lesson))
 
 	c.JSON(http.StatusOK, gin.H{"message": "Группа обновлена", "group_lesson": lesson})
 }
@@ -340,7 +344,7 @@ func (h *GroupLessonHandler) DeleteGroupLesson(c *gin.Context) {
 	}
 
 	var lesson models.GroupLesson
-	if err := h.db.First(&lesson, id).Error; err != nil {
+	if err := h.db.Preload("Teachers").First(&lesson, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Группа не найдена"})
 			return
@@ -348,38 +352,14 @@ func (h *GroupLessonHandler) DeleteGroupLesson(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить группу"})
 		return
 	}
+	before := groupLessonAuditSnapshot(lesson)
 	now := time.Now()
 	if err := h.db.Model(&lesson).Update("archived_at", now).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить группу в архив"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.group_lesson.archive", before, nil)
 	c.JSON(http.StatusOK, gin.H{"message": "Группа перемещена в архив"})
-	return
-
-	if err := h.db.Transaction(func(tx *gorm.DB) error {
-		var slotIDs []uint
-		if err := tx.Model(&models.ScheduleSlot{}).Where("group_lesson_id = ?", lesson.ID).Pluck("id", &slotIDs).Error; err != nil {
-			return err
-		}
-		if len(slotIDs) > 0 {
-			if err := tx.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.ScheduleSlotTeacher{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("schedule_slot_id IN ?", slotIDs).Delete(&models.GroupLessonAttendance{}).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Delete(&lesson).Error
-	}); err != nil {
-		if strings.Contains(err.Error(), "23503") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить группу: есть связанные записи"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить группу"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Группа удалена"})
 }
 
 func (h *GroupLessonHandler) RestoreGroupLesson(c *gin.Context) {

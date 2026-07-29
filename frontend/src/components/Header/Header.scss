@@ -952,9 +952,10 @@
 .header__bell-body {
   font-size: 12px;
   color: #64748b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  // A notification must explain what exactly has expired. The dropdown is
+  // scrollable, so wrapping is preferable to hiding the decisive wording.
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .header__bell-time {

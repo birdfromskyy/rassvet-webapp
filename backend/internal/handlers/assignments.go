@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"net/http"
 	"strconv"
@@ -281,6 +282,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		req.SubjectID,
 	).First(&existing).Error; err == nil {
 		if existing.ArchivedAt != nil {
+			before := assignmentAuditSnapshot(existing)
 			existing.ArchivedAt = nil
 			existing.FundingType = fundingType
 			existing.VisitsPerWeek = req.VisitsPerWeek
@@ -290,6 +292,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось восстановить назначение"})
 				return
 			}
+			logging.AdminMutation(c, "schedule.assignment.restore", before, assignmentAuditSnapshot(existing))
 			c.JSON(http.StatusOK, gin.H{"message": "Архивное назначение восстановлено", "assignment": existing})
 			return
 		}
@@ -323,6 +326,7 @@ func (h *AssignmentHandler) CreateAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.assignment.create", nil, assignmentAuditSnapshot(assignment))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message":    "Assignment created successfully",
@@ -352,6 +356,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := assignmentAuditSnapshot(assignment)
 
 	newStudentID := assignment.StudentID
 	newTeacherID := assignment.TeacherID
@@ -491,6 +496,7 @@ func (h *AssignmentHandler) UpdateAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.assignment.update", before, assignmentAuditSnapshot(assignment))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":    "Assignment updated successfully",
@@ -514,47 +520,20 @@ func (h *AssignmentHandler) DeleteAssignment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := assignmentAuditSnapshot(assignment)
 	now := time.Now()
-	if err := h.db.Model(&assignment).Update("archived_at", now).Error; err != nil {
+	// An archived assignment must not look active in historical/admin data.
+	// Archiving is reversible, but returning it to work must remain an explicit
+	// administrator action rather than an accidental side effect of restore.
+	if err := h.db.Model(&assignment).Updates(map[string]interface{}{
+		"archived_at": now,
+		"status":      models.AssignmentStatusPaused,
+	}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить назначение в архив"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.assignment.archive", before, nil)
 	c.JSON(http.StatusOK, gin.H{"message": "Назначение перемещено в архив"})
-	return
-
-	if assignment.Status == models.AssignmentStatusPaused {
-		err := h.db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("assignment_id = ?", assignment.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("assignment_id = ?", assignment.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
-				return err
-			}
-			return tx.Delete(&assignment).Error
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Assignment deleted successfully",
-		})
-		return
-	}
-
-	if err := h.db.Delete(&assignment).Error; err != nil {
-		if strings.Contains(err.Error(), "23503") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить назначение: есть связанные слоты расписания. Сначала удалите их или сбросьте расписание."})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Assignment deleted successfully",
-	})
 }
 
 func (h *AssignmentHandler) RestoreAssignment(c *gin.Context) {

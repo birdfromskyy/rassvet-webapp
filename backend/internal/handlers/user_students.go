@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/middleware"
 	"backend/internal/models"
 	"net/http"
@@ -150,6 +151,7 @@ func (h *UserStudentHandler) CreateUser(c *gin.Context) {
 	}
 
 	user.Password = ""
+	logging.AdminMutation(c, "admin.user.create", nil, userAuditSnapshot(user))
 	c.JSON(http.StatusCreated, gin.H{"user": user})
 }
 
@@ -185,6 +187,7 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения пользователя"})
 		return
 	}
+	before := userAuditSnapshot(user)
 
 	// Check email uniqueness if changed
 	if user.Email != req.Email {
@@ -260,6 +263,7 @@ func (h *UserStudentHandler) UpdateUser(c *gin.Context) {
 	}
 
 	user.Password = ""
+	logging.AdminMutation(c, "admin.user.update", before, userAuditSnapshot(user))
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
 
@@ -283,6 +287,7 @@ func (h *UserStudentHandler) DeleteUser(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Пользователь не найден"})
 		return
 	}
+	before := userAuditSnapshot(user)
 
 	// Superadmin accounts cannot be deleted via UI — manage them directly in the database
 	if string(user.Role) == "superadmin" {
@@ -364,7 +369,22 @@ func (h *UserStudentHandler) DeleteUser(c *gin.Context) {
 	h.db.Unscoped().Delete(&user)
 	h.revokeSessions(c, user.ID)
 
+	logging.AdminMutation(c, "admin.user.delete", before, nil)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// userAuditSnapshot excludes passwords and authentication secrets.
+func userAuditSnapshot(user models.User) map[string]any {
+	return map[string]any{
+		"id":              user.ID,
+		"email":           user.Email,
+		"first_name":      user.FirstName,
+		"last_name":       user.LastName,
+		"middle_name":     user.MiddleName,
+		"role":            user.Role,
+		"is_verified":     user.IsVerified,
+		"consent_version": user.ConsentVersion,
+	}
 }
 
 // Admin: GET /api/admin/users/:id/children

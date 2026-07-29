@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"errors"
 	"net/http"
@@ -177,6 +178,7 @@ func (h *TeacherHandler) CreateTeacher(c *gin.Context) {
 		}
 		teacher.IsActive = false
 	}
+	logging.AdminMutation(c, "schedule.teacher.create", nil, teacherAuditSnapshot(teacher))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Teacher created successfully",
@@ -206,6 +208,7 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := teacherAuditSnapshot(teacher)
 
 	if req.FullName != "" {
 		req.FullName = strings.TrimSpace(req.FullName)
@@ -237,6 +240,7 @@ func (h *TeacherHandler) UpdateTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить преподавателя"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.teacher.update", before, teacherAuditSnapshot(teacher))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Teacher updated successfully",
@@ -260,6 +264,7 @@ func (h *TeacherHandler) DeactivateTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := teacherAuditSnapshot(teacher)
 
 	teacher.IsActive = false
 
@@ -267,6 +272,7 @@ func (h *TeacherHandler) DeactivateTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.teacher.deactivate", before, teacherAuditSnapshot(teacher))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Teacher deactivated successfully",
@@ -290,6 +296,7 @@ func (h *TeacherHandler) ActivateTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := teacherAuditSnapshot(teacher)
 
 	teacher.IsActive = true
 
@@ -297,6 +304,7 @@ func (h *TeacherHandler) ActivateTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.teacher.activate", before, teacherAuditSnapshot(teacher))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Teacher activated successfully",
@@ -320,73 +328,14 @@ func (h *TeacherHandler) DeleteTeacher(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := teacherAuditSnapshot(teacher)
 	now := time.Now()
 	if err := h.db.Model(&teacher).Update("archived_at", now).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить преподавателя в архив"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.teacher.archive", before, nil)
 	c.JSON(http.StatusOK, gin.H{"message": "Преподаватель перемещён в архив"})
-	return
-
-	var activeAssignments int64
-	if err := h.db.Model(&models.Assignment{}).
-		Where("teacher_id = ? AND status = ?", teacher.ID, models.AssignmentStatusActive).
-		Count(&activeAssignments).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-	if activeAssignments > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить преподавателя: есть активные назначения. Сначала поставьте их на паузу."})
-		return
-	}
-
-	// A co-teacher is part of an immutable group/slot snapshot. Deleting that
-	// teacher implicitly would either erase historical participants or leave an
-	// invalid group without a teacher, so require an explicit reassignment first.
-	var groupLinks, slotLinks int64
-	if err := h.db.Model(&models.GroupLessonTeacher{}).Where("teacher_id = ?", teacher.ID).Count(&groupLinks).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-	if err := h.db.Model(&models.ScheduleSlotTeacher{}).Where("teacher_id = ?", teacher.ID).Count(&slotLinks).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-	if groupLinks > 0 || slotLinks > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить преподавателя: он указан в групповых занятиях или расписании. Сначала замените его там."})
-		return
-	}
-
-	err = h.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("teacher_id = ?", teacher.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("teacher_id = ?", teacher.ID).Delete(&models.ScheduleGenerationIssue{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("teacher_id = ?", teacher.ID).Delete(&models.TeacherSubject{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("teacher_id = ?", teacher.ID).Delete(&models.TeacherRoom{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("teacher_id = ?", teacher.ID).Delete(&models.TeacherAvailability{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("teacher_id = ?", teacher.ID).Delete(&models.Assignment{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Model(&models.GroupLesson{}).Where("default_teacher_id = ?", teacher.ID).Update("default_teacher_id", nil).Error; err != nil {
-			return err
-		}
-		return tx.Delete(&teacher).Error
-	})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить преподавателя"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Teacher deleted successfully"})
 }
 
 func (h *TeacherHandler) RestoreTeacher(c *gin.Context) {

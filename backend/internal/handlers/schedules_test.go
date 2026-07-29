@@ -98,3 +98,30 @@ func TestMultiTeacherGroupSlot_DoesNotConflictWithItself(t *testing.T) {
 	e.db.Model(&models.ScheduleSlotTeacher{}).Where("schedule_slot_id = ?", copiedSlot.ID).Count(&copiedTeacherLinks)
 	assert.EqualValues(t, 2, copiedTeacherLinks)
 }
+
+func TestCountRequestedVisitsIncludesActiveGroupLessons(t *testing.T) {
+	e := newTestEnv(t)
+	student := &models.Student{FullName: "Ученик", FundingType: models.FundingTypeBudget, IsActive: true}
+	teacher := &models.Teacher{FullName: "Преподаватель", IsActive: true}
+	subject := &models.Subject{Name: "Предмет", DefaultDurationMin: 30, IsActive: true}
+	require.NoError(t, e.db.Create(student).Error)
+	require.NoError(t, e.db.Create(teacher).Error)
+	require.NoError(t, e.db.Create(subject).Error)
+	require.NoError(t, e.db.Create(&models.Assignment{
+		StudentID: student.ID, TeacherID: teacher.ID, SubjectID: subject.ID,
+		FundingType: models.FundingTypeBudget, VisitsPerWeek: 2, DurationMin: 30,
+		Status: models.AssignmentStatusActive,
+	}).Error)
+	require.NoError(t, e.db.Create(&models.GroupLesson{
+		Name: "Активная группа", VisitsPerWeek: 3, DurationMin: 60, MaxStudents: 10,
+		Status: models.GroupLessonStatusActive,
+	}).Error)
+	require.NoError(t, e.db.Create(&models.GroupLesson{
+		Name: "Группа на паузе", VisitsPerWeek: 5, DurationMin: 60, MaxStudents: 10,
+		Status: models.GroupLessonStatusPaused,
+	}).Error)
+
+	individual, group := NewScheduleHandler(e.db, nil).countRequestedVisitsFromSchedule(&models.Schedule{})
+	assert.Equal(t, 2, individual)
+	assert.Equal(t, 3, group)
+}

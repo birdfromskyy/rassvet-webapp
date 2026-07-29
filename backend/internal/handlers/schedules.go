@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"backend/internal/services"
 	"crypto/rand"
@@ -124,6 +125,112 @@ func currentUserID(c *gin.Context) uint {
 	}
 }
 
+func currentUserRole(c *gin.Context) string {
+	role, _ := c.Get("role")
+	return fmt.Sprint(role)
+}
+
+func scheduleGenerationFields(jobID, mode string, actorID uint, actorRole string, result *services.ScheduleResponse, elapsed time.Duration) map[string]any {
+	autoSlots, groupAutoSlots := 0, 0
+	for _, slot := range result.Slots {
+		if slot.Origin == models.ScheduleSlotOriginAuto {
+			autoSlots++
+			if slot.SlotType == models.SlotTypeGroup {
+				groupAutoSlots++
+			}
+		}
+	}
+	return map[string]any{
+		"generation_id":         jobID,
+		"mode":                  mode,
+		"actor_id":              actorID,
+		"actor_role":            actorRole,
+		"schedule_id":           result.Schedule.ID,
+		"week_start":            result.Schedule.WeekStartDate,
+		"auto_slots_created":    autoSlots,
+		"group_auto_slots":      groupAutoSlots,
+		"individual_auto_slots": autoSlots - groupAutoSlots,
+		"requested":             result.Stats.TotalRequested,
+		"scheduled":             result.Stats.Scheduled,
+		"unplaced":              result.Stats.Unplaced,
+		"issues":                len(result.Issues),
+		"duration_ms":           elapsed.Milliseconds(),
+	}
+}
+
+func scheduleSlotAuditSnapshot(slot models.ScheduleSlot) map[string]any {
+	return map[string]any{
+		"id":                 slot.ID,
+		"schedule_id":        slot.ScheduleID,
+		"slot_type":          slot.SlotType,
+		"assignment_id":      slot.AssignmentID,
+		"group_lesson_id":    slot.GroupLessonID,
+		"student_id":         slot.StudentID,
+		"teacher_id":         slot.TeacherID,
+		"subject_id":         slot.SubjectID,
+		"room_id":            slot.RoomID,
+		"room_name":          slot.RoomName,
+		"weekday":            slot.Weekday,
+		"start_time":         slot.StartTime,
+		"end_time":           slot.EndTime,
+		"origin":             slot.Origin,
+		"status":             slot.Status,
+		"teacher_hours_mode": slot.TeacherHoursMode,
+	}
+}
+
+func (h *ScheduleHandler) resolveSlotReportTariff(slot models.ScheduleSlot) (reportTariffMatch, error) {
+	lookup, err := loadActiveReportTariffLookup(h.db)
+	if err != nil {
+		return reportTariffMatch{}, err
+	}
+	var subjectID *uint
+	if slot.SlotType == models.SlotTypeIndividual {
+		subjectID = slot.SubjectID
+	}
+	return resolveReportTariff(lookup, slot.SlotType, subjectID, slotDurationMinutes(slot)), nil
+}
+
+func reportTariffMissingMessage(match reportTariffMatch) string {
+	typeLabel := "группового"
+	if match.SlotType == models.SlotTypeIndividual {
+		typeLabel = "индивидуального"
+	}
+	return fmt.Sprintf("Для %s занятия длительностью %d мин нет активного правила тарификации. В отчётности сумма будет 0 руб.", typeLabel, match.DurationMinutes)
+}
+
+func (h *ScheduleHandler) requireReportTariffAcknowledgement(c *gin.Context, slot models.ScheduleSlot, acknowledged bool) (reportTariffMatch, bool) {
+	match, err := h.resolveSlotReportTariff(slot)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось проверить правило тарификации"})
+		return reportTariffMatch{}, false
+	}
+	if match.Covered || acknowledged {
+		return match, true
+	}
+	c.JSON(http.StatusUnprocessableEntity, gin.H{
+		"code":           "report_tariff_missing",
+		"error":          reportTariffMissingMessage(match),
+		"tariff_preview": match,
+	})
+	return match, false
+}
+
+func logAcknowledgedMissingReportTariff(c *gin.Context, slot models.ScheduleSlot, match reportTariffMatch) {
+	if match.Covered {
+		return
+	}
+	logging.Event("schedule.report_tariff_missing_acknowledged", map[string]any{
+		"actor_id":         currentUserID(c),
+		"actor_role":       currentUserRole(c),
+		"schedule_id":      slot.ScheduleID,
+		"slot_id":          slot.ID,
+		"slot_type":        slot.SlotType,
+		"subject_id":       slot.SubjectID,
+		"duration_minutes": match.DurationMinutes,
+	})
+}
+
 type CreateManualSlotRequest struct {
 	SlotType         string `json:"slot_type"`
 	AssignmentID     uint   `json:"assignment_id"`
@@ -138,17 +245,21 @@ type CreateManualSlotRequest struct {
 	Weekday          int    `json:"weekday" binding:"required"`
 	StartTime        string `json:"start_time" binding:"required"`
 	EndTime          string `json:"end_time" binding:"required"`
+	// A missing reporting tariff does not block a real lesson, but it must be
+	// acknowledged explicitly so its zero amount is never accidental.
+	AcknowledgeMissingReportTariff bool `json:"acknowledge_missing_report_tariff"`
 }
 
 type UpdateScheduleSlotRequest struct {
-	RoomID           *uint   `json:"room_id"`
-	Weekday          *int    `json:"weekday"`
-	StartTime        string  `json:"start_time"`
-	EndTime          string  `json:"end_time"`
-	Status           string  `json:"status"`
-	RoomName         string  `json:"room_name"`
-	TeacherIDs       []uint  `json:"teacher_ids"`
-	TeacherHoursMode *string `json:"teacher_hours_mode"`
+	RoomID                         *uint   `json:"room_id"`
+	Weekday                        *int    `json:"weekday"`
+	StartTime                      string  `json:"start_time"`
+	EndTime                        string  `json:"end_time"`
+	Status                         string  `json:"status"`
+	RoomName                       string  `json:"room_name"`
+	TeacherIDs                     []uint  `json:"teacher_ids"`
+	TeacherHoursMode               *string `json:"teacher_hours_mode"`
+	AcknowledgeMissingReportTariff bool    `json:"acknowledge_missing_report_tariff"`
 }
 
 // zeroScheduledStudent is a diagnostic row for the weekly schedule screen.
@@ -159,6 +270,7 @@ type zeroScheduledStudent struct {
 	StudentName     string `json:"student_name"`
 	Assignments     int    `json:"assignments"`
 	RequestedVisits int    `json:"requested_visits"`
+	IsResolved      bool   `json:"is_resolved"`
 }
 
 func (h *ScheduleHandler) GetScheduleByWeek(c *gin.Context) {
@@ -263,11 +375,17 @@ func (h *ScheduleHandler) StartGenerateSchedule(c *gin.Context) {
 	}
 
 	generatedByUserID := currentUserID(c)
+	actorRole := currentUserRole(c)
 	job := h.jobs.Create("Генерация поставлена в очередь")
 	jobResponse := *job
+	logging.Event("schedule_generation.started", map[string]any{
+		"generation_id": job.ID, "mode": "generate", "actor_id": generatedByUserID,
+		"actor_role": actorRole, "week_start": weekStartDate.Format("2006-01-02"),
+	})
 
 	go func() {
 		defer h.asyncGenerationMu.Unlock()
+		startedAt := time.Now()
 		progress := func(p services.ScheduleGenerationProgress) {
 			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
 				job.Percent = p.Percent
@@ -283,6 +401,11 @@ func (h *ScheduleHandler) StartGenerateSchedule(c *gin.Context) {
 				job.Error = err.Error()
 				job.Message = "Генерация завершилась с ошибкой"
 			})
+			logging.Event("schedule_generation.failed", map[string]any{
+				"generation_id": job.ID, "mode": "generate", "actor_id": generatedByUserID,
+				"actor_role": actorRole, "week_start": weekStartDate.Format("2006-01-02"),
+				"duration_ms": time.Since(startedAt).Milliseconds(), "error": err.Error(),
+			})
 			return
 		}
 		h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
@@ -291,6 +414,7 @@ func (h *ScheduleHandler) StartGenerateSchedule(c *gin.Context) {
 			job.Message = "Генерация завершена"
 			job.Result = result
 		})
+		logging.Event("schedule_generation.completed", scheduleGenerationFields(job.ID, "generate", generatedByUserID, actorRole, result, time.Since(startedAt)))
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{"job": jobResponse})
@@ -309,11 +433,17 @@ func (h *ScheduleHandler) StartResetAutoSchedule(c *gin.Context) {
 	}
 
 	generatedByUserID := currentUserID(c)
+	actorRole := currentUserRole(c)
 	job := h.jobs.Create("Пересчёт авто-слотов поставлен в очередь")
 	jobResponse := *job
+	logging.Event("schedule_generation.started", map[string]any{
+		"generation_id": job.ID, "mode": "reset_auto", "actor_id": generatedByUserID,
+		"actor_role": actorRole, "schedule_id": scheduleID,
+	})
 
 	go func() {
 		defer h.asyncGenerationMu.Unlock()
+		startedAt := time.Now()
 		progress := func(p services.ScheduleGenerationProgress) {
 			h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
 				job.Percent = p.Percent
@@ -329,6 +459,11 @@ func (h *ScheduleHandler) StartResetAutoSchedule(c *gin.Context) {
 				job.Error = err.Error()
 				job.Message = "Пересчёт завершился с ошибкой"
 			})
+			logging.Event("schedule_generation.failed", map[string]any{
+				"generation_id": job.ID, "mode": "reset_auto", "actor_id": generatedByUserID,
+				"actor_role": actorRole, "schedule_id": scheduleID,
+				"duration_ms": time.Since(startedAt).Milliseconds(), "error": err.Error(),
+			})
 			return
 		}
 		h.jobs.Update(job.ID, func(job *ScheduleGenerationJob) {
@@ -337,6 +472,7 @@ func (h *ScheduleHandler) StartResetAutoSchedule(c *gin.Context) {
 			job.Message = "Пересчёт завершён"
 			job.Result = result
 		})
+		logging.Event("schedule_generation.completed", scheduleGenerationFields(job.ID, "reset_auto", generatedByUserID, actorRole, result, time.Since(startedAt)))
 	}()
 
 	c.JSON(http.StatusAccepted, gin.H{"job": jobResponse})
@@ -573,7 +709,7 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 			return
 		}
 		var groupLesson models.GroupLesson
-		if err := h.db.Preload("Teachers").First(&groupLesson, req.GroupLessonID).Error; err != nil {
+		if err := h.db.Where("archived_at IS NULL").Preload("Teachers").First(&groupLesson, req.GroupLessonID).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				c.JSON(http.StatusNotFound, gin.H{"error": "Групповое занятие не найдено"})
 				return
@@ -617,6 +753,11 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 			return
 		}
 		slot.GroupLessonID = &req.GroupLessonID
+	}
+
+	tariffMatch, allowed := h.requireReportTariffAcknowledgement(c, slot, req.AcknowledgeMissingReportTariff)
+	if !allowed {
+		return
 	}
 
 	force := c.Query("force") == "true"
@@ -682,6 +823,10 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		return
 	}
 
+	logging.AdminMutation(c, "schedule.slot.create", nil, scheduleSlotAuditSnapshot(slot))
+	if req.AcknowledgeMissingReportTariff {
+		logAcknowledgedMissingReportTariff(c, slot, tariffMatch)
+	}
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Manual schedule slot created successfully",
 		"slot":    slot,
@@ -717,6 +862,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := scheduleSlotAuditSnapshot(slot)
 
 	if req.RoomID != nil {
 		if *req.RoomID == 0 {
@@ -739,6 +885,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		slot.Weekday = *req.Weekday
 	}
 
+	durationChanged := req.StartTime != "" || req.EndTime != ""
 	if req.StartTime != "" {
 		if !isValidTimeHHMM(req.StartTime) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала должно быть в формате ЧЧ:ММ"})
@@ -758,6 +905,15 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	if !isStartBeforeEnd(slot.StartTime, slot.EndTime) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала должно быть раньше времени окончания"})
 		return
+	}
+
+	var tariffMatch reportTariffMatch
+	if durationChanged {
+		var allowed bool
+		tariffMatch, allowed = h.requireReportTariffAcknowledgement(c, slot, req.AcknowledgeMissingReportTariff)
+		if !allowed {
+			return
+		}
 	}
 
 	if strings.TrimSpace(req.Status) != "" {
@@ -858,6 +1014,10 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		return
 	}
 
+	logging.AdminMutation(c, "schedule.slot.update", before, scheduleSlotAuditSnapshot(slot))
+	if durationChanged && req.AcknowledgeMissingReportTariff {
+		logAcknowledgedMissingReportTariff(c, slot, tariffMatch)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Schedule slot updated successfully",
 		"slot":    slot,
@@ -895,6 +1055,7 @@ func (h *ScheduleHandler) setScheduleSlotOrigin(c *gin.Context, origin string, a
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := scheduleSlotAuditSnapshot(slot)
 
 	slot.Origin = origin
 
@@ -918,6 +1079,7 @@ func (h *ScheduleHandler) setScheduleSlotOrigin(c *gin.Context, origin string, a
 		return
 	}
 
+	logging.AdminMutation(c, "schedule.slot."+action, before, scheduleSlotAuditSnapshot(slot))
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Schedule slot origin updated successfully",
 		"slot":    slot,
@@ -947,6 +1109,7 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	before := scheduleSlotAuditSnapshot(slot)
 
 	if err := h.db.Transaction(func(tx *gorm.DB) error {
 		// Existing databases may not have an ON DELETE CASCADE constraint on the
@@ -963,6 +1126,7 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 		return
 	}
 
+	logging.AdminMutation(c, "schedule.slot.delete", before, nil)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Schedule slot deleted successfully",
 	})
@@ -994,6 +1158,31 @@ func (h *ScheduleHandler) ClearAutoSchedule(c *gin.Context) {
 		return
 	}
 
+	h.respondWithSchedule(c, &schedule)
+}
+
+// RefreshDiagnostics recalculates explanations for unscheduled assignments
+// without touching any actual lesson in the weekly timetable.
+func (h *ScheduleHandler) RefreshDiagnostics(c *gin.Context) {
+	scheduleID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || scheduleID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID расписания"})
+		return
+	}
+	if err := h.generator.RefreshCurrentDiagnostics(uint(scheduleID)); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+	var schedule models.Schedule
+	if err := h.db.First(&schedule, scheduleID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить расписание"})
+		return
+	}
+	logging.Event("schedule_diagnostics.refreshed", map[string]any{
+		"schedule_id": schedule.ID,
+		"actor_id":    currentUserID(c),
+		"actor_role":  currentUserRole(c),
+	})
 	h.respondWithSchedule(c, &schedule)
 }
 
@@ -1166,6 +1355,7 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 		}
 	}()
 
+	copiedSlots := 0
 	for _, s := range prevManualSlots {
 		newSlot := models.ScheduleSlot{
 			ScheduleID:       schedule.ID,
@@ -1221,11 +1411,18 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 				return
 			}
 		}
+		copiedSlots++
 	}
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать занятия"})
 		return
 	}
+	logging.Event("schedule.manual_slots.copy_completed", map[string]any{
+		"actor_id": currentUserID(c), "actor_role": currentUserRole(c),
+		"source_schedule_id": prevSchedule.ID, "source_week": prevSchedule.WeekStartDate.Format("2006-01-02"),
+		"target_schedule_id": schedule.ID, "target_week": schedule.WeekStartDate.Format("2006-01-02"),
+		"requested": len(prevManualSlots), "copied": copiedSlots,
+	})
 
 	h.respondWithSchedule(c, &schedule)
 }
@@ -1264,6 +1461,8 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
+	issues = activeIndividualAssignmentIssues(issues)
+	h.markResolvedGenerationIssues(issues, slots)
 
 	indRequested, grpRequested := h.countRequestedVisitsFromSchedule(schedule)
 	var indScheduled, grpScheduled int
@@ -1287,14 +1486,17 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 	}
 	var configErrors, conflictErrors int
 	for _, issue := range issues {
+		if issue.ReasonCode == models.IssueReasonNoStudentLessons {
+			continue
+		}
 		if configErrorCodes[issue.ReasonCode] {
 			configErrors++
 		} else {
 			conflictErrors++
 		}
 	}
-	unplaced := len(issues)
-	zeroScheduledStudents, err := h.findZeroScheduledStudents(schedule.ID, slots)
+	unplaced := len(issues) - countZeroStudentDiagnostics(issues)
+	zeroScheduledStudents, err := h.findZeroScheduledStudents(schedule.ID, slots, issues)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось собрать диагностику непроставленных занятий"})
 		return
@@ -1328,7 +1530,54 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 	})
 }
 
-func (h *ScheduleHandler) findZeroScheduledStudents(scheduleID uint, slots []models.ScheduleSlot) ([]zeroScheduledStudent, error) {
+// activeIndividualAssignmentIssues keeps historical rows in the database, but
+// does not present an issue for an assignment that is now paused or whose
+// pupil/teacher is paused. These states are intentionally not scheduling
+// errors and this filter is response-only: it never changes slots or the
+// generator's source data.
+func activeIndividualAssignmentIssues(issues []models.ScheduleGenerationIssue) []models.ScheduleGenerationIssue {
+	filtered := make([]models.ScheduleGenerationIssue, 0, len(issues))
+	for _, issue := range issues {
+		if issue.AssignmentID != nil {
+			if issue.Assignment == nil || issue.Assignment.ArchivedAt != nil || issue.Assignment.Status != models.AssignmentStatusActive ||
+				issue.Student == nil || !issue.Student.IsActive ||
+				issue.Teacher == nil || !issue.Teacher.IsActive {
+				continue
+			}
+		}
+		filtered = append(filtered, issue)
+	}
+	return filtered
+}
+
+func countZeroStudentDiagnostics(issues []models.ScheduleGenerationIssue) int {
+	count := 0
+	for _, issue := range issues {
+		if issue.ReasonCode == models.IssueReasonNoStudentLessons {
+			count++
+		}
+	}
+	return count
+}
+
+func (h *ScheduleHandler) findZeroScheduledStudents(scheduleID uint, slots []models.ScheduleSlot, issues []models.ScheduleGenerationIssue) ([]zeroScheduledStudent, error) {
+	// New schedules retain this exact post-generation snapshot. Schedules that
+	// predate the feature keep the former live diagnostic until regenerated.
+	var snapshot []zeroScheduledStudent
+	for _, issue := range issues {
+		if issue.ReasonCode != models.IssueReasonNoStudentLessons || issue.StudentID == nil {
+			continue
+		}
+		name := fmt.Sprintf("#%d", *issue.StudentID)
+		if issue.Student != nil && issue.Student.FullName != "" {
+			name = issue.Student.FullName
+		}
+		snapshot = append(snapshot, zeroScheduledStudent{
+			StudentID: *issue.StudentID, StudentName: name,
+			Assignments: issue.AssignmentsCount, RequestedVisits: issue.RequestedVisits,
+			IsResolved: issue.IsResolved,
+		})
+	}
 	scheduledStudents := make(map[uint]bool)
 	for _, slot := range slots {
 		if slot.SlotType == models.SlotTypeIndividual && slot.Status != models.ScheduleSlotStatusCancelled && slot.StudentID != nil {
@@ -1340,14 +1589,25 @@ func (h *ScheduleHandler) findZeroScheduledStudents(scheduleID uint, slots []mod
 	if err := h.db.
 		Preload("Student").
 		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
+		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
 		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Where("assignments.archived_at IS NULL").
 		Order("students.full_name ASC, assignments.id ASC").
 		Find(&assignments).Error; err != nil {
 		return nil, err
 	}
 
+	eligibleStudents := make(map[uint]*zeroScheduledStudent)
 	rowsByStudent := make(map[uint]*zeroScheduledStudent)
 	for _, assignment := range assignments {
+		eligible := eligibleStudents[assignment.StudentID]
+		if eligible == nil {
+			eligible = &zeroScheduledStudent{StudentID: assignment.StudentID, StudentName: assignment.Student.FullName}
+			eligibleStudents[assignment.StudentID] = eligible
+		}
+		eligible.Assignments++
+		eligible.RequestedVisits += assignment.VisitsPerWeek
+
 		if scheduledStudents[assignment.StudentID] {
 			continue
 		}
@@ -1360,12 +1620,94 @@ func (h *ScheduleHandler) findZeroScheduledStudents(scheduleID uint, slots []mod
 		row.RequestedVisits += assignment.VisitsPerWeek
 	}
 
-	rows := make([]zeroScheduledStudent, 0, len(rowsByStudent))
-	for _, row := range rowsByStudent {
-		rows = append(rows, *row)
+	// Keep the generation snapshot for history, but merge in assignments that
+	// appeared afterwards. Otherwise a newly created assignment with no slot
+	// would be invisible until the next full generation.
+	rowsByID := make(map[uint]zeroScheduledStudent, len(snapshot)+len(rowsByStudent))
+	for _, row := range snapshot {
+		// A snapshot may predate a pause on the pupil, teacher, or assignment.
+		// Do not show it when it is no longer an eligible active assignment.
+		eligible := eligibleStudents[row.StudentID]
+		if eligible == nil {
+			continue
+		}
+		row.StudentName = eligible.StudentName
+		row.Assignments = eligible.Assignments
+		row.RequestedVisits = eligible.RequestedVisits
+		rowsByID[row.StudentID] = row
+	}
+	for studentID, row := range rowsByStudent {
+		// Current eligible assignments are authoritative: they exclude paused
+		// teachers and replace stale counts from an older generation snapshot.
+		rowsByID[studentID] = *row
+	}
+
+	rows := make([]zeroScheduledStudent, 0, len(rowsByID))
+	for _, row := range rowsByID {
+		rows = append(rows, row)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].StudentName < rows[j].StudentName })
 	return rows, nil
+}
+
+// markResolvedGenerationIssues preserves the generator's original diagnosis
+// while reflecting whether later manual work has filled the missing visits.
+// It only annotates the response; no issue row or schedule slot is mutated.
+func (h *ScheduleHandler) markResolvedGenerationIssues(issues []models.ScheduleGenerationIssue, slots []models.ScheduleSlot) {
+	scheduledByAssignment := make(map[uint]int)
+	scheduledByGroup := make(map[uint]int)
+	scheduledByStudent := make(map[uint]int)
+	for _, slot := range slots {
+		if slot.Status == models.ScheduleSlotStatusCancelled {
+			continue
+		}
+		if slot.AssignmentID != nil {
+			scheduledByAssignment[*slot.AssignmentID]++
+		}
+		if slot.GroupLessonID != nil {
+			scheduledByGroup[*slot.GroupLessonID]++
+		}
+		if slot.SlotType == models.SlotTypeIndividual && slot.StudentID != nil {
+			scheduledByStudent[*slot.StudentID]++
+		}
+	}
+
+	issueCountByAssignment := make(map[uint]int)
+	issueCountByGroup := make(map[uint]int)
+	for _, issue := range issues {
+		if issue.AssignmentID != nil {
+			issueCountByAssignment[*issue.AssignmentID]++
+		}
+		if issue.GroupLessonID != nil {
+			issueCountByGroup[*issue.GroupLessonID]++
+		}
+	}
+	resolvedByAssignment := make(map[uint]int)
+	resolvedByGroup := make(map[uint]int)
+	for index := range issues {
+		issue := &issues[index]
+		if issue.ReasonCode == models.IssueReasonNoStudentLessons && issue.StudentID != nil {
+			issue.IsResolved = scheduledByStudent[*issue.StudentID] > 0
+			continue
+		}
+		if issue.AssignmentID != nil && issue.Assignment != nil {
+			baseline := issue.Assignment.VisitsPerWeek - issueCountByAssignment[*issue.AssignmentID]
+			resolved := scheduledByAssignment[*issue.AssignmentID] - baseline
+			if resolved > resolvedByAssignment[*issue.AssignmentID] && resolved > 0 {
+				issue.IsResolved = true
+				resolvedByAssignment[*issue.AssignmentID]++
+			}
+			continue
+		}
+		if issue.GroupLessonID != nil && issue.GroupLesson != nil {
+			baseline := issue.GroupLesson.VisitsPerWeek - issueCountByGroup[*issue.GroupLessonID]
+			resolved := scheduledByGroup[*issue.GroupLessonID] - baseline
+			if resolved > resolvedByGroup[*issue.GroupLessonID] && resolved > 0 {
+				issue.IsResolved = true
+				resolvedByGroup[*issue.GroupLessonID]++
+			}
+		}
+	}
 }
 
 func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Schedule) (int, int) {
@@ -1377,9 +1719,23 @@ func (h *ScheduleHandler) countRequestedVisitsFromSchedule(schedule *models.Sche
 		Joins("JOIN students ON students.id = assignments.student_id AND students.is_active = true").
 		Joins("JOIN teachers ON teachers.id = assignments.teacher_id AND teachers.is_active = true").
 		Where("assignments.status = ?", models.AssignmentStatusActive).
+		Where("assignments.archived_at IS NULL").
 		Find(&assignments).Error; err == nil {
 		for _, a := range assignments {
 			individual += a.VisitsPerWeek
+		}
+	}
+
+	// Group lessons are independent of individual assignments. Count only
+	// active, non-archived entries, exactly as the generator does, so the
+	// dashboard's requested and placed figures use the same scope.
+	var groupLessons []models.GroupLesson
+	if err := h.db.
+		Where("status = ?", models.GroupLessonStatusActive).
+		Where("archived_at IS NULL").
+		Find(&groupLessons).Error; err == nil {
+		for _, lesson := range groupLessons {
+			group += lesson.VisitsPerWeek
 		}
 	}
 
@@ -1398,6 +1754,9 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 	if assignment.StudentID != studentID || assignment.TeacherID != teacherID || assignment.SubjectID != subjectID {
 		return fmt.Errorf("Назначение не соответствует выбранному ученику, преподавателю или предмету")
 	}
+	if assignment.ArchivedAt != nil || assignment.Status != models.AssignmentStatusActive {
+		return fmt.Errorf("Назначение находится в архиве или на паузе")
+	}
 
 	var room models.Room
 	if err := h.db.First(&room, roomID).Error; err != nil {
@@ -1405,6 +1764,9 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 			return fmt.Errorf("Кабинет не найден")
 		}
 		return err
+	}
+	if room.ArchivedAt != nil || !room.IsActive {
+		return fmt.Errorf("Кабинет находится в архиве или неактивен")
 	}
 
 	var roomSubject models.RoomSubject
@@ -1551,7 +1913,7 @@ func (h *ScheduleHandler) validateActiveTeacherIDs(ids []uint) error {
 		return fmt.Errorf("У группового занятия должен быть хотя бы один преподаватель")
 	}
 	var count int64
-	if err := h.db.Model(&models.Teacher{}).Where("id IN ? AND is_active = ?", unique, true).Count(&count).Error; err != nil {
+	if err := h.db.Model(&models.Teacher{}).Where("id IN ? AND is_active = ? AND archived_at IS NULL", unique, true).Count(&count).Error; err != nil {
 		return fmt.Errorf("Не удалось проверить преподавателей")
 	}
 	if count != int64(len(unique)) {
@@ -1629,6 +1991,9 @@ func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherI
 	if groupLesson.Status != models.GroupLessonStatusActive {
 		return fmt.Errorf("Групповое занятие приостановлено")
 	}
+	if groupLesson.ArchivedAt != nil {
+		return fmt.Errorf("Групповое занятие находится в архиве")
+	}
 
 	var teacher models.Teacher
 	if err := h.db.First(&teacher, teacherID).Error; err != nil {
@@ -1637,7 +2002,7 @@ func (h *ScheduleHandler) ensureManualGroupSlotRelations(groupLessonID, teacherI
 		}
 		return err
 	}
-	if !teacher.IsActive {
+	if !teacher.IsActive || teacher.ArchivedAt != nil {
 		return fmt.Errorf("Преподаватель неактивен")
 	}
 

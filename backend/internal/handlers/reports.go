@@ -29,6 +29,14 @@ type monthlyStudentReportRow struct {
 	DurationMin int     `json:"duration_min"`
 	Lessons     int     `json:"lessons"`
 	Hours       float64 `json:"hours"`
+	TariffRub   int     `json:"tariff_rub"`
+	AmountRub   int     `json:"amount_rub"`
+}
+
+type monthlyStudentTotalRow struct {
+	StudentID   uint   `json:"student_id"`
+	StudentName string `json:"student_name"`
+	AmountRub   int    `json:"amount_rub"`
 }
 
 type monthlyTeacherReportRow struct {
@@ -57,6 +65,8 @@ type reportLessonRow struct {
 	RoomName    string  `json:"room_name"`
 	StudentIDs  []uint  `json:"student_ids"`
 	TeacherIDs  []uint  `json:"teacher_ids"`
+	TariffRub   int     `json:"tariff_rub"`
+	AmountRub   int     `json:"amount_rub"`
 }
 
 func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
@@ -116,10 +126,18 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		return
 	}
 
+	tariffLookup, err := loadActiveReportTariffLookup(h.db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить правила тарификации"})
+		return
+	}
+
 	studentRows := map[string]*monthlyStudentReportRow{}
+	studentTotals := map[uint]*monthlyStudentTotalRow{}
 	teacherRows := map[string]*monthlyTeacherReportRow{}
 	lessons := []reportLessonRow{}
 	durationCounts := map[string]int{"30": 0, "50": 0, "other": 0}
+	totalAmountRub := 0
 
 	for _, slot := range slots {
 		lessonDate := slot.Schedule.WeekStartDate.AddDate(0, 0, slot.Weekday-1)
@@ -147,6 +165,15 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		hours := reportHours(duration)
 		subjectID := reportSubjectID(slot)
 		subjectName := reportSubjectName(slot)
+		var tariffSubjectID *uint
+		if slot.SlotType == models.SlotTypeIndividual && slot.SubjectID != nil {
+			tariffSubjectID = slot.SubjectID
+		}
+		tariffMatch := resolveReportTariff(tariffLookup, slot.SlotType, tariffSubjectID, duration)
+		tariffRub := 0
+		if tariffMatch.TariffRub != nil {
+			tariffRub = *tariffMatch.TariffRub
+		}
 
 		slotTeachers := slotReportTeachers(slot)
 		teacherNames := make([]string, 0, len(slotTeachers))
@@ -210,6 +237,8 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			RoomName:    reportRoomName(slot),
 			StudentIDs:  studentIDs,
 			TeacherIDs:  teacherIDs,
+			TariffRub:   tariffRub,
+			AmountRub:   tariffRub * len(reportStudents),
 		})
 
 		for _, student := range reportStudents {
@@ -226,11 +255,21 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 					SubjectID:   subjectID,
 					SubjectName: subjectName,
 					DurationMin: duration,
+					TariffRub:   tariffRub,
 				}
 				studentRows[sKey] = sRow
 			}
 			sRow.Lessons++
 			sRow.Hours += hours
+			sRow.AmountRub += tariffRub
+			totalAmountRub += tariffRub
+
+			total := studentTotals[student.ID]
+			if total == nil {
+				total = &monthlyStudentTotalRow{StudentID: student.ID, StudentName: studentName}
+				studentTotals[student.ID] = total
+			}
+			total.AmountRub += tariffRub
 		}
 	}
 
@@ -258,6 +297,13 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		}
 		return teachers[i].SubjectName < teachers[j].SubjectName
 	})
+	studentTotalRows := make([]monthlyStudentTotalRow, 0, len(studentTotals))
+	for _, row := range studentTotals {
+		studentTotalRows = append(studentTotalRows, *row)
+	}
+	sort.Slice(studentTotalRows, func(i, j int) bool {
+		return studentTotalRows[i].StudentName < studentTotalRows[j].StudentName
+	})
 	sort.Slice(lessons, func(i, j int) bool {
 		if lessons[i].Date != lessons[j].Date {
 			return lessons[i].Date < lessons[j].Date
@@ -276,10 +322,12 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			"start_date": startDate.Format("2006-01-02"),
 			"end_date":   endDate.Format("2006-01-02"),
 		},
-		"students":        students,
-		"teachers":        teachers,
-		"lessons":         lessons,
-		"duration_counts": durationCounts,
+		"students":         students,
+		"teachers":         teachers,
+		"lessons":          lessons,
+		"duration_counts":  durationCounts,
+		"student_totals":   studentTotalRows,
+		"total_amount_rub": totalAmountRub,
 	})
 }
 

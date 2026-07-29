@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/logging"
 	"backend/internal/models"
 	"net/http"
 	"strconv"
@@ -127,6 +128,7 @@ func (h *RoomHandler) CreateRoom(c *gin.Context) {
 		}
 		room.IsActive = false
 	}
+	logging.AdminMutation(c, "schedule.room.create", nil, roomAuditSnapshot(room))
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Room created successfully",
@@ -156,6 +158,7 @@ func (h *RoomHandler) UpdateRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения кабинета"})
 		return
 	}
+	before := roomAuditSnapshot(room)
 
 	if req.Name != "" {
 		req.Name = strings.TrimSpace(req.Name)
@@ -184,6 +187,7 @@ func (h *RoomHandler) UpdateRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить кабинет"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.room.update", before, roomAuditSnapshot(room))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Room updated successfully",
@@ -207,6 +211,7 @@ func (h *RoomHandler) DeactivateRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения кабинета"})
 		return
 	}
+	before := roomAuditSnapshot(room)
 
 	room.IsActive = false
 
@@ -214,6 +219,7 @@ func (h *RoomHandler) DeactivateRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось деактивировать кабинет"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.room.deactivate", before, roomAuditSnapshot(room))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Room deactivated successfully",
@@ -237,46 +243,14 @@ func (h *RoomHandler) DeleteRoom(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения кабинета"})
 		return
 	}
+	before := roomAuditSnapshot(room)
 	now := time.Now()
 	if err := h.db.Model(&room).Update("archived_at", now).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось переместить кабинет в архив"})
 		return
 	}
+	logging.AdminMutation(c, "schedule.room.archive", before, nil)
 	c.JSON(http.StatusOK, gin.H{"message": "Кабинет перемещён в архив"})
-	return
-
-	if !room.IsActive {
-		err := h.db.Transaction(func(tx *gorm.DB) error {
-			if err := tx.Where("room_id = ?", room.ID).Delete(&models.ScheduleSlot{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("room_id = ?", room.ID).Delete(&models.RoomSubject{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("room_id = ?", room.ID).Delete(&models.TeacherRoom{}).Error; err != nil {
-				return err
-			}
-			return tx.Delete(&room).Error
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить запись"})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "Room deleted successfully"})
-		return
-	}
-
-	if err := h.db.Delete(&room).Error; err != nil {
-		if strings.Contains(err.Error(), "23503") || strings.Contains(err.Error(), "foreign key") {
-			c.JSON(http.StatusConflict, gin.H{"error": "Нельзя удалить кабинет: есть связанные слоты расписания. Сначала деактивируйте."})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить кабинет"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Room deleted successfully"})
 }
 
 func (h *RoomHandler) RestoreRoom(c *gin.Context) {

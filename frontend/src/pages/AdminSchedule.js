@@ -36,7 +36,6 @@ import {
 	ListItem,
 	ListItemText,
 	ListItemSecondaryAction,
-	TableSortLabel,
 	Checkbox,
 	FormControlLabel,
 	Autocomplete,
@@ -67,6 +66,7 @@ import {
 } from '@mui/icons-material'
 import { toast } from 'react-toastify'
 import scheduleService from '../services/scheduleService'
+import commercialTariffService from '../services/commercialTariffService'
 import api from '../services/api'
 import './AdminSchedule.scss'
 
@@ -219,15 +219,18 @@ const AdminSchedule = () => {
 	const [filterIssueStudentId, setFilterIssueStudentId] = useState('')
 	const [filterIssueTeacherId, setFilterIssueTeacherId] = useState('')
 	const [filterIssueFundingType, setFilterIssueFundingType] = useState('')
+	const [hideResolvedDiagnostics, setHideResolvedDiagnostics] = useState(false)
+	const [refreshingDiagnostics, setRefreshingDiagnostics] = useState(false)
 
 	// Issue sorting
-	const [issueSortBy, setIssueSortBy] = useState('')
-	const [issueSortDir, setIssueSortDir] = useState('asc')
 
 	// Create slot dialog
 	const [createDialog, setCreateDialog] = useState(false)
 	const [slotForm, setSlotForm] = useState(EMPTY_SLOT_FORM)
 	const [groupDurationConfirm, setGroupDurationConfirm] = useState({ open: false, expected: 0, actual: 0, start: '', end: '' })
+	const [reportTariffConfirm, setReportTariffConfirm] = useState({ open: false, preview: null, subjectName: '', action: 'create' })
+	const pendingReportTariffAction = useRef(null)
+	const reportTariffAcknowledged = useRef(false)
 
 	// Edit slot dialog
 	const [editDialog, setEditDialog] = useState({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
@@ -276,6 +279,22 @@ const AdminSchedule = () => {
 			setLoading(false)
 		}
 	}, [weekStartISO])
+
+	const refreshDiagnostics = async event => {
+		event?.stopPropagation()
+		if (!scheduleData?.schedule?.id || refreshingDiagnostics) return
+		setRefreshingDiagnostics(true)
+		try {
+			const data = await scheduleService.refreshScheduleDiagnostics(scheduleData.schedule.id)
+			setScheduleData(data)
+			setHideResolvedDiagnostics(false)
+			toast.success('Диагностика расписания обновлена')
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Не удалось обновить диагностику')
+		} finally {
+			setRefreshingDiagnostics(false)
+		}
+	}
 
 	useEffect(() => {
 		loadSchedule()
@@ -848,9 +867,37 @@ const AdminSchedule = () => {
 
 	const openCreateSlot = () => {
 		setSlotForm(EMPTY_SLOT_FORM)
+		reportTariffAcknowledged.current = false
 		setCreateDialog(true)
 		// Refresh group lessons to get the latest default_teacher_id
 		scheduleService.getGroupLessons({ status: 'active' }).then(setGroupLessons).catch(() => {})
+	}
+
+	const confirmReportTariffBeforeAction = async (input, subjectName, action, dialogAction = 'create') => {
+		try {
+			const preview = await commercialTariffService.previewReportTariff(input)
+			if (preview.covered) {
+				await action()
+				return
+			}
+			pendingReportTariffAction.current = action
+			setReportTariffConfirm({ open: true, preview, subjectName, action: dialogAction })
+		} catch (e) {
+			toast.error(e.response?.data?.error || 'Не удалось проверить тариф для отчётности')
+		}
+	}
+
+	const acknowledgeMissingReportTariff = async () => {
+		reportTariffAcknowledged.current = true
+		const action = pendingReportTariffAction.current
+		pendingReportTariffAction.current = null
+		setReportTariffConfirm({ open: false, preview: null, subjectName: '', action: 'create' })
+		if (action) await action()
+	}
+
+	const closeReportTariffConfirm = () => {
+		pendingReportTariffAction.current = null
+		setReportTariffConfirm({ open: false, preview: null, subjectName: '', action: 'create' })
 	}
 
 	const doCreateSlot = async (force = false) => {
@@ -875,6 +922,7 @@ const AdminSchedule = () => {
 					weekday: Number(slotForm.weekday),
 					start_time: slotForm.start_time,
 					end_time: slotForm.end_time,
+					acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
 				}
 				: {
 					slot_type: 'individual',
@@ -886,12 +934,14 @@ const AdminSchedule = () => {
 					weekday: Number(slotForm.weekday),
 					start_time: slotForm.start_time,
 					end_time: slotForm.end_time,
+					acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
 				}
 			if (slotForm.slot_type === 'group' && groupLesson && slotForm.ignore_student_windows !== groupLesson.ignore_student_windows) {
 				await scheduleService.updateGroupLesson(groupLesson.id, { ignore_student_windows: slotForm.ignore_student_windows })
 			}
 			await scheduleService.createSlot(scheduleId, payload, force)
 			toast.success('Слот добавлен')
+			reportTariffAcknowledged.current = false
 			setCreateDialog(false)
 			loadSchedule()
 		} catch (e) {
@@ -927,17 +977,21 @@ const AdminSchedule = () => {
 				})
 				return
 			}
-			const conflicts = findConflictingSlots(
-				Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
-				null, teacherIds,
-				(groupLesson.enrollments || []).map(enr => enr.student_id),
-			)
-			if (conflicts.length > 0) {
-				pendingSlotAction.current = doCreateSlot
-				setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
-				return
-			}
-			await doCreateSlot()
+			await confirmReportTariffBeforeAction({
+				slot_type: 'group', start_time: slotForm.start_time, end_time: slotForm.end_time,
+			}, groupLesson.name || 'Групповое занятие', async () => {
+				const conflicts = findConflictingSlots(
+					Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
+					null, teacherIds,
+					(groupLesson.enrollments || []).map(enr => enr.student_id),
+				)
+				if (conflicts.length > 0) {
+					pendingSlotAction.current = doCreateSlot
+					setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
+					return
+				}
+				await doCreateSlot()
+			})
 			return
 		}
 
@@ -950,21 +1004,27 @@ const AdminSchedule = () => {
 			toast.error('Выберите кабинет для занятия')
 			return
 		}
-		const conflicts = findConflictingSlots(
-			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
-			Number(slotForm.room_id), assignment.teacher_id, [assignment.student_id],
-		)
-		const warnings = checkAvailabilityWarnings(
-			Number(slotForm.weekday), slotForm.start_time, slotForm.end_time, assignment,
-		)
-		if (conflicts.length > 0 || warnings.length > 0) {
-			pendingSlotAction.current = doCreateSlot
-			setConflictDialog({ open: true, conflicts, warnings, deleteConflicts: conflicts.length > 0 })
-			return
-		}
-		await doCreateSlot()
+		await confirmReportTariffBeforeAction({
+			slot_type: 'individual', subject_id: assignment.subject_id,
+			start_time: slotForm.start_time, end_time: slotForm.end_time,
+		}, assignment.subject?.name || 'Выбранный предмет', async () => {
+			const conflicts = findConflictingSlots(
+				Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
+				Number(slotForm.room_id), assignment.teacher_id, [assignment.student_id],
+			)
+			const warnings = checkAvailabilityWarnings(
+				Number(slotForm.weekday), slotForm.start_time, slotForm.end_time, assignment,
+			)
+			if (conflicts.length > 0 || warnings.length > 0) {
+				pendingSlotAction.current = doCreateSlot
+				setConflictDialog({ open: true, conflicts, warnings, deleteConflicts: conflicts.length > 0 })
+				return
+			}
+			await doCreateSlot()
+		})
 	}
 	const openEditSlot = async slot => {
+		reportTariffAcknowledged.current = false
 		setEditForm({
 			weekday: slot.weekday,
 			start_time: slot.start_time,
@@ -993,13 +1053,14 @@ const AdminSchedule = () => {
 			const slot = editDialog.slot
 			const { teacher_hours_mode, teacher_ids, ...basePayload } = editForm
 			const payload = slot.slot_type === 'group'
-				? { ...basePayload, teacher_ids, teacher_hours_mode }
-				: basePayload
+				? { ...basePayload, teacher_ids, teacher_hours_mode, acknowledge_missing_report_tariff: reportTariffAcknowledged.current }
+				: { ...basePayload, acknowledge_missing_report_tariff: reportTariffAcknowledged.current }
 			if (slot.slot_type === 'group' && slot.group_lesson && editForm.ignore_student_windows !== slot.group_lesson.ignore_student_windows) {
 				await scheduleService.updateGroupLesson(slot.group_lesson.id, { ignore_student_windows: editForm.ignore_student_windows })
 			}
 			await scheduleService.updateSlot(scheduleData.schedule.id, slot.id, payload, force)
 			toast.success('Слот обновлён')
+			reportTariffAcknowledged.current = false
 			setEditDialog({ open: false, slot: null, groupAttendance: [], groupAttendanceLoading: false })
 			loadSchedule()
 		} catch (e) {
@@ -1009,21 +1070,34 @@ const AdminSchedule = () => {
 
 	const saveEditSlot = async () => {
 		const slot = editDialog.slot
-		const conflicts = findConflictingSlots(
-			editForm.weekday,
-			editForm.start_time,
-			editForm.end_time,
-			slot?.slot_type === 'group' ? null : editForm.room_id,
-			slot?.slot_type === 'group' ? editForm.teacher_ids : getSlotTeacherIds(slot),
-			getSlotStudentIds(slot),
-			slot?.id,
-		)
-		if (conflicts.length > 0) {
-			pendingSlotAction.current = doSaveEditSlot
-			setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
+		const proceed = async () => {
+			const conflicts = findConflictingSlots(
+				editForm.weekday,
+				editForm.start_time,
+				editForm.end_time,
+				slot?.slot_type === 'group' ? null : editForm.room_id,
+				slot?.slot_type === 'group' ? editForm.teacher_ids : getSlotTeacherIds(slot),
+				getSlotStudentIds(slot),
+				slot?.id,
+			)
+			if (conflicts.length > 0) {
+				pendingSlotAction.current = doSaveEditSlot
+				setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
+				return
+			}
+			await doSaveEditSlot()
+		}
+		const durationChanged = slot && (slot.start_time !== editForm.start_time || slot.end_time !== editForm.end_time)
+		if (!durationChanged) {
+			await proceed()
 			return
 		}
-		await doSaveEditSlot()
+		await confirmReportTariffBeforeAction({
+			slot_type: slot.slot_type,
+			subject_id: slot.slot_type === 'individual' ? slot.subject_id : undefined,
+			start_time: editForm.start_time,
+			end_time: editForm.end_time,
+		}, slot.slot_type === 'group' ? (slot.group_lesson?.name || 'Групповое занятие') : (slot.subject?.name || 'Выбранный предмет'), proceed, 'save')
 	}
 
 	const pinSlotAsManual = async slot => {
@@ -1290,8 +1364,9 @@ const AdminSchedule = () => {
 	const isApproved = schedule?.status === 'approved'
 	const canAddSlot = isDraft || isApproved
 
-	const issueConfigCount = issues.filter(i => !i.message.startsWith('Все возможные')).length
-	const issueConflictCount = issues.filter(i => i.message.startsWith('Все возможные')).length
+	const visibleIssues = issues.filter(i => i.reason_code !== 'NO_STUDENT_LESSONS' && (!hideResolvedDiagnostics || !i.is_resolved))
+	const issueConfigCount = visibleIssues.filter(i => !i.is_resolved && !i.message.startsWith('Все возможные')).length
+	const issueConflictCount = visibleIssues.filter(i => !i.is_resolved && i.message.startsWith('Все возможные')).length
 
 	return (
 		<main className='admin-module admin-schedule-page'>
@@ -1820,39 +1895,9 @@ const AdminSchedule = () => {
 				)}
 
 				{/* Issues */}
-				{!loading && issues.length > 0 && (() => {
-					const handleIssueSortClick = col => {
-						if (issueSortBy === col) {
-							setIssueSortDir(d => d === 'asc' ? 'desc' : 'asc')
-						} else {
-							setIssueSortBy(col)
-							setIssueSortDir('asc')
-						}
-					}
-
-					const sortIssues = list => {
-						if (!issueSortBy) return list
-						return [...list].sort((a, b) => {
-							let aVal = '', bVal = ''
-							if (issueSortBy === 'student') {
-								aVal = a.group_lesson_id ? (a.group_lesson?.name || '') : (a.student?.full_name || '')
-								bVal = b.group_lesson_id ? (b.group_lesson?.name || '') : (b.student?.full_name || '')
-							} else if (issueSortBy === 'teacher') {
-								aVal = a.teacher?.full_name || ''
-								bVal = b.teacher?.full_name || ''
-							} else if (issueSortBy === 'reason') {
-								aVal = a.message || ''
-								bVal = b.message || ''
-							} else {
-								aVal = a.subject?.name || ''
-								bVal = b.subject?.name || ''
-							}
-							const cmp = aVal.localeCompare(bVal, 'ru')
-							return issueSortDir === 'asc' ? cmp : -cmp
-						})
-					}
-
-					const filtered = issues.filter(issue => {
+				{!loading && visibleIssues.length > 0 && (() => {
+					const filtered = visibleIssues.filter(issue => {
+						if (issue.reason_code === 'NO_STUDENT_LESSONS') return false
 						if (filterIssueStudentId && issue.student_id !== Number(filterIssueStudentId)) return false
 						if (filterIssueTeacherId && issue.teacher_id !== Number(filterIssueTeacherId)) return false
 						if (filterIssueFundingType) {
@@ -1863,64 +1908,82 @@ const AdminSchedule = () => {
 					})
 
 					const isConflict = issue => issue.message.startsWith('Все возможные')
-					const configErrors = sortIssues(filtered.filter(i => !isConflict(i)))
-					const conflicts = sortIssues(filtered.filter(i => isConflict(i)))
+					const configErrors = filtered.filter(i => !isConflict(i))
+					const conflicts = filtered.filter(i => isConflict(i))
 
-					const sortableHead = (
+					const activeSlots = (scheduleData?.slots || []).filter(slot => slot.status !== 'cancelled')
+					const groupIssues = list => {
+						const groups = new Map()
+						list.forEach(issue => {
+							const isGroup = Boolean(issue.group_lesson_id)
+							const entityID = isGroup ? issue.group_lesson_id : issue.assignment_id
+							const fallbackKey = `${issue.student_id || ''}-${issue.teacher_id || ''}-${issue.subject_id || ''}`
+							const key = `${isGroup ? 'group' : 'assignment'}-${entityID || fallbackKey}`
+							if (!groups.has(key)) {
+								const studentName = isGroup
+									? `Группа: ${issue.group_lesson?.name || issue.group_lesson_id}`
+									: (issue.student?.full_name || `Ученик #${issue.student_id}`)
+								const subjectName = issue.subject?.name || issue.assignment?.subject?.name || 'Без предмета'
+								const expected = isGroup ? issue.group_lesson?.visits_per_week : issue.assignment?.visits_per_week
+								const scheduled = activeSlots.filter(slot => isGroup
+									? slot.group_lesson_id === issue.group_lesson_id
+									: slot.assignment_id === issue.assignment_id,
+								).length
+								groups.set(key, { key, studentName, subjectName, expected: expected || 0, scheduled, issues: [] })
+							}
+							groups.get(key).issues.push(issue)
+						})
+						return [...groups.values()]
+							.map(group => ({
+								...group,
+								issues: [...group.issues].sort((a, b) => Number(a.is_resolved) - Number(b.is_resolved)),
+							}))
+							.sort((a, b) => {
+								const aResolved = a.issues.every(issue => issue.is_resolved)
+								const bResolved = b.issues.every(issue => issue.is_resolved)
+								if (aResolved !== bResolved) return Number(aResolved) - Number(bResolved)
+								return a.studentName.localeCompare(b.studentName, 'ru') || a.subjectName.localeCompare(b.subjectName, 'ru')
+							})
+					}
+
+					const issueHead = (
 						<TableHead>
 							<TableRow>
-								<TableCell>
-									<TableSortLabel
-										active={issueSortBy === 'student'}
-										direction={issueSortBy === 'student' ? issueSortDir : 'asc'}
-										onClick={() => handleIssueSortClick('student')}
-									>
-										Ученик / Группа
-									</TableSortLabel>
-								</TableCell>
-								<TableCell>
-									<TableSortLabel
-										active={issueSortBy === 'teacher'}
-										direction={issueSortBy === 'teacher' ? issueSortDir : 'asc'}
-										onClick={() => handleIssueSortClick('teacher')}
-									>
-										Преподаватель
-									</TableSortLabel>
-								</TableCell>
-								<TableCell>
-									<TableSortLabel
-										active={issueSortBy === 'subject'}
-										direction={issueSortBy === 'subject' ? issueSortDir : 'asc'}
-										onClick={() => handleIssueSortClick('subject')}
-									>
-										Предмет
-									</TableSortLabel>
-								</TableCell>
-								<TableCell>
-										<TableSortLabel
-											active={issueSortBy === 'reason'}
-											direction={issueSortBy === 'reason' ? issueSortDir : 'asc'}
-											onClick={() => handleIssueSortClick('reason')}
-										>
-											Причина
-										</TableSortLabel>
-									</TableCell>
+								<TableCell sx={{ width: '24%' }}>Преподаватель</TableCell>
+								<TableCell align='center' sx={{ width: '16%' }}>Статус</TableCell>
+								<TableCell sx={{ width: '60%' }}>Причина</TableCell>
 							</TableRow>
 						</TableHead>
 					)
 
 					const renderRows = list => list.map(issue => (
-						<TableRow key={issue.id}>
-							<TableCell>
-								{issue.group_lesson_id
-									? `Группа: ${issue.group_lesson?.name || issue.group_lesson_id}`
-									: (issue.student?.full_name || issue.student_id || '—')}
-							</TableCell>
-							<TableCell>{issue.teacher?.full_name || issue.teacher_id || '—'}</TableCell>
-							<TableCell>{issue.subject?.name || issue.subject_id || '—'}</TableCell>
-							<TableCell>{issue.message}</TableCell>
+						<TableRow key={issue.id} sx={issue.is_resolved ? { opacity: 0.55, bgcolor: '#f1f8f3' } : undefined}>
+							<TableCell sx={issue.is_resolved ? { textDecoration: 'line-through' } : undefined}>{issue.teacher?.full_name || issue.teacher_id || '—'}</TableCell>
+							<TableCell align='center'>{issue.is_resolved ? <Tooltip title='Исправлено вручную'><ConductedIcon color='success' fontSize='small' /></Tooltip> : 'Требует внимания'}</TableCell>
+							<TableCell sx={issue.is_resolved ? { textDecoration: 'line-through' } : undefined}>{issue.message}</TableCell>
 						</TableRow>
 					))
+
+					const renderIssueGroups = list => groupIssues(list).map(group => {
+						const resolved = group.issues.every(issue => issue.is_resolved)
+						const progressColor = resolved
+							? { backgroundColor: '#76a878', color: '#fff' }
+							: group.scheduled === 0
+								? { backgroundColor: '#ef6c00', color: '#fff' }
+								: { backgroundColor: '#f4d35e', color: '#513b00' }
+						return (
+							<Box className='schedule-issue-group' key={group.key} sx={{ mb: 1.5, borderColor: resolved ? '#b9dfc2' : '#e2d7c4', opacity: resolved ? 0.65 : 1 }}>
+								<Box sx={{ px: 2, py: 1.25, bgcolor: resolved ? '#eff8f1' : '#faf6ee', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+									<Box>
+										<Typography fontWeight={700} sx={resolved ? { textDecoration: 'line-through' } : undefined}>{group.studentName}</Typography>
+										<Typography variant='body2' color='text.secondary' sx={resolved ? { textDecoration: 'line-through' } : undefined}>{group.subjectName}</Typography>
+									</Box>
+									<Chip size='small' label={`${group.scheduled}/${group.expected} занятий`} sx={{ fontWeight: 700, ...progressColor }} />
+								</Box>
+								<TableContainer className='schedule-issue-group__table'><Table size='small' sx={{ width: '100%', tableLayout: 'fixed' }}>{issueHead}<TableBody>{renderRows(group.issues)}</TableBody></Table></TableContainer>
+							</Box>
+						)
+					})
 
 					return (
 						<Accordion
@@ -1950,6 +2013,15 @@ const AdminSchedule = () => {
 									{issueConflictCount > 0 && (
 										<span style={{ fontSize: 13, opacity: 0.85 }}>{issueConflictCount} конфликтов</span>
 									)}
+									<Button
+										size='small'
+										variant='outlined'
+										onClick={refreshDiagnostics}
+										disabled={refreshingDiagnostics}
+										sx={{ ml: 1, color: 'white', borderColor: 'rgba(255,255,255,.7)', '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,.12)' } }}
+									>
+										{refreshingDiagnostics ? 'Проверяем…' : 'Обновить'}
+									</Button>
 								</Box>
 							</AccordionSummary>
 							<AccordionDetails>
@@ -1997,30 +2069,20 @@ const AdminSchedule = () => {
 								{/* Category 1: config errors */}
 								{configErrors.length > 0 && (
 									<Box mb={3}>
-										<Typography variant='subtitle2' color='warning.dark' sx={{ mb: 1 }}>
+										<Box className='schedule-diagnostic-heading schedule-diagnostic-heading--configuration'>
 											Ошибки конфигурации — занятие невозможно поставить из-за неполных настроек ({configErrors.length})
-										</Typography>
-										<TableContainer>
-											<Table size='small'>
-												{sortableHead}
-												<TableBody>{renderRows(configErrors)}</TableBody>
-											</Table>
-										</TableContainer>
+										</Box>
+										{renderIssueGroups(configErrors)}
 									</Box>
 								)}
 
 								{/* Category 2: schedule conflicts */}
 								{conflicts.length > 0 && (
-									<Box>
-										<Typography variant='subtitle2' color='error.main' sx={{ mb: 1 }}>
+									<Box sx={{ pt: configErrors.length > 0 ? 2 : 0 }}>
+										<Box className='schedule-diagnostic-heading schedule-diagnostic-heading--conflict'>
 											Конфликты расписания — все слоты заняты другими занятиями ({conflicts.length})
-										</Typography>
-										<TableContainer>
-											<Table size='small'>
-												{sortableHead}
-												<TableBody>{renderRows(conflicts)}</TableBody>
-											</Table>
-										</TableContainer>
+										</Box>
+										{renderIssueGroups(conflicts)}
 									</Box>
 								)}
 							</AccordionDetails>
@@ -2028,34 +2090,76 @@ const AdminSchedule = () => {
 					)
 				})()}
 
-				{!loading && zeroScheduledStudents.length > 0 && (
-					<Box sx={{ mt: 2 }}>
-						<Typography variant='h6' sx={{ mb: 1 }}>Ученики без проставленных занятий</Typography>
-						<Alert severity='warning' sx={{ mb: 1.5 }}>
-							У этих активных учеников есть назначения, но в данной неделе нет ни одного индивидуального занятия.
-						</Alert>
-						<TableContainer>
+				{!loading && zeroScheduledStudents.length > 0 && (() => {
+					const displayedZeroScheduledStudents = hideResolvedDiagnostics
+						? zeroScheduledStudents.filter(student => !student.is_resolved)
+						: zeroScheduledStudents
+					if (displayedZeroScheduledStudents.length === 0) return null
+					return (
+					<Accordion
+						className='schedule-zero-diagnostics'
+						defaultExpanded
+						sx={{
+							mt: 2,
+							borderRadius: '14px !important',
+							boxShadow: 'none',
+							overflow: 'hidden',
+							border: '1px solid #e0d1b4',
+							'&:before': { display: 'none' },
+						}}
+					>
+						<AccordionSummary
+							expandIcon={<ExpandIcon sx={{ color: 'white' }} />}
+							sx={{
+								bgcolor: '#d97706',
+								color: 'white',
+								minHeight: '48px !important',
+								'& .MuiAccordionSummary-content': { my: '12px' },
+							}}
+						>
+							<Box display='flex' alignItems='center' gap={1.5}>
+								<span style={{ fontWeight: 800, fontSize: 15 }}>Ученики без проставленных занятий ({zeroScheduledStudents.filter(student => !student.is_resolved).length} требуют внимания)</span>
+								<Button
+									size='small'
+									variant='outlined'
+									onClick={refreshDiagnostics}
+									disabled={refreshingDiagnostics}
+									sx={{ ml: 1, color: 'white', borderColor: 'rgba(255,255,255,.7)', '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,.12)' } }}
+								>
+									{refreshingDiagnostics ? 'Проверяем…' : 'Обновить'}
+								</Button>
+							</Box>
+						</AccordionSummary>
+						<AccordionDetails sx={{ p: 0 }}>
+							<Alert severity='warning' sx={{ mb: 1.5, borderRadius: 0 }}>
+								Показываются результаты последней генерации и новые активные назначения без занятий. «Обновить» скрывает исправленные строки и заново проверяет текущие назначения.
+							</Alert>
+							<TableContainer>
 							<Table size='small'>
 								<TableHead>
 									<TableRow>
-										<TableCell>Ученик</TableCell>
+									<TableCell>Ученик</TableCell>
+									<TableCell align='center'>Статус</TableCell>
 										<TableCell align='center'>Активных назначений</TableCell>
 										<TableCell align='center'>Запрошено занятий в неделю</TableCell>
 									</TableRow>
 								</TableHead>
 								<TableBody>
-									{zeroScheduledStudents.map(student => (
-										<TableRow key={student.student_id}>
-											<TableCell>{student.student_name || `#${student.student_id}`}</TableCell>
+									{[...displayedZeroScheduledStudents].sort((a, b) => Number(a.is_resolved) - Number(b.is_resolved) || (a.student_name || '').localeCompare(b.student_name || '', 'ru')).map(student => (
+									<TableRow key={student.student_id} sx={student.is_resolved ? { opacity: 0.55, bgcolor: '#f1f8f3' } : undefined}>
+										<TableCell sx={student.is_resolved ? { textDecoration: 'line-through' } : undefined}>{student.student_name || `#${student.student_id}`}</TableCell>
+										<TableCell align='center'>{student.is_resolved ? <Tooltip title='Исправлено вручную'><ConductedIcon color='success' fontSize='small' /></Tooltip> : 'Требует внимания'}</TableCell>
 											<TableCell align='center'>{student.assignments}</TableCell>
 											<TableCell align='center'>{student.requested_visits}</TableCell>
 										</TableRow>
 									))}
 								</TableBody>
 							</Table>
-						</TableContainer>
-					</Box>
-				)}
+							</TableContainer>
+						</AccordionDetails>
+					</Accordion>
+					)
+				})()}
 
 			{/* Create Slot Dialog */}
 			<Dialog
@@ -2226,6 +2330,32 @@ const AdminSchedule = () => {
 					<Button onClick={() => createSlot()} variant='contained'>
 						Добавить
 					</Button>
+				</DialogActions>
+			</Dialog>
+
+			{/* Missing reporting tariff confirmation. It never discards the manual form. */}
+			<Dialog
+				open={reportTariffConfirm.open}
+				onClose={closeReportTariffConfirm}
+				maxWidth='xs'
+				fullWidth
+				PaperProps={{ className: 'admin-module-dialog' }}
+			>
+				<DialogTitle className='admin-module-dialog__title'>Нет тарифа для отчётности</DialogTitle>
+				<DialogContent className='admin-module-dialog__content'>
+					<Alert severity='warning' sx={{ mb: 2 }}>
+						{reportTariffConfirm.preview?.slot_type === 'group' ? 'Групповое' : 'Индивидуальное'} занятие не покрыто активным правилом тарификации.
+					</Alert>
+					<Typography>
+						{reportTariffConfirm.subjectName} · {reportTariffConfirm.preview?.duration_minutes || 0} мин
+					</Typography>
+					<Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
+						Если {reportTariffConfirm.action === 'save' ? 'сохранить' : 'создать'} занятие сейчас, в отчётности тариф и сумма для него будут равны 0 руб.
+					</Typography>
+				</DialogContent>
+				<DialogActions className='admin-module-dialog__actions'>
+					<Button onClick={closeReportTariffConfirm}>Вернуться к форме</Button>
+					<Button variant='contained' color='warning' onClick={acknowledgeMissingReportTariff}>{reportTariffConfirm.action === 'save' ? 'Сохранить всё равно' : 'Создать всё равно'}</Button>
 				</DialogActions>
 			</Dialog>
 

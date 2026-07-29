@@ -8,6 +8,7 @@ import {
 	Assignment as AssignmentIcon,
 	CalendarMonth as ScheduleIcon,
 	Groups as GroupIcon,
+	Payments as TariffsIcon,
 	ArrowBack as BackIcon,
 	Assessment as ReportsIcon,
 } from '@mui/icons-material'
@@ -57,6 +58,12 @@ const MODULES = [
 		description: 'Генерация и управление расписанием на неделю.',
 		icon: ScheduleIcon,
 		path: '/admin/schedule/weekly',
+	},
+	{
+		title: 'Тарифы на коммерческие услуги',
+		description: 'Текущая стоимость услуг и правила расчёта сумм в отчётности по детям.',
+		icon: TariffsIcon,
+		path: '/admin/schedule/tariffs',
 	},
 	{
 		title: 'Отчётность',

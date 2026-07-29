@@ -50,6 +50,7 @@ func Migrate(db *gorm.DB) {
 		&models.Room{},
 		&models.RoomSubject{},
 		&models.Student{},
+		&models.StudentServiceValidity{},
 		&models.StudentAvailability{},
 		&models.TeacherAvailability{},
 		&models.Assignment{},
@@ -74,6 +75,8 @@ func Migrate(db *gorm.DB) {
 		&models.Article{},
 		&models.ArticleBlock{},
 		&models.ServiceItem{},
+		&models.CommercialTariff{},
+		&models.ReportTariffRule{},
 		&models.FinZone{},
 		&models.SiteSetting{},
 

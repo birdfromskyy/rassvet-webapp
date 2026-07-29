@@ -1,0 +1,287 @@
+@use "../styles/design2" as *;
+
+.admin-commercial-tariffs {
+  .tariff-admin-tabs {
+    margin-bottom: 22px;
+    border-bottom: 1px solid $border;
+
+    .MuiTab-root {
+      min-height: 48px;
+      color: $muted;
+      font-family: $font;
+      font-weight: 800;
+      text-transform: none;
+    }
+
+    .Mui-selected {
+      color: $ink;
+    }
+
+    .MuiTabs-indicator {
+      height: 3px;
+      border-radius: 3px 3px 0 0;
+      background: $yellow;
+    }
+  }
+
+  .tariff-admin-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+
+  .tariff-admin-summary__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 76px;
+    padding: 16px 18px;
+    border: 1px solid $border;
+    border-radius: 18px;
+    background: $paper;
+
+    span {
+      color: $muted;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    strong {
+      color: $ink;
+      font-size: 28px;
+      font-weight: 800;
+    }
+  }
+
+  .tariff-admin-summary__item--active {
+    background: rgba(55, 145, 88, 0.08);
+  }
+
+  .tariff-admin-summary__item--hidden {
+    background: rgba(85, 112, 127, 0.07);
+  }
+
+  .tariff-admin-table.MuiTableContainer-root {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .tariff-admin-table .MuiTable-root {
+    border-collapse: separate;
+    border-spacing: 0 10px;
+  }
+
+  .tariff-admin-table .MuiTableHead-root {
+    background: #fff;
+  }
+
+  .tariff-admin-table .MuiTableHead-root .MuiTableCell-root {
+    padding: 12px 16px;
+    border: 0;
+    background: #fff;
+    box-shadow: 0 1px 0 $border;
+  }
+
+  .tariff-admin-table .MuiTableBody-root .MuiTableRow-root {
+    filter: drop-shadow(0 7px 14px rgba(7, 68, 98, 0.045));
+    transition: filter 0.2s ease, transform 0.2s ease;
+
+    &:hover {
+      background: transparent;
+      filter: drop-shadow(0 12px 20px rgba(7, 68, 98, 0.1));
+      transform: translateY(-1px);
+
+      .MuiTableCell-root {
+        border-color: rgba(244, 223, 0, 0.72);
+        background: #fffdf1;
+      }
+    }
+  }
+
+  .tariff-admin-table .MuiTableBody-root .MuiTableCell-root {
+    padding: 15px 16px;
+    border-top: 1px solid $border;
+    border-bottom: 1px solid $border;
+    background: #fff;
+    vertical-align: middle;
+
+    &:first-child {
+      border-left: 1px solid $border;
+      border-radius: 17px 0 0 17px;
+    }
+
+    &:last-child {
+      border-right: 1px solid $border;
+      border-radius: 0 17px 17px 0;
+    }
+  }
+
+  .tariff-admin-order {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: $ink;
+    box-shadow: inset 0 -3px 0 $yellow;
+    color: #fff;
+    font-weight: 800;
+  }
+
+  .tariff-admin-service {
+    display: grid;
+    gap: 4px;
+    min-width: 250px;
+
+    strong {
+      color: $ink;
+      font-size: 14.5px;
+      line-height: 1.4;
+    }
+
+    small {
+      color: rgba(85, 112, 127, 0.72);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+  }
+
+  .tariff-admin-volume,
+  .tariff-admin-price {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 7px 11px;
+    border-radius: 11px;
+    white-space: nowrap;
+  }
+
+  .tariff-admin-volume {
+    border: 1px solid $border;
+    background: $paper;
+    color: $ink;
+    font-weight: 700;
+  }
+
+  .tariff-admin-price {
+    justify-content: center;
+    min-width: 96px;
+    background: rgba(244, 223, 0, 0.34);
+    color: $ink;
+    font-size: 16px;
+    font-weight: 800;
+  }
+
+  .tariff-admin-status {
+    height: 30px !important;
+    border: 0 !important;
+    font-family: $font !important;
+    font-weight: 800 !important;
+  }
+
+  .tariff-admin-status--active {
+    background: rgba(44, 137, 80, 0.12) !important;
+    color: #237245 !important;
+  }
+
+  .tariff-admin-status--hidden {
+    background: rgba(85, 112, 127, 0.1) !important;
+    color: $muted !important;
+  }
+
+  .tariff-admin-actions {
+    white-space: nowrap;
+
+    .MuiIconButton-root {
+      width: 38px;
+      height: 38px;
+      margin-left: 4px;
+      border: 1px solid $border;
+      background: #fff;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .tariff-admin-summary {
+      grid-template-columns: 1fr;
+    }
+
+    .tariff-admin-summary__item {
+      min-height: 62px;
+    }
+
+    .tariff-admin-table.MuiTableContainer-root {
+      max-height: none;
+      overflow: visible;
+    }
+
+    .tariff-admin-table .MuiTableHead-root {
+      display: none;
+    }
+
+    .tariff-admin-table .MuiTable-root,
+    .tariff-admin-table .MuiTableBody-root,
+    .tariff-admin-table .MuiTableRow-root,
+    .tariff-admin-table .MuiTableCell-root {
+      display: block;
+      width: 100%;
+    }
+
+    .tariff-admin-table .MuiTableBody-root {
+      display: grid;
+      gap: 14px;
+    }
+
+    .tariff-admin-table .MuiTableBody-root .MuiTableRow-root {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 9px;
+      padding: 16px;
+      border: 1px solid $border;
+      border-radius: 18px;
+      background: #fff;
+      filter: none;
+    }
+
+    .tariff-admin-table .MuiTableBody-root .MuiTableCell-root {
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr);
+      align-items: center;
+      min-height: 34px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      white-space: normal;
+
+      &::before {
+        color: $muted;
+        content: attr(data-label);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+    }
+
+    .tariff-admin-service {
+      min-width: 0;
+    }
+
+    .tariff-admin-actions {
+      display: flex !important;
+      justify-content: flex-end;
+      padding-top: 8px !important;
+      border-top: 1px solid $border !important;
+
+      &::before {
+        margin-right: auto;
+      }
+    }
+  }
+}

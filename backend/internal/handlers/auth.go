@@ -712,7 +712,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	rt, err := c.Cookie("refresh_token")
 	if err != nil || rt == "" {
-		log.Printf("[REFRESH] 401 no_cookie ip=%s cookie_err=%v", c.ClientIP(), err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Сессия истекла, войдите снова"})
 		return
 	}

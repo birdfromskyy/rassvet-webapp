@@ -1,4 +1,69 @@
 .admin-schedule-page {
+
+  // The issue card owns the only outer border. The general admin table style
+  // would otherwise add a second rounded container inside every card.
+  .schedule-issue-group {
+    border: 1px solid;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+
+    &__table.MuiTableContainer-root {
+      border: 0;
+      border-radius: 0;
+      overflow-x: auto;
+    }
+
+    .MuiTableHead-root .MuiTableCell-root {
+      background: #f8f5ef;
+    }
+  }
+
+  .schedule-diagnostic-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    color: #fff;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+
+    .MuiButton-root {
+      flex: 0 0 auto;
+      color: #fff;
+      border-color: rgba(255, 255, 255, .72);
+
+      &:hover {
+        border-color: #fff;
+        background: rgba(255, 255, 255, .12);
+      }
+    }
+
+    &--configuration { background: #d97706; }
+    &--conflict { background: #c62828; }
+    &--unscheduled { background: #d97706; margin-bottom: 0; }
+  }
+
+  .schedule-zero-diagnostics {
+    overflow: hidden;
+    border: 1px solid #e0d1b4;
+    border-radius: 8px;
+    background: #fff;
+
+    .MuiAlert-root {
+      margin: 0;
+      border-bottom: 1px solid #f0e5d3;
+    }
+
+    .MuiTableContainer-root {
+      border: 0;
+      border-radius: 0;
+    }
+  }
   min-height: 100vh;
   background: #f7f4ec;
   padding: 46px 0 80px;

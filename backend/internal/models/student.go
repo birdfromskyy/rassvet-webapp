@@ -16,6 +16,7 @@ type Student struct {
 	AllowScheduleWindows bool       `json:"allow_schedule_windows" gorm:"not null;default:false"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
+	ValidityCount        int        `json:"validity_count" gorm:"column:validity_count;->;-:migration"`
 
 	Availability     []StudentAvailability     `json:"availability,omitempty" gorm:"foreignKey:StudentID"`
 	Assignments      []Assignment              `json:"assignments,omitempty" gorm:"foreignKey:StudentID"`

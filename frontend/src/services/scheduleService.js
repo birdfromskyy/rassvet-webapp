@@ -144,6 +144,17 @@ const scheduleService = {
 	deleteStudentAvailability: async (id, availId) => {
 		await api.delete(`/admin/students/${id}/availability/${availId}`)
 	},
+	getStudentServiceValidities: async id => {
+		const r = await api.get(`/admin/students/${id}/service-validities`)
+		return r.data.validities || []
+	},
+	saveStudentServiceValidity: async (id, data) => {
+		const r = await api.put(`/admin/students/${id}/service-validities`, data)
+		return r.data.validity
+	},
+	deleteStudentServiceValidity: async (id, serviceType) => {
+		await api.delete(`/admin/students/${id}/service-validities/${serviceType}`)
+	},
 
 	// ========== ASSIGNMENTS ==========
 	getAssignments: async (filters = {}) => {
@@ -238,6 +249,10 @@ const scheduleService = {
 	},
 	clearAutoSchedule: async id => {
 		const r = await api.post(`/admin/schedules/${id}/clear-auto`)
+		return r.data
+	},
+	refreshScheduleDiagnostics: async id => {
+		const r = await api.post(`/admin/schedules/${id}/refresh-diagnostics`)
 		return r.data
 	},
 
