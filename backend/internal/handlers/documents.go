@@ -22,16 +22,16 @@ import (
 )
 
 const (
-	privateDocsDir     = "./private_uploads/docs"
-	maxPassportFiles   = 7
+	privateDocsDir      = "./private_uploads/docs"
+	maxPassportFiles    = 7
 	maxSnilsParentFiles = 1
-	maxIppsuFiles      = 5
-	maxBirthCertFiles  = 3
-	maxSnilsChildFiles = 1
-	maxFileSizeBytes   = 5 * 1024 * 1024  // 5 MB per file
-	maxChildTotalBytes = 25 * 1024 * 1024 // 25 MB total per child submission
+	maxIppsuFiles       = 5
+	maxBirthCertFiles   = 3
+	maxSnilsChildFiles  = 1
+	maxFileSizeBytes    = 5 * 1024 * 1024  // 5 MB per file
+	maxChildTotalBytes  = 25 * 1024 * 1024 // 25 MB total per child submission
 	maxParentTotalBytes = 15 * 1024 * 1024 // 15 MB total for parent docs
-	maxChildren        = 5
+	maxChildren         = 5
 )
 
 var (
@@ -344,10 +344,11 @@ func (h *DocumentHandler) checkQuestionnaireApproved(c *gin.Context, userID uint
 
 // POST /api/documents/children  (multipart/form-data)
 // Fields:
-//   child_name         — required
-//   ippsu_files[]      — up to 10 files
-//   birth_cert_files[] — up to 10 files
-//   child_snils_files[]— up to 10 files
+//
+//	child_name         — required
+//	ippsu_files[]      — up to 10 files
+//	birth_cert_files[] — up to 10 files
+//	child_snils_files[]— up to 10 files
 func (h *DocumentHandler) AddChildDocs(c *gin.Context) {
 	userID := c.GetUint("userID")
 	if !h.checkQuestionnaireApproved(c, userID) {
@@ -731,11 +732,11 @@ func (h *DocumentHandler) AdminDeletePersonalData(c *gin.Context) {
 // Returns all users that have a parent profile or child submissions.
 func (h *DocumentHandler) AdminListDocuments(c *gin.Context) {
 	type UserDoc struct {
-		UserID    uint                      `json:"user_id"`
-		Email     string                    `json:"email"`
-		FullName  string                    `json:"full_name"`
-		Profile   *models.ParentProfile     `json:"parent_profile"`
-		Children  []models.ChildDocSubmission `json:"children"`
+		UserID   uint                        `json:"user_id"`
+		Email    string                      `json:"email"`
+		FullName string                      `json:"full_name"`
+		Profile  *models.ParentProfile       `json:"parent_profile"`
+		Children []models.ChildDocSubmission `json:"children"`
 	}
 
 	// Collect all profiles
@@ -834,8 +835,13 @@ func (h *DocumentHandler) AdminUpdateSubmissionStatus(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат даты (ожидается ГГГГ-ММ-ДД)"})
 			return
 		}
+		dateChanged := sub.IppsuExpiryDate == nil ||
+			sub.IppsuExpiryDate.Format("2006-01-02") != t.Format("2006-01-02")
 		sub.IppsuExpiryDate = &t
-		sub.ExpiryNotified = false
+		if dateChanged {
+			sub.ExpiryNotified = false
+			sub.ExpiryReminderNotified = false
+		}
 	}
 
 	h.db.Save(&sub)

@@ -97,8 +97,16 @@ func (h *StudentServiceValidityHandler) Upsert(c *gin.Context) {
 		return
 	}
 
+	dateChanged := lookup.Error == gorm.ErrRecordNotFound ||
+		row.ValidUntil.Format("2006-01-02") != validUntil.Format("2006-01-02")
 	row.ValidUntil = validUntil
-	row.NotifiedAt = nil // a changed date must be checked and notified again
+	// A changed date starts a new validity period, so both independent
+	// notifications may be sent again for the new period. Saving the same date
+	// must not create a duplicate notification.
+	if dateChanged {
+		row.NotifiedAt = nil
+		row.ExpiringSoonNotifiedAt = nil
+	}
 	row.UpdatedByUserID = actorID
 	if lookup.Error == nil {
 		err = h.db.Save(&row).Error

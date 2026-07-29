@@ -20,27 +20,32 @@ func NewNotificationHandler(db *gorm.DB) *NotificationHandler {
 
 // CreateNotification is a helper used by other handlers to create notifications.
 // For admin-targeted notifications pass role="admin" and userID=0; the function
-// will fan out to all users with role="admin".
-func CreateNotification(db *gorm.DB, userID uint, role, title, body, link string) {
+// will fan out to all users with role="admin". It returns an error so callers
+// that need delivery guarantees can keep their state changes transactional.
+func CreateNotification(db *gorm.DB, userID uint, role, title, body, link string) error {
 	if models.IsAdminRole(role) {
 		var admins []models.User
-		db.Where("role IN ('admin','superadmin')").Find(&admins)
+		if err := db.Where("role IN ('admin','superadmin')").Find(&admins).Error; err != nil {
+			return err
+		}
 		for _, a := range admins {
-			db.Create(&models.Notification{
+			if err := db.Create(&models.Notification{
 				UserID: a.ID,
 				Title:  title,
 				Body:   body,
 				Link:   link,
-			})
+			}).Error; err != nil {
+				return err
+			}
 		}
-		return
+		return nil
 	}
-	db.Create(&models.Notification{
+	return db.Create(&models.Notification{
 		UserID: userID,
 		Title:  title,
 		Body:   body,
 		Link:   link,
-	})
+	}).Error
 }
 
 // GET /api/notifications

@@ -23,5 +23,9 @@ type ChildDocSubmission struct {
 	Status          string     `gorm:"size:20;default:'pending'" json:"status"`         // pending | approved | rejected
 	AdminNote       string     `gorm:"type:text" json:"admin_note"`
 	IppsuExpiryDate *time.Time `gorm:"index" json:"ippsu_expiry_date"`
-	ExpiryNotified  bool       `gorm:"default:false" json:"expiry_notified"`
+	// ExpiryNotified and ExpiryReminderNotified deliberately track different
+	// events: a warning must never suppress the notification that the document
+	// has actually expired.
+	ExpiryNotified         bool `gorm:"default:false" json:"expiry_notified"`
+	ExpiryReminderNotified bool `gorm:"default:false" json:"expiry_reminder_notified"`
 }

@@ -19,6 +19,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -457,7 +458,9 @@ func main() {
 	// Background context — cancelled on graceful shutdown to stop background workers.
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 
-	// Background goroutine: daily check for expired ИППСУ → create in-app notifications.
+	// Background goroutine: checks expiring and expired validity dates once a day.
+	// The data is informational only: it is never read by schedule generation or
+	// by manual schedule editing.
 	go func() {
 		type row struct {
 			ID              uint
@@ -467,8 +470,140 @@ func main() {
 			UserFirstName   string
 			UserLastName    string
 		}
+		notifyChildDocument := func(r row, expiringSoon bool) error {
+			expiryStr := ""
+			if r.IppsuExpiryDate != nil {
+				expiryStr = r.IppsuExpiryDate.Format("02.01.2006")
+			}
+			fullName := strings.TrimSpace(r.UserLastName + " " + r.UserFirstName)
+
+			return db.Transaction(func(tx *gorm.DB) error {
+				if expiringSoon {
+					if err := handlers.CreateNotification(tx, r.UserID, "",
+						"Срок действия ИППСУ скоро истечёт",
+						"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истекает "+expiryStr+
+							". Пожалуйста, заранее загрузите обновлённый документ в личном кабинете.",
+						"/profile",
+					); err != nil {
+						return err
+					}
+					if err := handlers.CreateNotification(tx, 0, "admin",
+						"Скоро истечёт срок ИППСУ",
+						"У клиента "+fullName+" скоро истекает срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
+						"/admin/documents",
+					); err != nil {
+						return err
+					}
+					return tx.Model(&models.ChildDocSubmission{}).Where("id = ?", r.ID).
+						Update("expiry_reminder_notified", true).Error
+				}
+
+				if err := handlers.CreateNotification(tx, r.UserID, "",
+					"Срок действия ИППСУ истёк",
+					"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истёк "+expiryStr+
+						". Пожалуйста, загрузите обновлённый документ в личном кабинете.",
+					"/profile",
+				); err != nil {
+					return err
+				}
+				if err := handlers.CreateNotification(tx, 0, "admin",
+					"Истёк срок ИППСУ",
+					"У клиента "+fullName+" истёк срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
+					"/admin/documents",
+				); err != nil {
+					return err
+				}
+				return tx.Model(&models.ChildDocSubmission{}).Where("id = ?", r.ID).
+					Update("expiry_notified", true).Error
+			})
+		}
+
+		type serviceValidityRow struct {
+			ID          uint
+			StudentID   uint
+			StudentName string
+			ServiceType string
+			ValidUntil  time.Time
+		}
+		serviceName := func(serviceType string) string {
+			switch serviceType {
+			case models.StudentServiceAdaptivePhysicalCulture:
+				return "Адаптивная физкультура"
+			case models.StudentServiceMassage:
+				return "Массаж"
+			default:
+				return "ИППСУ"
+			}
+		}
+		notifyServiceValidity := func(row serviceValidityRow, expiringSoon bool, now time.Time) error {
+			name := serviceName(row.ServiceType)
+			date := row.ValidUntil.Format("02.01.2006")
+
+			return db.Transaction(func(tx *gorm.DB) error {
+				var parentIDs []uint
+				if err := tx.Model(&models.UserStudent{}).Where("student_id = ?", row.StudentID).
+					Pluck("user_id", &parentIDs).Error; err != nil {
+					return err
+				}
+
+				for _, parentID := range parentIDs {
+					title := "Истёк срок: " + name
+					body := "Срок действия услуги «" + name + "» для ребёнка «" + row.StudentName +
+						"» истёк " + date + ". Пожалуйста, обратитесь к администрации центра."
+					if expiringSoon {
+						title = "Срок действия услуги скоро истечёт: " + name
+						body = "Срок действия услуги «" + name + "» для ребёнка «" + row.StudentName +
+							"» истекает " + date + ". Пожалуйста, заранее обратитесь к администрации центра."
+					}
+					if row.ServiceType == models.StudentServiceIppsu {
+						if expiringSoon {
+							title = "Срок действия ИППСУ скоро истечёт"
+							body = "Срок действия ИППСУ для ребёнка «" + row.StudentName + "» истекает " + date + ". Пожалуйста, заранее обратитесь к администрации центра."
+						} else {
+							title = "Истёк срок ИППСУ"
+							body = "Срок действия ИППСУ для ребёнка «" + row.StudentName + "» истёк " + date + ". Пожалуйста, обратитесь к администрации центра."
+						}
+					}
+					if err := handlers.CreateNotification(tx, parentID, "", title, body, "/dashboard"); err != nil {
+						return err
+					}
+				}
+
+				adminTitle := "Истёк срок: " + name
+				adminBody := "У ученика «" + row.StudentName + "» истёк срок действия услуги «" + name + "» (" + date + ")."
+				if expiringSoon {
+					adminTitle = "Скоро истечёт срок: " + name
+					adminBody = "У ученика «" + row.StudentName + "» скоро истекает срок действия услуги «" + name + "» (" + date + ")."
+				}
+				if row.ServiceType == models.StudentServiceIppsu {
+					if expiringSoon {
+						adminTitle = "Скоро истечёт срок ИППСУ"
+						adminBody = "У ученика «" + row.StudentName + "» скоро истекает срок действия ИППСУ (" + date + ")."
+					} else {
+						adminTitle = "Истёк срок ИППСУ"
+						adminBody = "У ученика «" + row.StudentName + "» истёк срок действия ИППСУ (" + date + ")."
+					}
+				}
+				if err := handlers.CreateNotification(tx, 0, "admin", adminTitle, adminBody, "/admin/schedule/students"); err != nil {
+					return err
+				}
+
+				if expiringSoon {
+					return tx.Model(&models.StudentServiceValidity{}).Where("id = ?", row.ID).
+						Update("expiring_soon_notified_at", now).Error
+				}
+				return tx.Model(&models.StudentServiceValidity{}).Where("id = ?", row.ID).
+					Update("notified_at", now).Error
+			})
+		}
+
 		for {
-			var rows []row
+			now := time.Now()
+			reminderDates := services.ExpiryReminderDates(now)
+			oneDayBefore := reminderDates[0].Format("2006-01-02")
+			sevenDaysBefore := reminderDates[1].Format("2006-01-02")
+
+			var expiredRows []row
 			if err := db.Raw(`
 				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
 				       u.first_name AS user_first_name, u.last_name AS user_last_name
@@ -479,51 +614,48 @@ func main() {
 				  AND c.ippsu_expiry_date IS NOT NULL
 				  AND c.ippsu_expiry_date < NOW()
 				  AND c.expiry_notified = false
-			`).Scan(&rows).Error; err != nil {
+			`).Scan(&expiredRows).Error; err != nil {
 				log.Printf("[JOB] ippsu_check query error: %v", err)
 			}
 
-			notified, jobErrors := 0, 0
-			for _, r := range rows {
-				expiryStr := ""
-				if r.IppsuExpiryDate != nil {
-					expiryStr = r.IppsuExpiryDate.Format("02.01.2006")
-				}
-				fullName := strings.TrimSpace(r.UserLastName + " " + r.UserFirstName)
-
-				handlers.CreateNotification(db, r.UserID, "",
-					"Срок действия ИППСУ истёк",
-					"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истёк "+expiryStr+
-						". Пожалуйста, загрузите обновлённый документ в личном кабинете.",
-					"/profile",
-				)
-				handlers.CreateNotification(db, 0, "admin",
-					"Истёк срок ИППСУ",
-					"У клиента "+fullName+" истёк срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
-					"/admin/documents",
-				)
-				if err := db.Model(&models.ChildDocSubmission{}).
-					Where("id = ?", r.ID).
-					Update("expiry_notified", true).Error; err != nil {
-					jobErrors++
-					continue
-				}
-				notified++
+			var expiringRows []row
+			if err := db.Raw(`
+				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
+				       u.first_name AS user_first_name, u.last_name AS user_last_name
+				FROM child_doc_submissions c
+				JOIN users u ON u.id = c.user_id
+				WHERE c.deleted_at IS NULL
+				  AND c.status = 'approved'
+				  AND c.ippsu_expiry_date IS NOT NULL
+				  AND c.expiry_reminder_notified = false
+				  AND c.ippsu_expiry_date::date IN (?::date, ?::date)
+			`, oneDayBefore, sevenDaysBefore).Scan(&expiringRows).Error; err != nil {
+				log.Printf("[JOB] ippsu_reminder query error: %v", err)
 			}
 
-			log.Printf("[JOB] ippsu_check found=%d notified=%d errors=%d", len(rows), notified, jobErrors)
+			expiredNotified, expiringNotified, jobErrors := 0, 0, 0
+			for _, r := range expiredRows {
+				if err := notifyChildDocument(r, false); err != nil {
+					jobErrors++
+					log.Printf("[JOB] ippsu_check notification error submission_id=%d: %v", r.ID, err)
+					continue
+				}
+				expiredNotified++
+			}
+			for _, r := range expiringRows {
+				if err := notifyChildDocument(r, true); err != nil {
+					jobErrors++
+					log.Printf("[JOB] ippsu_reminder notification error submission_id=%d: %v", r.ID, err)
+					continue
+				}
+				expiringNotified++
+			}
+			log.Printf("[JOB] ippsu_check expired_found=%d expired_notified=%d expiring_found=%d expiring_notified=%d errors=%d", len(expiredRows), expiredNotified, len(expiringRows), expiringNotified, jobErrors)
 
 			// Service validity is deliberately independent from child_doc_submissions:
 			// an administrator chooses the child, and the parent only receives an
 			// informational reminder. It never blocks the schedule or its editing.
-			type serviceValidityRow struct {
-				ID          uint
-				StudentID   uint
-				StudentName string
-				ServiceType string
-				ValidUntil  time.Time
-			}
-			var serviceRows []serviceValidityRow
+			var expiredServiceRows []serviceValidityRow
 			if err := db.Raw(`
 				SELECT v.id, v.student_id, s.full_name AS student_name,
 				       v.service_type, v.valid_until
@@ -531,60 +663,42 @@ func main() {
 				JOIN students s ON s.id = v.student_id
 				WHERE v.notified_at IS NULL
 				  AND v.valid_until < NOW()
-			`).Scan(&serviceRows).Error; err != nil {
+				  AND v.service_type IN (?, ?, ?)
+			`, models.StudentServiceIppsu, models.StudentServiceAdaptivePhysicalCulture, models.StudentServiceMassage).Scan(&expiredServiceRows).Error; err != nil {
 				log.Printf("[JOB] student_service_validity_check query error: %v", err)
 			}
 
-			serviceNotified, serviceErrors := 0, 0
-			for _, row := range serviceRows {
-				serviceName := "ИППСУ"
-				if row.ServiceType == models.StudentServiceAdaptivePhysicalCulture {
-					serviceName = "Адаптивная физкультура"
-				} else if row.ServiceType == models.StudentServiceMassage {
-					serviceName = "Массаж"
-				}
-				expiryDate := row.ValidUntil.Format("02.01.2006")
-
-				var parentIDs []uint
-				if err := db.Model(&models.UserStudent{}).
-					Where("student_id = ?", row.StudentID).
-					Pluck("user_id", &parentIDs).Error; err != nil {
-					serviceErrors++
-					log.Printf("[JOB] student_service_validity parents error validity_id=%d: %v", row.ID, err)
-					continue
-				}
-				for _, parentID := range parentIDs {
-					title := "Истёк срок: " + serviceName
-					body := "Срок действия услуги «" + serviceName + "» для ребёнка «" + row.StudentName +
-						"» истёк " + expiryDate + ". Пожалуйста, обратитесь к администрации центра."
-					if row.ServiceType == models.StudentServiceIppsu {
-						title = "Истёк срок ИППСУ"
-						body = "Срок действия ИППСУ для ребёнка «" + row.StudentName + "» истёк " + expiryDate + ". Пожалуйста, обратитесь к администрации центра."
-					}
-					handlers.CreateNotification(db, parentID, "", title, body, "/dashboard")
-				}
-				adminTitle := "Истёк срок: " + serviceName
-				adminBody := "У ученика «" + row.StudentName + "» истёк срок действия услуги «" + serviceName +
-					"» (" + expiryDate + ")."
-				if row.ServiceType == models.StudentServiceIppsu {
-					adminTitle = "Истёк срок ИППСУ"
-					adminBody = "У ученика «" + row.StudentName + "» истёк срок действия ИППСУ (" + expiryDate + ")."
-				}
-				handlers.CreateNotification(db, 0, "admin",
-					adminTitle,
-					adminBody,
-					"/admin/schedule/students",
-				)
-				now := time.Now()
-				if err := db.Model(&models.StudentServiceValidity{}).
-					Where("id = ?", row.ID).
-					Update("notified_at", now).Error; err != nil {
-					serviceErrors++
-					continue
-				}
-				serviceNotified++
+			var expiringServiceRows []serviceValidityRow
+			if err := db.Raw(`
+				SELECT v.id, v.student_id, s.full_name AS student_name,
+				       v.service_type, v.valid_until
+				FROM student_service_validities v
+				JOIN students s ON s.id = v.student_id
+				WHERE v.expiring_soon_notified_at IS NULL
+				  AND v.service_type IN (?, ?, ?)
+				  AND v.valid_until IN (?::date, ?::date)
+			`, models.StudentServiceIppsu, models.StudentServiceAdaptivePhysicalCulture, models.StudentServiceMassage, oneDayBefore, sevenDaysBefore).Scan(&expiringServiceRows).Error; err != nil {
+				log.Printf("[JOB] student_service_validity_reminder query error: %v", err)
 			}
-			log.Printf("[JOB] student_service_validity_check found=%d notified=%d errors=%d", len(serviceRows), serviceNotified, serviceErrors)
+
+			expiredServiceNotified, expiringServiceNotified, serviceErrors := 0, 0, 0
+			for _, row := range expiredServiceRows {
+				if err := notifyServiceValidity(row, false, now); err != nil {
+					serviceErrors++
+					log.Printf("[JOB] student_service_validity_check notification error validity_id=%d: %v", row.ID, err)
+					continue
+				}
+				expiredServiceNotified++
+			}
+			for _, row := range expiringServiceRows {
+				if err := notifyServiceValidity(row, true, now); err != nil {
+					serviceErrors++
+					log.Printf("[JOB] student_service_validity_reminder notification error validity_id=%d: %v", row.ID, err)
+					continue
+				}
+				expiringServiceNotified++
+			}
+			log.Printf("[JOB] student_service_validity_check expired_found=%d expired_notified=%d expiring_found=%d expiring_notified=%d errors=%d", len(expiredServiceRows), expiredServiceNotified, len(expiringServiceRows), expiringServiceNotified, serviceErrors)
 
 			select {
 			case <-bgCtx.Done():
