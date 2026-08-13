@@ -13,6 +13,8 @@ func TestExpiryReminderDates(t *testing.T) {
 
 	require.Equal(t, "2026-07-30", dates[0].Format("2006-01-02"))
 	require.Equal(t, "2026-08-05", dates[1].Format("2006-01-02"))
+	require.Equal(t, "2026-08-19", dates[2].Format("2006-01-02"))
 	require.Equal(t, now.Location(), dates[0].Location())
 	require.Equal(t, now.Location(), dates[1].Location())
+	require.Equal(t, now.Location(), dates[2].Location())
 }

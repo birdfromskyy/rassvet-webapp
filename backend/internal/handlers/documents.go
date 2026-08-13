@@ -841,6 +841,9 @@ func (h *DocumentHandler) AdminUpdateSubmissionStatus(c *gin.Context) {
 		if dateChanged {
 			sub.ExpiryNotified = false
 			sub.ExpiryReminderNotified = false
+			sub.ExpiryReminder21Notified = false
+			sub.ExpiryReminder7Notified = false
+			sub.ExpiryReminder1Notified = false
 		}
 	}
 

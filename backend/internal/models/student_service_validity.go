@@ -9,15 +9,18 @@ const (
 )
 
 type StudentServiceValidity struct {
-	ID                     uint       `json:"id" gorm:"primaryKey"`
-	StudentID              uint       `json:"student_id" gorm:"not null;uniqueIndex:idx_student_service_validity"`
-	ServiceType            string     `json:"service_type" gorm:"type:varchar(50);not null;uniqueIndex:idx_student_service_validity"`
-	ValidUntil             time.Time  `json:"valid_until" gorm:"type:date;not null;index"`
-	NotifiedAt             *time.Time `json:"notified_at,omitempty"`
-	ExpiringSoonNotifiedAt *time.Time `json:"expiring_soon_notified_at,omitempty"`
-	UpdatedByUserID        uint       `json:"updated_by_user_id" gorm:"not null"`
-	CreatedAt              time.Time  `json:"created_at"`
-	UpdatedAt              time.Time  `json:"updated_at"`
+	ID                       uint       `json:"id" gorm:"primaryKey"`
+	StudentID                uint       `json:"student_id" gorm:"not null;uniqueIndex:idx_student_service_validity"`
+	ServiceType              string     `json:"service_type" gorm:"type:varchar(50);not null;uniqueIndex:idx_student_service_validity"`
+	ValidUntil               time.Time  `json:"valid_until" gorm:"type:date;not null;index"`
+	NotifiedAt               *time.Time `json:"notified_at,omitempty"`
+	ExpiringSoonNotifiedAt   *time.Time `json:"expiring_soon_notified_at,omitempty"` // legacy marker
+	Expiring21DaysNotifiedAt *time.Time `json:"expiring_21_days_notified_at,omitempty"`
+	Expiring7DaysNotifiedAt  *time.Time `json:"expiring_7_days_notified_at,omitempty"`
+	Expiring1DayNotifiedAt   *time.Time `json:"expiring_1_day_notified_at,omitempty"`
+	UpdatedByUserID          uint       `json:"updated_by_user_id" gorm:"not null"`
+	CreatedAt                time.Time  `json:"created_at"`
+	UpdatedAt                time.Time  `json:"updated_at"`
 
 	Student Student `json:"student,omitempty" gorm:"foreignKey:StudentID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;"`
 }
