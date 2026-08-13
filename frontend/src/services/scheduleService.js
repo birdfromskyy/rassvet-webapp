@@ -392,6 +392,7 @@ const scheduleService = {
 		const params = { week_start: weekStart, _ts: Date.now() }
 		if (filters.teacher_id) params.teacher_id = filters.teacher_id
 		if (filters.student_id) params.student_id = filters.student_id
+		if (filters.room_id) params.room_id = filters.room_id
 		const r = await api.get('/teacher/schedule', { params })
 		return r.data
 	},

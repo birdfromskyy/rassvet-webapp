@@ -574,7 +574,7 @@ func (h *UserStudentHandler) GetChildSchedule(c *gin.Context) {
 	})
 }
 
-// Protected teacher: GET /api/teacher/schedule?week_start=YYYY-MM-DD&teacher_id=&student_id=
+// Protected teacher: GET /api/teacher/schedule?week_start=YYYY-MM-DD&teacher_id=&student_id=&room_id=
 func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 	role, _ := c.Get("role")
 	if role != string(models.RoleTeacher) && !models.IsAdminRole(role.(string)) {
@@ -614,6 +614,16 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 		studentID = uint(parsed)
 	}
 
+	var roomID uint
+	if raw := strings.TrimSpace(c.Query("room_id")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed <= 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID кабинета"})
+			return
+		}
+		roomID = uint(parsed)
+	}
+
 	var schedule models.Schedule
 	if err := h.db.Where("week_start_date = ? AND status = ?", parsedWeekStart, models.ScheduleStatusApproved).First(&schedule).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -644,6 +654,9 @@ func (h *UserStudentHandler) GetTeacherPublishedSchedule(c *gin.Context) {
 			SELECT 1 FROM schedule_slot_teachers sst
 			WHERE sst.schedule_slot_id = schedule_slots.id AND sst.teacher_id = ?
 		)`, teacherID, teacherID)
+	}
+	if roomID != 0 {
+		query = query.Where("schedule_slots.room_id = ?", roomID)
 	}
 
 	if err := query.Order("weekday ASC, start_time ASC, id ASC").Find(&slots).Error; err != nil {
@@ -741,7 +754,13 @@ func (h *UserStudentHandler) GetTeacherScheduleOptions(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"teachers": teachers, "students": students})
+	var rooms []models.Room
+	if err := h.db.Where("is_active = ? AND archived_at IS NULL", true).Order("name ASC").Find(&rooms).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения списка кабинетов"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"teachers": teachers, "students": students, "rooms": rooms})
 }
 
 func extractUserID(c *gin.Context) uint {

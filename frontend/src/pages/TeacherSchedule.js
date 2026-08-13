@@ -9,6 +9,7 @@ import './TeacherSchedule.scss'
 
 const ALL_TEACHERS = { id: '', full_name: 'Все преподаватели' }
 const ALL_STUDENTS = { id: '', full_name: 'Все ученики' }
+const ALL_ROOMS = { id: '', name: 'Все кабинеты' }
 const WEEKDAY_NAMES = {
   1: 'Понедельник', 2: 'Вторник', 3: 'Среда',
   4: 'Четверг', 5: 'Пятница', 6: 'Суббота', 7: 'Воскресенье',
@@ -70,8 +71,10 @@ const TeacherSchedule = ({ user }) => {
   useBrandFont()
   const [teachers, setTeachers] = useState([])
   const [students, setStudents] = useState([])
+  const [rooms, setRooms] = useState([])
   const [teacher, setTeacher] = useState(ALL_TEACHERS)
   const [student, setStudent] = useState(ALL_STUDENTS)
+  const [room, setRoom] = useState(ALL_ROOMS)
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()))
   const [scheduleData, setScheduleData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -81,12 +84,15 @@ const TeacherSchedule = ({ user }) => {
     const params = new URLSearchParams(window.location.search)
     const teacherIdFromUrl = Number(params.get('teacherId')) || 0
     const studentIdFromUrl = Number(params.get('studentId')) || 0
+    const roomIdFromUrl = Number(params.get('roomId')) || 0
     scheduleService.getTeacherScheduleOptions()
       .then(data => {
         const loadedTeachers = data.teachers || []
         const loadedStudents = data.students || []
+        const loadedRooms = data.rooms || []
         setTeachers(loadedTeachers)
         setStudents(loadedStudents)
+        setRooms(loadedRooms)
         // URL param > user's linked teacher (only when not filtering by student)
         const resolvedTeacherId = teacherIdFromUrl || (studentIdFromUrl ? 0 : (user?.teacher_id || 0))
         if (resolvedTeacherId) {
@@ -106,6 +112,10 @@ const TeacherSchedule = ({ user }) => {
           const s = loadedStudents.find(s => s.id === studentIdFromUrl)
           if (s) setStudent(s)
         }
+        if (roomIdFromUrl) {
+          const r = loadedRooms.find(r => r.id === roomIdFromUrl)
+          if (r) setRoom(r)
+        }
       })
       .catch(() => toast.error('Ошибка загрузки фильтров расписания'))
       .finally(() => setOptionsLoading(false))
@@ -119,6 +129,7 @@ const TeacherSchedule = ({ user }) => {
     scheduleService.getTeacherPublishedSchedule(formatDateISO(weekStart), {
       teacher_id: teacher?.id || '',
       student_id: student?.id || '',
+      room_id: room?.id || '',
     })
       .then(data => { if (!cancelled) setScheduleData(data) })
       .catch(e => {
@@ -128,7 +139,7 @@ const TeacherSchedule = ({ user }) => {
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [weekStart, teacher, student, optionsLoading])
+  }, [weekStart, teacher, student, room, optionsLoading])
 
   const slotsByDay = useMemo(() => {
     const grouped = {}
@@ -178,6 +189,18 @@ const TeacherSchedule = ({ user }) => {
               onChange={(_, value) => setStudent(value || ALL_STUDENTS)}
               renderInput={params => (
                 <TextField {...params} label="Ученик" size="small"
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: '14px', background: '#fff' } }}
+                />
+              )}
+            />
+            <Autocomplete
+              options={[ALL_ROOMS, ...rooms]}
+              value={room}
+              getOptionLabel={option => option?.name || ''}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              onChange={(_, value) => setRoom(value || ALL_ROOMS)}
+              renderInput={params => (
+                <TextField {...params} label="Кабинет" size="small"
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: '14px', background: '#fff' } }}
                 />
               )}
