@@ -14,6 +14,18 @@ type NotificationHandler struct {
 	db *gorm.DB
 }
 
+type adminNotificationSender interface {
+	QueueAdminNotification(notificationID uint)
+}
+
+var externalAdminNotificationSender adminNotificationSender
+
+// ConfigureAdminNotificationSender is called once during application startup.
+// Tests and deployments without a VK token keep the sender nil/no-op.
+func ConfigureAdminNotificationSender(sender adminNotificationSender) {
+	externalAdminNotificationSender = sender
+}
+
 func NewNotificationHandler(db *gorm.DB) *NotificationHandler {
 	return &NotificationHandler{db: db}
 }
@@ -28,15 +40,23 @@ func CreateNotification(db *gorm.DB, userID uint, role, title, body, link string
 		if err := db.Where("role IN ('admin','superadmin')").Find(&admins).Error; err != nil {
 			return err
 		}
+		var deliveryNotificationID uint
 		for _, a := range admins {
-			if err := db.Create(&models.Notification{
+			notification := models.Notification{
 				UserID: a.ID,
 				Title:  title,
 				Body:   body,
 				Link:   link,
-			}).Error; err != nil {
+			}
+			if err := db.Create(&notification).Error; err != nil {
 				return err
 			}
+			if deliveryNotificationID == 0 {
+				deliveryNotificationID = notification.ID
+			}
+		}
+		if externalAdminNotificationSender != nil && deliveryNotificationID != 0 {
+			externalAdminNotificationSender.QueueAdminNotification(deliveryNotificationID)
 		}
 		return nil
 	}
