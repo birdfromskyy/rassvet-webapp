@@ -25,9 +25,12 @@ type ChildDocSubmission struct {
 	IppsuExpiryDate *time.Time `gorm:"index" json:"ippsu_expiry_date"`
 	// Expiry notifications are independent events: reminders for 21, 7 and 1
 	// day before expiry must not suppress each other or the expiry notice itself.
-	ExpiryNotified           bool `gorm:"default:false" json:"expiry_notified"`
-	ExpiryReminderNotified   bool `gorm:"default:false" json:"expiry_reminder_notified"` // legacy marker
-	ExpiryReminder21Notified bool `gorm:"default:false" json:"expiry_reminder_21_notified"`
-	ExpiryReminder7Notified  bool `gorm:"default:false" json:"expiry_reminder_7_notified"`
-	ExpiryReminder1Notified  bool `gorm:"default:false" json:"expiry_reminder_1_notified"`
+	ExpiryNotified         bool `gorm:"default:false" json:"expiry_notified"`
+	ExpiryReminderNotified bool `gorm:"default:false" json:"expiry_reminder_notified"` // legacy marker
+	// Keep explicit physical names here. GORM's default naming of a number in a
+	// Go identifier omits the separator, and the daily job queries these fields
+	// directly to guarantee one notification for each reminder date.
+	ExpiryReminder21Notified bool `gorm:"column:expiry_reminder21_notified;default:false" json:"expiry_reminder_21_notified"`
+	ExpiryReminder7Notified  bool `gorm:"column:expiry_reminder7_notified;default:false" json:"expiry_reminder_7_notified"`
+	ExpiryReminder1Notified  bool `gorm:"column:expiry_reminder1_notified;default:false" json:"expiry_reminder_1_notified"`
 }

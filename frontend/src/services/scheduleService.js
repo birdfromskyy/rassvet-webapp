@@ -148,6 +148,10 @@ const scheduleService = {
 		const r = await api.get(`/admin/students/${id}/service-validities`)
 		return r.data.validities || []
 	},
+	getStudentServiceValidityList: async (filters = {}) => {
+		const r = await api.get('/admin/student-service-validities', { params: filters })
+		return r.data.validities || []
+	},
 	saveStudentServiceValidity: async (id, data) => {
 		const r = await api.put(`/admin/students/${id}/service-validities`, data)
 		return r.data.validity

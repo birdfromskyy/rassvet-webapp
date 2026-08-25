@@ -11,6 +11,7 @@ import {
 	Payments as TariffsIcon,
 	ArrowBack as BackIcon,
 	Assessment as ReportsIcon,
+	FactCheck as ValidityIcon,
 } from '@mui/icons-material'
 
 import useBrandFont from '../hooks/useBrandFont'
@@ -34,6 +35,12 @@ const MODULES = [
 		description: 'Ученики, их доступность и тип финансирования.',
 		icon: StudentIcon,
 		path: '/admin/schedule/students',
+	},
+	{
+		title: 'Сроки услуг',
+		description: 'Единый список сроков ИППСУ, массажа и адаптивной физкультуры.',
+		icon: ValidityIcon,
+		path: '/admin/schedule/service-validities',
 	},
 	{
 		title: 'Кабинеты',

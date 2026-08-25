@@ -9,15 +9,17 @@ const (
 )
 
 type StudentServiceValidity struct {
-	ID                       uint       `json:"id" gorm:"primaryKey"`
-	StudentID                uint       `json:"student_id" gorm:"not null;uniqueIndex:idx_student_service_validity"`
-	ServiceType              string     `json:"service_type" gorm:"type:varchar(50);not null;uniqueIndex:idx_student_service_validity"`
-	ValidUntil               time.Time  `json:"valid_until" gorm:"type:date;not null;index"`
-	NotifiedAt               *time.Time `json:"notified_at,omitempty"`
-	ExpiringSoonNotifiedAt   *time.Time `json:"expiring_soon_notified_at,omitempty"` // legacy marker
-	Expiring21DaysNotifiedAt *time.Time `json:"expiring_21_days_notified_at,omitempty"`
-	Expiring7DaysNotifiedAt  *time.Time `json:"expiring_7_days_notified_at,omitempty"`
-	Expiring1DayNotifiedAt   *time.Time `json:"expiring_1_day_notified_at,omitempty"`
+	ID                     uint       `json:"id" gorm:"primaryKey"`
+	StudentID              uint       `json:"student_id" gorm:"not null;uniqueIndex:idx_student_service_validity"`
+	ServiceType            string     `json:"service_type" gorm:"type:varchar(50);not null;uniqueIndex:idx_student_service_validity"`
+	ValidUntil             time.Time  `json:"valid_until" gorm:"type:date;not null;index"`
+	NotifiedAt             *time.Time `json:"notified_at,omitempty"`
+	ExpiringSoonNotifiedAt *time.Time `json:"expiring_soon_notified_at,omitempty"` // legacy marker
+	// These explicit column names match the established GORM naming of numeric
+	// identifiers and are also used by the daily reminder job.
+	Expiring21DaysNotifiedAt *time.Time `gorm:"column:expiring21_days_notified_at" json:"expiring_21_days_notified_at,omitempty"`
+	Expiring7DaysNotifiedAt  *time.Time `gorm:"column:expiring7_days_notified_at" json:"expiring_7_days_notified_at,omitempty"`
+	Expiring1DayNotifiedAt   *time.Time `gorm:"column:expiring1_day_notified_at" json:"expiring_1_day_notified_at,omitempty"`
 	UpdatedByUserID          uint       `json:"updated_by_user_id" gorm:"not null"`
 	CreatedAt                time.Time  `json:"created_at"`
 	UpdatedAt                time.Time  `json:"updated_at"`

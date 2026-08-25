@@ -5,6 +5,7 @@ import (
 	"backend/internal/models"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -43,6 +44,43 @@ func (h *StudentServiceValidityHandler) GetByStudent(c *gin.Context) {
 	}
 	var rows []models.StudentServiceValidity
 	if err := h.db.Where("student_id = ?", studentID).Order("service_type").Find(&rows).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить сроки услуг"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"validities": rows})
+}
+
+// List returns every explicitly set service-validity date. It is an
+// informational directory: it neither creates notifications nor changes any
+// scheduling data.
+func (h *StudentServiceValidityHandler) List(c *gin.Context) {
+	serviceType := strings.TrimSpace(c.Query("service_type"))
+	if serviceType != "" && !validServiceType(serviceType) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неизвестная услуга"})
+		return
+	}
+
+	sortDirection := strings.ToLower(strings.TrimSpace(c.DefaultQuery("sort", "asc")))
+	if sortDirection != "asc" && sortDirection != "desc" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный порядок сортировки"})
+		return
+	}
+
+	query := h.db.Model(&models.StudentServiceValidity{}).
+		Preload("Student").
+		Joins("JOIN students ON students.id = student_service_validities.student_id")
+	if serviceType != "" {
+		query = query.Where("student_service_validities.service_type = ?", serviceType)
+	}
+	if studentQuery := strings.TrimSpace(c.Query("student")); studentQuery != "" {
+		query = query.Where("LOWER(students.full_name) LIKE LOWER(?)", "%"+studentQuery+"%")
+	}
+
+	var rows []models.StudentServiceValidity
+	if err := query.
+		Order("student_service_validities.valid_until " + strings.ToUpper(sortDirection)).
+		Order("students.full_name ASC").
+		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить сроки услуг"})
 		return
 	}
