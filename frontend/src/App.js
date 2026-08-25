@@ -39,6 +39,7 @@ import AdminSchedulePanel from "./pages/AdminSchedulePanel";
 import AdminSubjects from "./pages/AdminSubjects";
 import AdminTeachers from "./pages/AdminTeachers";
 import AdminStudents from "./pages/AdminStudents";
+import AdminStudentServiceValidities from "./pages/AdminStudentServiceValidities";
 import AdminRooms from "./pages/AdminRooms";
 import AdminAssignments from "./pages/AdminAssignments";
 import AdminSchedule from "./pages/AdminSchedule";
@@ -54,6 +55,7 @@ import AdminCMSPanel from "./pages/AdminCMSPanel/AdminCMSPanel";
 import AdminDocuments from "./pages/AdminDocuments";
 import AdminConsultations from "./pages/AdminConsultations";
 import AdminAchievements from "./pages/AdminAchievements";
+import AdminAchievementPreview from "./pages/AdminAchievementPreview";
 import AdminAwards from "./pages/AdminAwards";
 import AdminShorts from "./pages/AdminShorts";
 import AdminVacancies from "./pages/AdminVacancies";
@@ -72,6 +74,7 @@ import Profile from "./pages/Profile/Profile";
 import FinActivities from "./pages/FinActivities/FinActivities";
 import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
 import Achievements from "./pages/Achievements/Achievements";
+import AchievementDetail from "./pages/Achievements/AchievementDetail";
 import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest";
 import AccessibilityPanel from "./components/AccessibilityPanel/AccessibilityPanel";
 import PrivacyPolicy from "./pages/PrivacyPolicy/PrivacyPolicy";
@@ -79,6 +82,7 @@ import AdminPrivacyPolicy from "./pages/AdminPrivacyPolicy/AdminPrivacyPolicy";
 import Vacancies from "./pages/Vacancies/Vacancies";
 import CommercialTariffs from "./pages/CommercialTariffs/CommercialTariffs";
 import AdminCommercialTariffs from "./pages/AdminCommercialTariffs";
+import AdminVKNotifications from "./pages/AdminVKNotifications";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -214,6 +218,7 @@ function App() {
               path="/admin/news/:id/preview"
               element={<AdminNewsPreview />}
             />
+            <Route path="/admin/achievements/:id/preview" element={<AdminAchievementPreview />} />
             <Route path="/admin/schedule" element={<AdminSchedulePanel />} />
             <Route
               path="/admin/schedule/subjects"
@@ -226,6 +231,10 @@ function App() {
             <Route
               path="/admin/schedule/students"
               element={<AdminStudents />}
+            />
+            <Route
+              path="/admin/schedule/service-validities"
+              element={<AdminStudentServiceValidities />}
             />
             <Route path="/admin/schedule/rooms" element={<AdminRooms />} />
             <Route
@@ -284,6 +293,7 @@ function App() {
             <Route path="/admin/cms/services" element={<AdminServices />} />
             <Route path="/admin/cms/commercial-tariffs" element={<Navigate to="/admin/schedule/tariffs" replace />} />
             <Route path="/admin/cms/settings" element={<AdminSiteSettings />} />
+            <Route path="/admin/cms/vk-notifications" element={<AdminVKNotifications />} />
             <Route path="/admin/cms/achievements" element={<AdminAchievements />} />
             <Route path="/admin/cms/awards" element={<AdminAwards />} />
             <Route path="/admin/cms/shorts" element={<AdminShorts />} />
@@ -313,6 +323,7 @@ function App() {
         <Route path="/vacancies" element={<Vacancies />} />
         <Route path="/social-service-form" element={<SocialServiceForm />} />
         <Route path="/achievements" element={<Achievements />} />
+        <Route path="/achievements/:id" element={<AchievementDetail />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route
           path="/"

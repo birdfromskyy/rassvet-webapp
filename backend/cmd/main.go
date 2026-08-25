@@ -85,6 +85,9 @@ func main() {
 
 	// Notification handler
 	notificationHandler := handlers.NewNotificationHandler(db)
+	vkNotificationService := services.NewVKNotificationService(db, cfg.VKCommunityToken, cfg.VKAPIVersion, cfg.FrontendURL)
+	handlers.ConfigureAdminNotificationSender(vkNotificationService)
+	vkNotificationRecipientHandler := handlers.NewVKNotificationRecipientHandler(db, vkNotificationService)
 
 	// New feature handlers
 	consultationHandler := handlers.NewConsultationHandler(db)
@@ -106,6 +109,7 @@ func main() {
 
 	// CMS handlers
 	cmsFileHandler := handlers.NewCmsFileHandler(db)
+	cmsFileGroupHandler := handlers.NewCmsFileGroupHandler(db)
 	historyHandler := handlers.NewHistoryHandler(db)
 	articleHandler := handlers.NewArticleHandler(db)
 	serviceCmsHandler := handlers.NewServiceCmsHandler(db)
@@ -147,6 +151,7 @@ func main() {
 
 	// Public CMS: achievements, awards, vacancies
 	r.GET("/api/achievements", achievementHandler.GetPublic)
+	r.GET("/api/achievements/:id", achievementHandler.GetPublicByID)
 	r.GET("/api/awards", awardHandler.GetPublic)
 	r.GET("/api/shorts", shortHandler.GetPublic)
 	r.GET("/api/vacancies", vacancyHandler.GetPublic)
@@ -154,6 +159,7 @@ func main() {
 	// Public CMS routes (no auth required)
 	r.GET("/api/employees", teacherHandler.GetPublicTeachers)
 	r.GET("/api/cms-files", cmsFileHandler.GetBySection)
+	r.GET("/api/cms-file-groups", cmsFileGroupHandler.GetPublicBySection)
 	r.GET("/api/history", historyHandler.GetEvents)
 	r.GET("/api/articles", articleHandler.GetArticles)
 	r.GET("/api/articles/categories", articleHandler.GetCategories)
@@ -194,6 +200,14 @@ func main() {
 			// File upload
 			admin.POST("/upload", handlers.UploadFile)
 
+			// VK copies of administrator-wide notifications. The community token
+			// stays server-side and this API exposes no arbitrary VK method/text.
+			admin.GET("/vk-notification-recipients", vkNotificationRecipientHandler.GetAll)
+			admin.POST("/vk-notification-recipients", vkNotificationRecipientHandler.Create)
+			admin.PUT("/vk-notification-recipients/:id", vkNotificationRecipientHandler.Update)
+			admin.DELETE("/vk-notification-recipients/:id", vkNotificationRecipientHandler.Delete)
+			admin.POST("/vk-notification-recipients/:id/test", vkNotificationRecipientHandler.SendTest)
+
 			// CMS — Employees managed via /admin/teachers (CMS fields added to Teacher model)
 
 			// CMS — Files (docs, rules, rating)
@@ -201,6 +215,10 @@ func main() {
 			admin.POST("/cms-files", cmsFileHandler.CreateFile)
 			admin.PUT("/cms-files/:id", cmsFileHandler.UpdateFile)
 			admin.DELETE("/cms-files/:id", cmsFileHandler.DeleteFile)
+			admin.GET("/cms-file-groups", cmsFileGroupHandler.GetAllBySection)
+			admin.POST("/cms-file-groups", cmsFileGroupHandler.Create)
+			admin.PUT("/cms-file-groups/:id", cmsFileGroupHandler.Update)
+			admin.DELETE("/cms-file-groups/:id", cmsFileGroupHandler.Delete)
 
 			// CMS — History
 			admin.GET("/history", historyHandler.GetEvents)
@@ -213,6 +231,7 @@ func main() {
 			admin.GET("/articles/:id", articleHandler.GetArticleByID)
 			admin.POST("/articles", articleHandler.CreateArticle)
 			admin.PUT("/articles/:id", articleHandler.UpdateArticle)
+			admin.PUT("/articles/:id/publication", articleHandler.SetPublicationStatus)
 			admin.DELETE("/articles/:id", articleHandler.DeleteArticle)
 
 			// CMS — Services (/about_services)
@@ -275,6 +294,7 @@ func main() {
 			admin.PUT("/students/:id/availability/:availabilityId", studentHandler.UpdateStudentAvailability)
 			admin.DELETE("/students/:id/availability/:availabilityId", studentHandler.DeleteStudentAvailability)
 			admin.GET("/students/:id/service-validities", studentServiceValidityHandler.GetByStudent)
+			admin.GET("/student-service-validities", studentServiceValidityHandler.List)
 			admin.PUT("/students/:id/service-validities", studentServiceValidityHandler.Upsert)
 			admin.DELETE("/students/:id/service-validities/:serviceType", studentServiceValidityHandler.Delete)
 
@@ -375,6 +395,7 @@ func main() {
 
 			// Achievements CMS
 			admin.GET("/achievements", achievementHandler.GetAll)
+			admin.GET("/achievements/:id", achievementHandler.GetByID)
 			admin.POST("/achievements", achievementHandler.Create)
 			admin.PUT("/achievements/:id", achievementHandler.Update)
 			admin.DELETE("/achievements/:id", achievementHandler.Delete)
@@ -473,11 +494,11 @@ func main() {
 		childReminderColumn := func(daysBefore int) string {
 			switch daysBefore {
 			case 21:
-				return "expiry_reminder_21_notified"
+				return "expiry_reminder21_notified"
 			case 7:
-				return "expiry_reminder_7_notified"
+				return "expiry_reminder7_notified"
 			case 1:
-				return "expiry_reminder_1_notified"
+				return "expiry_reminder1_notified"
 			default:
 				return ""
 			}
@@ -485,11 +506,11 @@ func main() {
 		serviceReminderColumn := func(daysBefore int) string {
 			switch daysBefore {
 			case 21:
-				return "expiring_21_days_notified_at"
+				return "expiring21_days_notified_at"
 			case 7:
-				return "expiring_7_days_notified_at"
+				return "expiring7_days_notified_at"
 			case 1:
-				return "expiring_1_day_notified_at"
+				return "expiring1_day_notified_at"
 			default:
 				return ""
 			}
@@ -716,19 +737,12 @@ func main() {
 					WHERE v.` + serviceReminderColumn(daysBefore) + ` IS NULL
 					  AND v.valid_until = ?::date`
 				reminderArgs := []any{reminderDate}
-				if daysBefore == 21 {
-					// The 21-day warning is required only for IPPSU. Other service
-					// validity reminders remain at their established 7- and 1-day terms.
-					reminderQuery += " AND v.service_type = ?"
-					reminderArgs = append(reminderArgs, models.StudentServiceIppsu)
-				} else {
-					reminderQuery += " AND v.service_type IN (?, ?, ?)"
-					reminderArgs = append(reminderArgs,
-						models.StudentServiceIppsu,
-						models.StudentServiceAdaptivePhysicalCulture,
-						models.StudentServiceMassage,
-					)
-				}
+				reminderQuery += " AND v.service_type IN (?, ?, ?)"
+				reminderArgs = append(reminderArgs,
+					models.StudentServiceIppsu,
+					models.StudentServiceAdaptivePhysicalCulture,
+					models.StudentServiceMassage,
+				)
 				if err := db.Raw(reminderQuery, reminderArgs...).Scan(&expiringServiceRows).Error; err != nil {
 					serviceErrors++
 					log.Printf("[JOB] student_service_validity_reminder query error days_before=%d: %v", daysBefore, err)

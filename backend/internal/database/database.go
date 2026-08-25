@@ -70,6 +70,7 @@ func Migrate(db *gorm.DB) {
 		&models.ChildDocSubmission{},
 
 		// CMS models (Employee removed — teachers table is used instead)
+		&models.CmsFileGroup{},
 		&models.CmsFile{},
 		&models.HistoryEvent{},
 		&models.Article{},
@@ -82,12 +83,14 @@ func Migrate(db *gorm.DB) {
 
 		// In-app notifications
 		&models.Notification{},
+		&models.VKNotificationRecipient{},
 
 		// Consultation requests (from public form)
 		&models.ConsultationRequest{},
 
 		// CMS: achievements and awards
 		&models.Achievement{},
+		&models.AchievementBlock{},
 		&models.Award{},
 
 		// Questionnaire (parent uploads filled anketa)
@@ -112,4 +115,5 @@ func Migrate(db *gorm.DB) {
 	// Create unique indexes manually to avoid GORM's DROP CONSTRAINT without IF EXISTS bug
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_key ON site_settings(key)")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_cms_file_groups_section_title ON cms_file_groups(section, title)")
 }
