@@ -37,6 +37,7 @@ const newsService = {
   getArticleById: (id) => api.get(`/admin/articles/${id}`).then(r => r.data),
   createArticle: (data) => api.post('/admin/articles', data).then(r => { invalidate('articles'); return r.data }),
   updateArticle: (id, data) => api.put(`/admin/articles/${id}`, data).then(r => { invalidate('articles'); return r.data }),
+  setPublicationStatus: (id, status) => api.put(`/admin/articles/${id}/publication`, { status }).then(r => { invalidate('articles'); return r.data }),
   deleteArticle: (id) => api.delete(`/admin/articles/${id}`).then(r => { invalidate('articles'); return r.data }),
 }
 

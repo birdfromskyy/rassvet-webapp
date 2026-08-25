@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -14,8 +15,10 @@ func deleteUploadFile(urlPath string) {
 	}
 	// Only remove files that live inside ./uploads/ — safety guard against
 	// accidental deletion of files outside the uploads directory.
-	if !strings.HasPrefix(urlPath, "/uploads/") {
+	cleanPath := filepath.ToSlash(filepath.Clean(urlPath))
+	filename := strings.TrimPrefix(cleanPath, "/uploads/")
+	if cleanPath != urlPath || filename == cleanPath || filename == "" || strings.Contains(filename, "/") {
 		return
 	}
-	_ = os.Remove("." + urlPath)
+	_ = os.Remove(filepath.Join(uploadsDir, filename))
 }

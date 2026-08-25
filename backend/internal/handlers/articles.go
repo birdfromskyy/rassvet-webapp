@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"backend/internal/models"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -31,28 +33,53 @@ type ArticleRequest struct {
 	Summary       string         `json:"summary"`
 	FeaturedImage string         `json:"featured_image"`
 	Status        string         `json:"status"` // draft | published
+	PublishedAt   string         `json:"published_at"`
 	Blocks        []BlockRequest `json:"blocks"`
 }
 
-func (h *ArticleHandler) saveBlocks(articleID uint, blocks []BlockRequest) error {
-	return h.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("article_id = ?", articleID).Delete(&models.ArticleBlock{}).Error; err != nil {
+type ArticlePublicationRequest struct {
+	Status string `json:"status" binding:"required,oneof=draft published"`
+}
+
+func parseArticlePublishedAt(raw string) (*time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, nil
+	}
+	date, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		return nil, fmt.Errorf("дата публикации должна быть в формате ГГГГ-ММ-ДД")
+	}
+	// Midday UTC retains the selected calendar date for all Russian time zones
+	// when the client later formats the existing time.Time value.
+	date = time.Date(date.Year(), date.Month(), date.Day(), 12, 0, 0, 0, time.UTC)
+	return &date, nil
+}
+
+func validateArticleStatus(status string) error {
+	if status != "" && status != "draft" && status != "published" {
+		return fmt.Errorf("некорректный статус новости")
+	}
+	return nil
+}
+
+func saveArticleBlocks(tx *gorm.DB, articleID uint, blocks []BlockRequest) error {
+	if err := tx.Where("article_id = ?", articleID).Delete(&models.ArticleBlock{}).Error; err != nil {
+		return err
+	}
+	for i, b := range blocks {
+		block := models.ArticleBlock{
+			ArticleID: articleID,
+			Type:      b.Type,
+			Content:   b.Content,
+			Title:     b.Title,
+			SortOrder: i,
+		}
+		if err := tx.Create(&block).Error; err != nil {
 			return err
 		}
-		for i, b := range blocks {
-			block := models.ArticleBlock{
-				ArticleID: articleID,
-				Type:      b.Type,
-				Content:   b.Content,
-				Title:     b.Title,
-				SortOrder: i,
-			}
-			if err := tx.Create(&block).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // GetArticles — public endpoint, only published articles with pagination.
@@ -121,7 +148,7 @@ func (h *ArticleHandler) GetCategories(c *gin.Context) {
 
 func (h *ArticleHandler) GetAllArticles(c *gin.Context) {
 	var articles []models.Article
-	h.db.Order("created_at DESC").Find(&articles)
+	h.db.Order("published_at DESC NULLS LAST, created_at DESC").Find(&articles)
 	c.JSON(http.StatusOK, articles)
 }
 
@@ -143,6 +170,15 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateArticleStatus(req.Status); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	publishedAt, err := parseArticlePublishedAt(req.PublishedAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Check slug uniqueness
 	var count int64
@@ -158,21 +194,22 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 		Summary:       req.Summary,
 		FeaturedImage: req.FeaturedImage,
 		Status:        req.Status,
+		PublishedAt:   publishedAt,
 	}
 	if article.Status == "" {
 		article.Status = "draft"
 	}
-	if article.Status == "published" {
+	if article.PublishedAt == nil {
 		now := time.Now()
 		article.PublishedAt = &now
 	}
 
-	if err := h.db.Create(&article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.saveBlocks(article.ID, req.Blocks); err != nil {
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&article).Error; err != nil {
+			return err
+		}
+		return saveArticleBlocks(tx, article.ID, req.Blocks)
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -194,6 +231,15 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateArticleStatus(req.Status); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	publishedAt, err := parseArticlePublishedAt(req.PublishedAt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	// Check slug uniqueness (excluding self)
 	var count int64
@@ -203,31 +249,55 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 		return
 	}
 
-	wasPublished := article.Status == "published"
-
 	article.Title = req.Title
 	article.Slug = req.Slug
 	article.Summary = req.Summary
 	article.FeaturedImage = req.FeaturedImage
-	if req.Status != "" {
-		article.Status = req.Status
-	}
-	if article.Status == "published" && !wasPublished && article.PublishedAt == nil {
+	if publishedAt != nil {
+		article.PublishedAt = publishedAt
+	} else if article.PublishedAt == nil {
 		now := time.Now()
 		article.PublishedAt = &now
 	}
-
-	if err := h.db.Save(&article).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	if req.Status != "" {
+		article.Status = req.Status
 	}
-
-	if err := h.saveBlocks(article.ID, req.Blocks); err != nil {
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&article).Error; err != nil {
+			return err
+		}
+		return saveArticleBlocks(tx, article.ID, req.Blocks)
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	h.db.Preload("Blocks", func(db *gorm.DB) *gorm.DB { return db.Order("sort_order ASC") }).First(&article, article.ID)
+	c.JSON(http.StatusOK, article)
+}
+
+// SetPublicationStatus changes only status. It deliberately does not call
+// saveBlocks, so the list-page switch cannot overwrite article content.
+func (h *ArticleHandler) SetPublicationStatus(c *gin.Context) {
+	var article models.Article
+	if err := h.db.First(&article, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Статья не найдена"})
+		return
+	}
+	var req ArticlePublicationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	article.Status = req.Status
+	if article.PublishedAt == nil {
+		now := time.Now()
+		article.PublishedAt = &now
+	}
+	if err := h.db.Save(&article).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, article)
 }
 

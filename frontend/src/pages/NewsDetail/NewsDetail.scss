@@ -71,11 +71,27 @@
     letter-spacing: -0.03em;
   }
 
+  .nd-eyebrow {
+    display: block;
+    margin: 0 0 12px;
+    color: #f4df00;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
   .nd-summary {
     margin: 0 0 16px;
     font-size: clamp(16px, 1.4vw, 20px);
     line-height: 1.55;
     color: rgba(255, 255, 255, 0.78);
+
+    p {
+      margin: 0 0 12px;
+
+      &:last-child { margin-bottom: 0; }
+    }
   }
 
   .nd-meta {
@@ -121,6 +137,29 @@
       border-radius: 20px;
       border: 1px solid $border;
     }
+  }
+
+  .nd-block--image {
+    margin: 30px 0;
+
+    figcaption {
+      margin-top: 10px;
+      color: $muted;
+      font-size: 14px;
+      line-height: 1.45;
+      text-align: center;
+    }
+  }
+
+  .nd-conclusion {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgba(244, 223, 0, 0.24);
+    color: $ink;
+    font-size: 15px;
+    font-weight: 800;
   }
 
   .nd-video {
@@ -172,6 +211,57 @@
         transform: translateY(-2px);
         box-shadow: 0 16px 32px rgba(7, 68, 98, 0.12);
       }
+    }
+  }
+}
+
+.admin-news-preview {
+  .admin-news-preview__bar {
+    /* The site header is sticky. Keeping the preview ribbon in normal flow
+       avoids the two sticky layers occupying the same top coordinate. */
+    position: relative;
+    z-index: 1;
+    background: #074462;
+    color: #fff;
+  }
+
+  .admin-news-preview__bar-inner {
+    width: min(94%, 1440px);
+    min-height: 56px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    font-weight: 700;
+
+    button {
+      min-height: 34px;
+      padding: 0 14px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 999px;
+      background: transparent;
+      color: #fff;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    strong {
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: #f4df00;
+      color: #074462;
+      font-size: 12px;
+
+      &.is-published { background: #2f8a54; color: #fff; }
+    }
+
+    .admin-news-preview__publish {
+      margin-left: auto;
+      border-color: #f4df00;
+      background: #f4df00;
+      color: #074462;
     }
   }
 }

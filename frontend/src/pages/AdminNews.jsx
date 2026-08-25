@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Chip,
   CircularProgress,
   MenuItem,
   Select,
@@ -25,6 +24,7 @@ import {
   Divider,
   Tooltip,
   Paper,
+  Switch,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -57,12 +57,25 @@ const BLOCK_TYPES = [
   { type: "file", label: "Файл", icon: FileIcon },
 ];
 
+const todayInput = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+};
+
 const emptyMeta = {
   title: "",
   slug: "",
   summary: "",
   featured_image: "",
   status: "draft",
+  published_at: todayInput(),
+};
+
+const toDateInput = (value) => {
+  if (!value) return todayInput();
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return todayInput();
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 };
 
 const TRANSLIT = {
@@ -127,6 +140,7 @@ export default function AdminNews() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [search, setSearch] = useState("");
+  const [publicationChanging, setPublicationChanging] = useState({});
 
   const filteredArticles = articles.filter((article) => {
     const value = `${article.title} ${article.slug} ${
@@ -163,6 +177,7 @@ export default function AdminNews() {
       summary: article.summary || "",
       featured_image: article.featured_image || "",
       status: article.status || "draft",
+      published_at: toDateInput(article.published_at || article.created_at),
     });
 
     try {
@@ -239,6 +254,20 @@ export default function AdminNews() {
 
     await newsService.deleteArticle(id);
     load();
+  };
+
+  const togglePublication = async (article) => {
+    const status = article.status === "published" ? "draft" : "published";
+    setPublicationChanging((state) => ({ ...state, [article.id]: true }));
+    try {
+      const updated = await newsService.setPublicationStatus(article.id, status);
+      setArticles((items) => items.map((item) => item.id === article.id ? { ...item, ...updated } : item));
+      toast.success(status === "published" ? "Новость опубликована" : "Новость переведена в черновик");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Не удалось изменить статус новости");
+    } finally {
+      setPublicationChanging((state) => ({ ...state, [article.id]: false }));
+    }
   };
 
   const addBlock = (type) =>
@@ -356,17 +385,18 @@ export default function AdminNews() {
                       </TableCell>
 
                       <TableCell>
-                        <Chip
-                          label={
-                            a.status === "published"
-                              ? "Опубликована"
-                              : "Черновик"
-                          }
-                          size="small"
-                          color={
-                            a.status === "published" ? "success" : "default"
-                          }
-                        />
+                        <Tooltip title={a.status === "published" ? "Снять с публикации" : "Опубликовать"}>
+                          <span className="admin-news__publication-switch">
+                            <Switch
+                              checked={a.status === "published"}
+                              onChange={() => togglePublication(a)}
+                              disabled={Boolean(publicationChanging[a.id])}
+                              color="success"
+                              inputProps={{ "aria-label": `Статус новости «${a.title}»` }}
+                            />
+                            <span>{a.status === "published" ? "Опубликована" : "Черновик"}</span>
+                          </span>
+                        </Tooltip>
                       </TableCell>
 
                       <TableCell>
@@ -411,7 +441,7 @@ export default function AdminNews() {
 
                   {!filteredArticles.length && (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={5} align="center">
                         <Typography color="text.secondary">
                           Новости не найдены
                         </Typography>
@@ -466,10 +496,21 @@ export default function AdminNews() {
               value={meta.summary}
               fullWidth
               multiline
-              rows={2}
+              rows={6}
+              helperText="Каждый перенос строки будет показан отдельным абзацем в новости и предпросмотре."
               onChange={(e) =>
                 setMeta((m) => ({ ...m, summary: e.target.value }))
               }
+            />
+
+            <TextField
+              label="Дата публикации"
+              type="date"
+              value={meta.published_at}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              helperText="Если не указывать дату, будет использована сегодняшняя. Отложенная публикация не создаётся."
+              onChange={(e) => setMeta((m) => ({ ...m, published_at: e.target.value }))}
             />
 
             <FormControl fullWidth>
