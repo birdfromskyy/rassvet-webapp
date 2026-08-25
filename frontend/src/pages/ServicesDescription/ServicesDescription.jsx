@@ -54,11 +54,20 @@ function ServicesDescription() {
               Центр предоставляет услуги в соответствии с{" "}
               <a
                 className="sd-link"
+                href="https://vk.ru/away.php?to=https%3A%2F%2Fnvpku86.gosuslugi.ru%2Fnetcat_files%2F49%2F126%2FFederal_nyy_zakon_ot_28_12.2013_N_442_FZ_red_ot_26.12.2024_.pdf&utf=1"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Федеральным законом от 28.12.2013 № 442-ФЗ «Об основах социального обслуживания граждан в Российской Федерации»
+              </a>{" "}
+              и{" "}
+              <a
+                className="sd-link"
                 href="https://depsr.admhmao.ru/dokumenty/hmao/postanovleniya-pravitelstva-hmao/398875/"
                 target="_blank"
                 rel="noreferrer"
               >
-                постановлением Правительства ХМАО — Югры
+                постановлением Правительства ХМАО — Югры №326-п от 06.09.2014
               </a>
               .
             </p>

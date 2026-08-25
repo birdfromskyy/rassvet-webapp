@@ -15,7 +15,6 @@ import {
   FiUser,
   FiTrash2,
   FiMessageCircle,
-  FiHeadphones,
 } from "react-icons/fi";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
@@ -25,12 +24,14 @@ import notificationService from "../../services/notificationService";
 import { useAuth } from "../../contexts/AuthContext";
 import { FiHeart, FiBriefcase } from "react-icons/fi";
 
-const searchPages = [
+const publicSearchPages = [
   { title: "Главная", path: "/main" },
   { title: "Миссия и цели", path: "/mission" },
   { title: "История и достижения", path: "/history" },
   { title: "Документы", path: "/docs" },
   { title: "Сотрудники", path: "/employees" },
+  { title: "Материально-техническое обеспечение", path: "/fin-activities" },
+  { title: "О правилах внутреннего распорядка", path: "/internal-rules" },
   { title: "Структура организации", path: "/structure" },
   { title: "Перечень услуг", path: "/services-list" },
   { title: "Описание услуг", path: "/services-description" },
@@ -41,11 +42,19 @@ const searchPages = [
   { title: "Независимая оценка качества", path: "/rating" },
   { title: "Форма социального обслуживания", path: "/social-service-form" },
   { title: "Свободные места", path: "/available-places" },
+  { title: "Отзывы", path: "/reviews" },
   { title: "Наши успехи", path: "/achievements" },
   { title: "Наши награды", path: "/awards" },
-  { title: "Первичная консультация", path: "/consultation-request" },
+  { title: "Первичная консультация", path: "/consultation-request", keywords: "записаться заявка" },
   { title: "Поддержать центр", path: "/donation" },
-  { title: "Техподдержка", path: "/support" },
+  { title: "Вакансии", path: "/vacancies" },
+  { title: "Политика обработки персональных данных", path: "/privacy" },
+];
+
+const buildSearchPages = (isLoggedIn) => [
+  ...publicSearchPages,
+  ...(isLoggedIn ? [{ title: "Техподдержка", path: "/support" }] : []),
+  { title: "Личный кабинет", path: isLoggedIn ? "/dashboard" : "/login" },
 ];
 
 const buildDropdowns = (isLoggedIn) => [
@@ -112,6 +121,7 @@ function Header() {
   const { isAuthenticated } = useAuth() || {};
   const isLoggedIn = !!isAuthenticated;
   const dropdowns = buildDropdowns(isLoggedIn);
+  const searchPages = buildSearchPages(isLoggedIn);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -124,9 +134,10 @@ function Header() {
     };
   }, [isMenuOpen]);
 
-  const filteredPages = searchPages.filter((page) =>
-    page.title.toLowerCase().includes(searchValue.toLowerCase().trim()),
-  );
+  const filteredPages = searchPages.filter((page) => {
+    const searchText = `${page.title} ${page.keywords || ""}`.toLowerCase();
+    return searchText.includes(searchValue.toLowerCase().trim());
+  });
 
   useEffect(() => {
     siteSettingService

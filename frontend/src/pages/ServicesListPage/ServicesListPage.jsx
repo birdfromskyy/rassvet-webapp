@@ -77,7 +77,7 @@ function ServicesListPage() {
           {sections.length > 0 ? (
             <div className="sl-grid">
               {sections.map((section) => (
-                <article className="sl-card" key={section.id} data-reveal>
+                <article className="sl-card" id={`service-${section.id}`} key={section.id} data-reveal>
                   <h3 className="sl-card__title">{section.title}</h3>
                   {section.children.length > 0 && (
                     <ul className="sl-list">

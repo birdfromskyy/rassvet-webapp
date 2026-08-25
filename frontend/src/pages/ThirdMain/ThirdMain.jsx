@@ -12,6 +12,7 @@ import heroIconHeart from "../../assets/charity.png";
 import heroIconChat from "../../assets/professionalism.png";
 import heroIconFamily from "../../assets/family-room.png";
 import aboutIllustration from "../../assets/sea-and-sun.png";
+import ratingQr from "../../assets/rating-qr.jpg";
 
 /* Home page — new design ("Rassvet 2.0", see Skills/Design2.md).
    Brand palette (#074462 / #f4df00 / warm cream) on full-screen
@@ -31,6 +32,7 @@ const SECTIONS = [
   { id: "tm-stories", label: "Видео" },
   { id: "tm-reviews", label: "Отзывы" },
   { id: "tm-map", label: "Как нас найти" },
+  { id: "tm-rating", label: "Оценка работы" },
 ];
 
 /* The footer participates in fullpage navigation as the final stop,
@@ -42,6 +44,8 @@ const WHEEL_THRESHOLD = 10;
 const DESKTOP_QUERY = "(min-width: 993px)";
 const DEFAULT_HOME_VIDEO_URL =
   "https://vk.com/video_ext.php?oid=-228149734&id=456239094&hash=1a7c1dffa23542b1";
+const RATING_URL = "https://bus.gov.ru/qrcode/rate/818963";
+const HOME_SERVICE_PREVIEW_LIMIT = 4;
 
 const toHomeVideoEmbedUrl = (url) => {
   if (!url || url.includes("video_ext.php")) return url || DEFAULT_HOME_VIDEO_URL;
@@ -60,6 +64,21 @@ const parseJson = (str) => {
   } catch {
     return [];
   }
+};
+
+const getHomeCategoryLabel = (title) => (
+  title.includes("коммуникативного потенциала")
+    ? "Коммуникативный потенциал"
+    : title
+);
+
+const directionWord = (count) => {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return "направлений";
+  if (lastDigit === 1) return "направление";
+  if (lastDigit >= 2 && lastDigit <= 4) return "направления";
+  return "направлений";
 };
 
 /* Reveal-on-scroll. Re-runs when `deps` change so content that
@@ -308,11 +327,12 @@ function ThirdMain() {
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((child) => ({ ...child, subItems: parseJson(child.items) })),
           }));
-        // Home shows the first four categories only (the long
-        // "коммуникативный потенциал" block lives on /services-list).
-        const top4 = built.slice(0, 4);
-        setServiceCats(top4);
-        if (top4.length) setActiveCatId(top4[0].id);
+        // A category is a top-level service with its own entries. All five
+        // are available on the home page; the right panel is independently
+        // scrollable, so a long category does not break full-page scrolling.
+        const categories = built.filter((section) => section.children.length > 0);
+        setServiceCats(categories);
+        if (categories.length) setActiveCatId(categories[0].id);
       })
       .catch(() => {});
   }, []);
@@ -333,6 +353,8 @@ function ThirdMain() {
 
   const activeCat =
     serviceCats.find((c) => c.id === activeCatId) || serviceCats[0] || null;
+  const activeCatPreview = activeCat?.children.slice(0, HOME_SERVICE_PREVIEW_LIMIT) || [];
+  const hiddenServiceCount = Math.max(0, (activeCat?.children.length || 0) - activeCatPreview.length);
   const stars = (n) => "★".repeat(Math.min(5, Math.max(1, n)));
 
   return (
@@ -489,43 +511,48 @@ function ThirdMain() {
                   type="button"
                   role="tab"
                   aria-selected={activeCatId === cat.id}
+                  aria-label={cat.title}
+                  title={cat.title}
                   className={`tm-services__tab${
                     activeCatId === cat.id ? " is-active" : ""
                   }`}
                   onClick={() => setActiveCatId(cat.id)}
                 >
                   <span className="tm-services__tab-dot" aria-hidden="true" />
-                  <span>{cat.title}</span>
+                  <span>{getHomeCategoryLabel(cat.title)}</span>
                 </button>
               ))}
             </div>
 
-            <a href="/services-description" className="tm-btn tm-btn--ink">
-              Подробнее об услугах
+            <a href="/services-list" className="tm-btn tm-btn--ink">
+              Все услуги
             </a>
           </div>
 
           <div className="tm-services__panel" data-reveal data-reveal-delay="1" role="tabpanel">
             {activeCat && (
               <>
-                <h3 className="tm-services__panel-title">{activeCat.title}</h3>
-                {activeCat.children.length > 0 && (
+                <h3 className="tm-services__panel-title">{getHomeCategoryLabel(activeCat.title)}</h3>
+                <p className="tm-services__panel-text">
+                  Краткий перечень направлений. Полный официальный список доступен отдельно.
+                </p>
+                {activeCatPreview.length > 0 && (
                   <ul className="tm-services__list">
-                    {activeCat.children.map((child) => (
+                    {activeCatPreview.map((child) => (
                       <li key={child.id}>
                         <strong>{child.title}</strong>
-                        {child.text && <span> — {child.text}</span>}
-                        {child.subItems.length > 0 && (
-                          <ul className="tm-services__sublist">
-                            {child.subItems.map((item, i) => (
-                              <li key={i}>{item}</li>
-                            ))}
-                          </ul>
-                        )}
                       </li>
                     ))}
                   </ul>
                 )}
+                {hiddenServiceCount > 0 && (
+                  <p className="tm-services__more">
+                    Ещё {hiddenServiceCount} {directionWord(hiddenServiceCount)} — в полном перечне.
+                  </p>
+                )}
+                <a href={`/services-list#service-${activeCat.id}`} className="tm-services__detail-link">
+                  Открыть полный перечень
+                </a>
               </>
             )}
           </div>
@@ -599,6 +626,39 @@ function ThirdMain() {
               title="Карта проезда к Центру РАСсвет"
             />
           </div>
+        </div>
+      </section>
+
+      {/* ── Screen 7: Independent quality assessment ────────── */}
+      <section className="tm-section tm-rating" id="tm-rating">
+        <div className="page-container tm-rating__inner">
+          <div className="tm-rating__content" data-reveal>
+            <span className="tm-tag tm-tag--dark">Независимая оценка</span>
+            <h2 className="tm-h2">Оцените нашу работу</h2>
+            <p className="tm-rating__lead">Вы можете оценить условия оказания услуг:</p>
+            <ul className="tm-rating__list">
+              <li>Комфорт и чистоту помещений</li>
+              <li>Доброжелательность и вежливость персонала</li>
+              <li>Лёгкость получения информации о работе организации и её точность</li>
+              <li>Удобство записи для получения услуг и своевременность их оказания</li>
+              <li>Доступность для граждан с инвалидностью</li>
+            </ul>
+            <a href={RATING_URL} className="tm-btn tm-btn--ink" target="_blank" rel="noreferrer">
+              Оценить на bus.gov.ru
+            </a>
+          </div>
+          <a
+            href={RATING_URL}
+            className="tm-rating__qr"
+            target="_blank"
+            rel="noreferrer"
+            data-reveal
+            data-reveal-delay="1"
+            aria-label="Перейти к оценке работы Центра на bus.gov.ru"
+          >
+            <img src={ratingQr} alt="QR-код для независимой оценки качества работы Центра" />
+            <span>Наведите камеру телефона на QR-код</span>
+          </a>
         </div>
       </section>
 

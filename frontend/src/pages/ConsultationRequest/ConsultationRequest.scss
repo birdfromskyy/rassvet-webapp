@@ -88,9 +88,11 @@
     color: $ink;
   }
 
-  input,
-  select,
-  textarea {
+  // Header is rendered inside .consultation-page too. Scope field styles to
+  // the form so they do not add a second border to the global header search.
+  .consultation-form input,
+  .consultation-form select,
+  .consultation-form textarea {
     width: 100%;
     padding: 13px 16px;
     border: 1.5px solid rgba(7, 68, 98, 0.16);
