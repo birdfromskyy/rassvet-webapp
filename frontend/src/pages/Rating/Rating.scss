@@ -9,3 +9,126 @@
     background: $paper;
   }
 }
+
+.rating-section__groups {
+  display: grid;
+  gap: 40px;
+}
+
+.rating-section__group h3 {
+  margin: 0 0 18px;
+  color: #074462;
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.rating-feedback {
+  /* Keep the feedback area visually continuous with the documents section. */
+  background: $paper;
+
+  &__card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+    align-items: center;
+    gap: clamp(28px, 5vw, 72px);
+    padding: clamp(26px, 4vw, 56px);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  &__content {
+    max-width: 600px;
+
+    .d2-h2 { margin: 14px 0; }
+
+    p {
+      margin: 0;
+      color: $content;
+      font-size: clamp(16px, 1.5vw, 19px);
+      line-height: 1.6;
+    }
+  }
+
+  &__poster {
+    justify-self: center;
+    display: block;
+    width: min(100%, 440px);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid $border;
+    border-radius: 20px;
+    background: #ffffff;
+    box-shadow: 0 16px 34px rgba(7, 68, 98, 0.12);
+    cursor: zoom-in;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 22px 42px rgba(7, 68, 98, 0.18);
+    }
+
+    &:focus-visible {
+      outline: 3px solid $yellow;
+      outline-offset: 4px;
+    }
+
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+  }
+}
+
+.rating-poster-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: rgba(5, 22, 32, 0.92);
+  cursor: zoom-out;
+
+  img {
+    max-width: min(94vw, 1100px);
+    max-height: 86vh;
+    object-fit: contain;
+    border-radius: 12px;
+    background: #ffffff;
+    cursor: default;
+  }
+
+  &__close {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 46px;
+    height: 46px;
+    border: 0;
+    border-radius: 50%;
+    background: #ffffff;
+    color: $ink;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover { opacity: 0.85; }
+  }
+}
+
+@media (max-width: 760px) {
+  .rating-feedback {
+    &__card {
+      grid-template-columns: 1fr;
+      gap: 26px;
+      padding: 24px 18px;
+      border-radius: 22px;
+    }
+
+    &__poster { width: min(100%, 440px); }
+  }
+}

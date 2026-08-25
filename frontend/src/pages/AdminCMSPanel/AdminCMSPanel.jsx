@@ -21,6 +21,7 @@ import {
   VideoLibrary as ShortsIcon,
   Security as PrivacyIcon,
   Work as VacanciesIcon,
+  NotificationsActive as VKNotificationsIcon,
 } from "@mui/icons-material";
 
 import useBrandFont from "../../hooks/useBrandFont";
@@ -68,6 +69,7 @@ const GROUPS = [
     title: "Настройки системы",
     modules: [
       { title: "Настройки сайта", description: "Глобальные данные, миссия, контакты, структура и видео.", icon: SettingsIcon, path: "/admin/cms/settings" },
+      { title: "Уведомления VK", description: "Получатели копий административных уведомлений в VK.", icon: VKNotificationsIcon, path: "/admin/cms/vk-notifications" },
       { title: "Политика ПДн", description: "Политика обработки персональных данных (152-ФЗ).", icon: PrivacyIcon, path: "/admin/cms/privacy" },
     ],
   },

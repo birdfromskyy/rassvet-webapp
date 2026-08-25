@@ -44,6 +44,17 @@ export const cmsFileService = {
   delete: (id) => api.delete(`/admin/cms-files/${id}`).then(r => { invalidate('cms-files'); return r.data }),
 }
 
+export const cmsFileGroupService = {
+  getPublicBySection: (section) =>
+    cachedGet(`cms-file-groups:${section}`, () =>
+      api.get('/cms-file-groups', { params: { section } }).then(r => r.data)
+    ),
+  getAllAdmin: (section) => api.get('/admin/cms-file-groups', { params: { section } }).then(r => r.data),
+  create: (data) => api.post('/admin/cms-file-groups', data).then(r => { invalidate('cms-files'); invalidate('cms-file-groups'); return r.data }),
+  update: (id, data) => api.put(`/admin/cms-file-groups/${id}`, data).then(r => { invalidate('cms-files'); invalidate('cms-file-groups'); return r.data }),
+  delete: (id) => api.delete(`/admin/cms-file-groups/${id}`).then(r => { invalidate('cms-files'); invalidate('cms-file-groups'); return r.data }),
+}
+
 // ── History ────────────────────────────────────────────────────────────────
 
 export const historyService = {

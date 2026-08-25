@@ -18,10 +18,25 @@ func NewCmsFileHandler(db *gorm.DB) *CmsFileHandler {
 
 type CmsFileRequest struct {
 	Section   string `json:"section" binding:"required"` // docs | rules | rating
+	GroupID   *uint  `json:"group_id"`
 	Title     string `json:"title" binding:"required"`
 	FileURL   string `json:"file_url"`
 	SortOrder int    `json:"sort_order"`
 	IsActive  *bool  `json:"is_active"`
+}
+
+func (h *CmsFileHandler) validateGroup(section string, groupID *uint) error {
+	if groupID == nil {
+		return nil
+	}
+	var group models.CmsFileGroup
+	if err := h.db.First(&group, *groupID).Error; err != nil {
+		return err
+	}
+	if group.Section != section {
+		return gorm.ErrInvalidData
+	}
+	return nil
 }
 
 // GetBySection returns active files for the given section, ordered by sort_order.
@@ -59,6 +74,10 @@ func (h *CmsFileHandler) CreateFile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := h.validateGroup(req.Section, req.GroupID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Выбранный раздел недоступен для этого файла"})
+		return
+	}
 
 	isActive := true
 	if req.IsActive != nil {
@@ -67,6 +86,7 @@ func (h *CmsFileHandler) CreateFile(c *gin.Context) {
 
 	file := models.CmsFile{
 		Section:   req.Section,
+		GroupID:   req.GroupID,
 		Title:     req.Title,
 		FileURL:   req.FileURL,
 		SortOrder: req.SortOrder,
@@ -94,8 +114,13 @@ func (h *CmsFileHandler) UpdateFile(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := h.validateGroup(req.Section, req.GroupID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Выбранный раздел недоступен для этого файла"})
+		return
+	}
 
 	file.Section = req.Section
+	file.GroupID = req.GroupID
 	file.Title = req.Title
 	file.FileURL = req.FileURL
 	file.SortOrder = req.SortOrder
