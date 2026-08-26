@@ -66,21 +66,6 @@ const parseJson = (str) => {
   }
 };
 
-const getHomeCategoryLabel = (title) => (
-  title.includes("коммуникативного потенциала")
-    ? "Коммуникативный потенциал"
-    : title
-);
-
-const directionWord = (count) => {
-  const lastTwoDigits = count % 100;
-  const lastDigit = count % 10;
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return "направлений";
-  if (lastDigit === 1) return "направление";
-  if (lastDigit >= 2 && lastDigit <= 4) return "направления";
-  return "направлений";
-};
-
 /* Reveal-on-scroll. Re-runs when `deps` change so content that
    appears after data loads (e.g. reviews) is picked up too. */
 function useReveal(rootRef, deps = []) {
@@ -354,7 +339,6 @@ function ThirdMain() {
   const activeCat =
     serviceCats.find((c) => c.id === activeCatId) || serviceCats[0] || null;
   const activeCatPreview = activeCat?.children.slice(0, HOME_SERVICE_PREVIEW_LIMIT) || [];
-  const hiddenServiceCount = Math.max(0, (activeCat?.children.length || 0) - activeCatPreview.length);
   const stars = (n) => "★".repeat(Math.min(5, Math.max(1, n)));
 
   return (
@@ -515,11 +499,11 @@ function ThirdMain() {
                   title={cat.title}
                   className={`tm-services__tab${
                     activeCatId === cat.id ? " is-active" : ""
-                  }`}
+                  }${cat.title.length > 80 ? " is-long-label" : ""}`}
                   onClick={() => setActiveCatId(cat.id)}
                 >
                   <span className="tm-services__tab-dot" aria-hidden="true" />
-                  <span>{getHomeCategoryLabel(cat.title)}</span>
+                  <span>{cat.title}</span>
                 </button>
               ))}
             </div>
@@ -532,7 +516,7 @@ function ThirdMain() {
           <div className="tm-services__panel" data-reveal data-reveal-delay="1" role="tabpanel">
             {activeCat && (
               <>
-                <h3 className="tm-services__panel-title">{getHomeCategoryLabel(activeCat.title)}</h3>
+                <h3 className="tm-services__panel-title">{activeCat.title}</h3>
                 <p className="tm-services__panel-text">
                   Краткий перечень направлений. Полный официальный список доступен отдельно.
                 </p>
@@ -544,11 +528,6 @@ function ThirdMain() {
                       </li>
                     ))}
                   </ul>
-                )}
-                {hiddenServiceCount > 0 && (
-                  <p className="tm-services__more">
-                    Ещё {hiddenServiceCount} {directionWord(hiddenServiceCount)} — в полном перечне.
-                  </p>
                 )}
                 <a href={`/services-list#service-${activeCat.id}`} className="tm-services__detail-link">
                   Открыть полный перечень
@@ -640,7 +619,7 @@ function ThirdMain() {
               <li>Комфорт и чистоту помещений</li>
               <li>Доброжелательность и вежливость персонала</li>
               <li>Лёгкость получения информации о работе организации и её точность</li>
-              <li>Удобство записи для получения услуг и своевременность их оказания</li>
+              <li>График работы организации и персонала</li>
               <li>Доступность для граждан с инвалидностью</li>
             </ul>
             <a href={RATING_URL} className="tm-btn tm-btn--ink" target="_blank" rel="noreferrer">
