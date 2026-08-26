@@ -30,7 +30,7 @@ function AdminAchievementPreview() {
       </div>
       <Header />
       {loading ? <div className="nd-state"><CircularProgress sx={{ color: "#074462" }} /></div> : article ? (
-        <NewsArticleView article={article} eyebrow="История успеха" conclusion={story.conclusion} showDate={false} onBack={() => navigate("/admin/cms/achievements")} backLabel="← К историям успеха" />
+        <NewsArticleView article={article} eyebrow="История успеха" conclusion={story.conclusion} showDate={false} showImageCaptions={false} onBack={() => navigate("/admin/cms/achievements")} backLabel="← К историям успеха" />
       ) : <div className="nd-state"><p className="d2-empty">История не найдена</p></div>}
       <Footer />
     </div>

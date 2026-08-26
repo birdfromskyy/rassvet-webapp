@@ -48,6 +48,7 @@ function NewsArticleView({
   eyebrow,
   conclusion,
   showDate = true,
+  showImageCaptions = true,
 }) {
   const [lightbox, setLightbox] = useState(null);
   useEffect(() => {
@@ -66,7 +67,7 @@ function NewsArticleView({
     }
     if (block.type === "image") {
       const imageUrl = getUploadUrl(block.content);
-      return imageUrl ? <figure key={key} className="nd-block nd-block--image"><button type="button" className="nd-img-btn" onClick={() => setLightbox(imageUrl)} title="Нажмите, чтобы увеличить"><img src={imageUrl} alt={block.title || "Изображение"} className="nd-block__image" /></button>{block.title && <figcaption>{block.title}</figcaption>}</figure> : null;
+      return imageUrl ? <figure key={key} className="nd-block nd-block--image"><button type="button" className="nd-img-btn" onClick={() => setLightbox(imageUrl)} title="Нажмите, чтобы увеличить"><img src={imageUrl} alt={block.title || "Изображение"} className="nd-block__image" /></button>{showImageCaptions && block.title && <figcaption>{block.title}</figcaption>}</figure> : null;
     }
     if (block.type === "video") {
       const embedUrl = getVkEmbedUrl(block.content);

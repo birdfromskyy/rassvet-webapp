@@ -57,6 +57,7 @@ function AchievementDetail() {
           eyebrow="История успеха"
           conclusion={story.conclusion}
           showDate={false}
+          showImageCaptions={false}
           onBack={() => navigate("/achievements")}
           backLabel="← Все истории"
         />
