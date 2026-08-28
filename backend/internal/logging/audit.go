@@ -142,11 +142,16 @@ func skipAccessLog(method, path string, status int) bool {
 	if method == "OPTIONS" && status < 400 {
 		return true
 	}
-	if path == "/api/health" && status < 400 {
-		return true
-	}
-	if path == "/api/refresh" && status < 400 {
-		return true
+	if status < 400 {
+		switch path {
+		case "/api/health", "/api/refresh":
+			return true
+		case "/api/notifications/unread-count", "/api/admin/support/unread-count":
+			// These counters are refreshed in the background. Logging every
+			// successful poll obscures meaningful user actions, while failed
+			// requests above remain visible.
+			return true
+		}
 	}
 	return false
 }
