@@ -33,6 +33,20 @@ const displayDate = iso => {
 }
 const ruSort = (a = '', b = '') => String(a).localeCompare(String(b), 'ru')
 
+const mergeReportPeople = (...lists) => {
+	const byID = new Map()
+	lists.flat().forEach(person => byID.set(person.id, person))
+	return [...byID.values()].sort((a, b) => ruSort(a.full_name, b.full_name))
+}
+
+const reportPersonLabel = person => {
+	if (!person) return ''
+	if (!person.id) return person.full_name || ''
+	if (person.archived_at) return `${person.full_name} — в архиве`
+	if (!person.is_active) return `${person.full_name} — на паузе`
+	return person.full_name || ''
+}
+
 const lessonTypeLabel = type => (type === 'group' ? 'Групповое' : 'Индивидуальное')
 const lessonPersonLabel = lesson =>
 	lesson.slot_type === 'group' ? lesson.group_name : lesson.student_name
@@ -243,10 +257,17 @@ const AdminReports = () => {
 	const [loading, setLoading] = useState(false)
 
 	useEffect(() => {
-		Promise.all([scheduleService.getTeachers(), scheduleService.getStudents()])
-			.then(([t, s]) => {
-				setTeachers(t.filter(x => x.is_active))
-				setStudents(s)
+		// Reports are historical data, so the filters deliberately include
+		// paused and archived people as well as active directory entries.
+		Promise.all([
+			scheduleService.getTeachers(),
+			scheduleService.getTeachers({ archived: true }),
+			scheduleService.getStudents(),
+			scheduleService.getStudents({ archived: true }),
+		])
+			.then(([activeAndPausedTeachers, archivedTeachers, activeAndPausedStudents, archivedStudents]) => {
+				setTeachers(mergeReportPeople(activeAndPausedTeachers, archivedTeachers))
+				setStudents(mergeReportPeople(activeAndPausedStudents, archivedStudents))
 			})
 			.catch(() => toast.error('Ошибка загрузки справочников'))
 	}, [])
@@ -400,7 +421,7 @@ const AdminReports = () => {
 						<Autocomplete
 							options={[ALL_OPTION, ...teachers]}
 							value={teacher}
-							getOptionLabel={t => t?.full_name || ''}
+							getOptionLabel={reportPersonLabel}
 							onChange={(_, v) => setTeacher(v || ALL_OPTION)}
 							renderInput={params => <TextField {...params} label='Преподаватель' size='small' />}
 						/>
@@ -408,7 +429,7 @@ const AdminReports = () => {
 						<Autocomplete
 							options={[{ ...ALL_OPTION, full_name: 'Все дети' }, ...students]}
 							value={student}
-							getOptionLabel={s => s?.full_name || ''}
+							getOptionLabel={reportPersonLabel}
 							onChange={(_, v) => setStudent(v || ALL_OPTION)}
 							renderInput={params => <TextField {...params} label='Ребёнок' size='small' />}
 						/>

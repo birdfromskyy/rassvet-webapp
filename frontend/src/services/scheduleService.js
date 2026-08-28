@@ -22,8 +22,8 @@ const scheduleService = {
 	},
 
 	// ========== TEACHERS ==========
-	getTeachers: async () => {
-		const r = await api.get('/admin/teachers')
+	getTeachers: async (filters = {}) => {
+		const r = await api.get('/admin/teachers', { params: filters })
 		return r.data.teachers || []
 	},
 	createTeacher: async data => {
@@ -111,8 +111,8 @@ const scheduleService = {
 	},
 
 	// ========== STUDENTS ==========
-	getStudents: async () => {
-		const r = await api.get('/admin/students')
+	getStudents: async (filters = {}) => {
+		const r = await api.get('/admin/students', { params: filters })
 		return r.data.students || []
 	},
 	createStudent: async data => {
