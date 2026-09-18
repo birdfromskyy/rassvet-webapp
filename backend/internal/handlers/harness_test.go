@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -54,8 +55,14 @@ func TestMain(m *testing.M) {
 	user := getEnv("DB_USER", "postgres")
 	pass := os.Getenv("DB_PASSWORD")
 	name := getEnv("TEST_DB_NAME", "reviews_test")
+	if (host != "localhost" && host != "127.0.0.1" && host != "::1") || !regexp.MustCompile(`^[a-z][a-z0-9_]*_test$`).MatchString(name) {
+		log.Fatal("Handler tests require a loopback host and a safe database name ending in _test")
+	}
 
 	if pass == "" {
+		if os.Getenv("REQUIRE_TEST_DB") == "1" {
+			log.Fatal("Test database is required but DB_PASSWORD is unset")
+		}
 		log.Println("SKIP handler tests: DB_PASSWORD not set (no test Postgres)")
 		os.Exit(0)
 	}
@@ -64,6 +71,9 @@ func TestMain(m *testing.M) {
 	adminDSN := fmt.Sprintf("host=%s user=%s password=%s dbname=postgres port=%s sslmode=disable", host, user, pass, port)
 	admin, err := gorm.Open(postgres.Open(adminDSN), &gorm.Config{})
 	if err != nil {
+		if os.Getenv("REQUIRE_TEST_DB") == "1" {
+			log.Fatal("Required local test database is unavailable")
+		}
 		log.Printf("SKIP handler tests: cannot reach Postgres: %v", err)
 		os.Exit(0)
 	}
@@ -140,6 +150,12 @@ func buildTestRouter(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *gin.En
 
 		adm := protected.Group("/admin")
 		adm.Use(middleware.AdminMiddleware())
+		RegisterMonthlyReportingRoutes(adm, db)
+		student := NewStudentHandler(db)
+		adm.POST("/students", student.CreateStudent)
+		adm.GET("/students/:id", student.GetStudentByID)
+		adm.PUT("/students/:id", student.UpdateStudent)
+		adm.PATCH("/students/:id/deactivate", student.DeactivateStudent)
 		{
 			adm.GET("/users", us.GetUsers)
 			adm.GET("/reports/monthly", report.GetMonthlyReport)

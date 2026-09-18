@@ -10,6 +10,11 @@ const (
 type Student struct {
 	ID                   uint       `json:"id" gorm:"primaryKey"`
 	FullName             string     `json:"full_name" gorm:"type:varchar(255);not null"`
+	LastName             string     `json:"last_name" gorm:"type:varchar(80);not null;default:'';-:migration"`
+	FirstName            string     `json:"first_name" gorm:"type:varchar(80);not null;default:'';-:migration"`
+	MiddleName           string     `json:"middle_name" gorm:"type:varchar(80);not null;default:'';-:migration"`
+	BirthDate            *Date      `json:"birth_date" gorm:"type:date;-:migration"`
+	IdentityRevision     int64      `json:"identity_revision" gorm:"not null;default:1;-:migration"`
 	FundingType          string     `json:"funding_type" gorm:"type:varchar(20);not null;index"`
 	IsActive             bool       `json:"is_active" gorm:"not null;default:true"`
 	ArchivedAt           *time.Time `json:"archived_at,omitempty" gorm:"index"`

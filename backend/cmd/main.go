@@ -71,6 +71,7 @@ func main() {
 	roomHandler := handlers.NewRoomHandler(db)
 	studentHandler := handlers.NewStudentHandler(db)
 	studentServiceValidityHandler := handlers.NewStudentServiceValidityHandler(db)
+	socialServiceHandler := handlers.NewSocialServiceHandler(db)
 	teacherHandler := handlers.NewTeacherHandler(db)
 	assignmentHandler := handlers.NewAssignmentHandler(db)
 	groupLessonHandler := handlers.NewGroupLessonHandler(db)
@@ -282,6 +283,7 @@ func main() {
 			admin.PUT("/rooms/:id/subjects", roomHandler.UpdateRoomSubjects)
 
 			// Students
+			handlers.RegisterMonthlyReportingRoutes(admin, db)
 			admin.GET("/students", studentHandler.GetStudents)
 			admin.GET("/students/:id", studentHandler.GetStudentByID)
 			admin.POST("/students", studentHandler.CreateStudent)
@@ -297,6 +299,18 @@ func main() {
 			admin.GET("/student-service-validities", studentServiceValidityHandler.List)
 			admin.PUT("/students/:id/service-validities", studentServiceValidityHandler.Upsert)
 			admin.DELETE("/students/:id/service-validities/:serviceType", studentServiceValidityHandler.Delete)
+			admin.GET("/students/:id/social-services", socialServiceHandler.GetForStudent)
+			admin.PUT("/students/:id/social-services", socialServiceHandler.SelectForStudent)
+			admin.PUT("/students/:id/social-services/:serviceId", socialServiceHandler.UpdateForStudent)
+			admin.DELETE("/students/:id/social-services/:serviceId", socialServiceHandler.DeleteForStudent)
+
+			// Legal social-service reporting directory. It is intentionally separate
+			// from schedule subjects and commercial lesson tariffs.
+			admin.GET("/social-services", socialServiceHandler.GetAll)
+			admin.POST("/social-services/initial-directory", socialServiceHandler.ImportInitialDirectory)
+			admin.POST("/social-services", socialServiceHandler.Create)
+			admin.PUT("/social-services/:id", socialServiceHandler.Update)
+			admin.DELETE("/social-services/:id", socialServiceHandler.Delete)
 
 			// Teachers
 			admin.GET("/teachers", teacherHandler.GetTeachers)

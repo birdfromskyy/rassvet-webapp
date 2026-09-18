@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/logging"
 	"backend/internal/models"
+	"backend/internal/services/reporting"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,10 +22,14 @@ func NewStudentHandler(db *gorm.DB) *StudentHandler {
 }
 
 type CreateStudentRequest struct {
-	FullName             string `json:"full_name" binding:"required"`
-	FundingType          string `json:"funding_type"`
-	IsActive             *bool  `json:"is_active"`
-	AllowScheduleWindows *bool  `json:"allow_schedule_windows"`
+	FullName             string       `json:"full_name"`
+	LastName             string       `json:"last_name"`
+	FirstName            string       `json:"first_name"`
+	MiddleName           string       `json:"middle_name"`
+	BirthDate            *models.Date `json:"birth_date"`
+	FundingType          string       `json:"funding_type"`
+	IsActive             *bool        `json:"is_active"`
+	AllowScheduleWindows *bool        `json:"allow_schedule_windows"`
 }
 
 type UpdateStudentRequest struct {
@@ -161,6 +166,20 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 	}
 
 	req.FullName = strings.TrimSpace(req.FullName)
+	req.LastName = strings.TrimSpace(req.LastName)
+	req.FirstName = strings.TrimSpace(req.FirstName)
+	req.MiddleName = strings.TrimSpace(req.MiddleName)
+	if req.LastName != "" || req.FirstName != "" || req.MiddleName != "" {
+		if err := reporting.ValidatePerson(req.LastName, req.FirstName, req.MiddleName, req.BirthDate); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		req.FullName = reporting.FullName(req.LastName, req.FirstName, req.MiddleName)
+	}
+	if err := reporting.ValidateBirthDate(req.BirthDate); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	if req.FullName == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Поле «ФИО» обязательно"})
 		return
@@ -184,13 +203,14 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 	}
 
 	student := models.Student{
+		LastName: req.LastName, FirstName: req.FirstName, MiddleName: req.MiddleName, BirthDate: req.BirthDate, IdentityRevision: 1,
 		FullName:             req.FullName,
 		FundingType:          req.FundingType,
 		IsActive:             isActive,
 		AllowScheduleWindows: allowScheduleWindows,
 	}
 
-	if err := h.db.Select("FullName", "FundingType", "IsActive", "AllowScheduleWindows").Create(&student).Error; err != nil {
+	if err := h.db.Select("FullName", "LastName", "FirstName", "MiddleName", "BirthDate", "IdentityRevision", "FundingType", "IsActive", "AllowScheduleWindows").Create(&student).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать ученика"})
 		return
 	}
@@ -258,8 +278,41 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		student.AllowScheduleWindows = *req.AllowScheduleWindows
 	}
 
-	if err := h.db.Save(&student).Error; err != nil {
+	// Legacy clients may still submit full_name. Never overwrite structured
+	// identity with the stale model loaded above. A real name change invalidates
+	// its old split, instead of silently attaching wrong parts to a new name.
+	changes := map[string]interface{}{"updated_at": time.Now()}
+	if req.FullName != "" {
+		changes["full_name"] = req.FullName
+		changes["last_name"] = gorm.Expr("CASE WHEN full_name = ? THEN last_name ELSE '' END", req.FullName)
+		changes["first_name"] = gorm.Expr("CASE WHEN full_name = ? THEN first_name ELSE '' END", req.FullName)
+		changes["middle_name"] = gorm.Expr("CASE WHEN full_name = ? THEN middle_name ELSE '' END", req.FullName)
+		changes["identity_revision"] = gorm.Expr("identity_revision + CASE WHEN full_name = ? THEN 0 ELSE 1 END", req.FullName)
+	}
+	if req.FundingType != "" {
+		changes["funding_type"] = student.FundingType
+	}
+	if req.IsActive != nil {
+		changes["is_active"] = student.IsActive
+	}
+	if req.AllowScheduleWindows != nil {
+		changes["allow_schedule_windows"] = student.AllowScheduleWindows
+	}
+	query := h.db.Model(&models.Student{}).Where("id = ?", id)
+	if req.FullName != "" {
+		query = query.Where("identity_revision = ?", student.IdentityRevision)
+	}
+	result := query.Updates(changes)
+	if err := result.Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить ученика"})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Данные ребёнка уже изменены. Обновите страницу"})
+		return
+	}
+	if err := h.db.First(&student, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось прочитать ученика"})
 		return
 	}
 	logging.AdminMutation(c, "schedule.student.update", before, studentAuditSnapshot(student))
@@ -290,7 +343,7 @@ func (h *StudentHandler) DeactivateStudent(c *gin.Context) {
 
 	student.IsActive = false
 
-	if err := h.db.Save(&student).Error; err != nil {
+	if err := h.db.Model(&student).Update("is_active", false).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}

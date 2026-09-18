@@ -51,6 +51,8 @@ func Migrate(db *gorm.DB) {
 		&models.RoomSubject{},
 		&models.Student{},
 		&models.StudentServiceValidity{},
+		&models.SocialService{},
+		&models.StudentSocialService{},
 		&models.StudentAvailability{},
 		&models.TeacherAvailability{},
 		&models.Assignment{},
@@ -116,4 +118,13 @@ func Migrate(db *gorm.DB) {
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_key ON site_settings(key)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_cms_file_groups_section_title ON cms_file_groups(section, title)")
+	if err := CorrectInitialSocialServiceCategories(db); err != nil {
+		log.Println("Social service category correction error:", err)
+	}
+	if err := CorrectSocialServicePeriodicities(db); err != nil {
+		log.Println("Social service periodicity correction error:", err)
+	}
+	if err := MigrateReporting(db); err != nil {
+		log.Fatal("Failed to migrate monthly reporting:", err)
+	}
 }
