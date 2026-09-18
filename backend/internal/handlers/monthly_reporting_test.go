@@ -38,6 +38,38 @@ func requireConflict(t *testing.T, err error) {
 	require.Equal(t, 409, e.Status)
 }
 
+func TestReplaceDraftFromPreviousMonth(t *testing.T) {
+	e := newTestEnv(t)
+	st, dir, s := reportingFixture(t, e.db)
+	zero := 0
+	_, err := s.Create(st.ID, "2026-12-01", monthInput(dir.ID, &zero), nil)
+	require.NoError(t, err)
+	target, err := s.Create(st.ID, "2027-01-01", monthInput(dir.ID, &zero), nil)
+	require.NoError(t, err)
+	require.NoError(t, e.db.Model(&dir).Updates(map[string]interface{}{"is_active": false, "name": "Новое имя", "tariff_kopecks": 1}).Error)
+	copied, err := s.CopyPreviousIntoDraft(st.ID, "2027-01-01", target.Revision, nil)
+	require.NoError(t, err)
+	require.Equal(t, target.Revision+1, copied.Revision)
+	require.Equal(t, target.Snapshot, copied.Snapshot)
+	require.Nil(t, copied.Items[0].ActualMonthlyCount)
+	require.Equal(t, int64(35571), copied.Items[0].TariffKopecks)
+	require.Equal(t, "Синтетическая услуга", copied.Items[0].Name)
+	_, err = s.CopyPreviousIntoDraft(st.ID, "2027-01-01", target.Revision, nil)
+	requireConflict(t, err)
+	var old models.StudentServiceMonthRevision
+	require.NoError(t, e.db.Where("month_id = ? AND revision = 1", target.ID).First(&old).Error)
+	require.Equal(t, &zero, old.Data.Items[0].ActualMonthlyCount)
+	_, err = s.CopyPreviousIntoDraft(st.ID, "2026-12-01", 1, nil)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	unchanged, err := s.Get(st.ID, "2026-12-01")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), unchanged.Revision)
+	_, err = s.Transition(st.ID, "2026-12-01", 1, true, nil)
+	require.NoError(t, err)
+	_, err = s.CopyPreviousIntoDraft(st.ID, "2026-12-01", 2, nil)
+	requireConflict(t, err)
+}
+
 func TestServiceMonthsIsolationSnapshotsAndCopy(t *testing.T) {
 	e := newTestEnv(t)
 	st, dir, s := reportingFixture(t, e.db)

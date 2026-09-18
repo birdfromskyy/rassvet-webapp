@@ -35,6 +35,7 @@ func RegisterMonthlyReportingRoutes(admin *gin.RouterGroup, db *gorm.DB) {
 	admin.PUT("/students/:id/service-months/:month", h.updateMonth)
 	admin.POST("/students/:id/service-months/:month/finalize", h.finalize)
 	admin.POST("/students/:id/service-months/:month/reopen", h.reopen)
+	admin.POST("/students/:id/service-months/:month/copy-previous", h.copyPrevious)
 	admin.GET("/students/:id/service-months/:month/revisions", h.revisions)
 }
 
@@ -312,7 +313,21 @@ func (h monthlyReportingHandler) updateMonth(c *gin.Context) {
 	replyMonth(c, m, err)
 }
 func (h monthlyReportingHandler) finalize(c *gin.Context) { h.transition(c, true) }
-func (h monthlyReportingHandler) reopen(c *gin.Context)   { h.transition(c, false) }
+func (h monthlyReportingHandler) copyPrevious(c *gin.Context) {
+	id, ok := reportingID(c, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Revision int64 `json:"revision"`
+	}
+	if !reportingBody(c, &in) {
+		return
+	}
+	m, err := h.service.CopyPreviousIntoDraft(id, models.Date(c.Param("month")), in.Revision, reportingActor(c))
+	replyMonth(c, m, err)
+}
+func (h monthlyReportingHandler) reopen(c *gin.Context) { h.transition(c, false) }
 func (h monthlyReportingHandler) transition(c *gin.Context, finalize bool) {
 	id, ok := reportingID(c, "id")
 	if !ok {
