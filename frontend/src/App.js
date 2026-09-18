@@ -46,6 +46,7 @@ import AdminSchedule from "./pages/AdminSchedule";
 import AdminGroupLessons from "./pages/AdminGroupLessons";
 import AdminUsers from "./pages/AdminUsers";
 import AdminReports from "./pages/AdminReports";
+import AdminMonthlySocialServices from "./pages/AdminMonthlySocialServices";
 import AdminCmsFiles from "./pages/AdminCmsFiles";
 import AdminHistory from "./pages/AdminHistory";
 import AdminFinZones from "./pages/AdminFinZones";
@@ -248,6 +249,7 @@ function App() {
             <Route path="/admin/schedule/tariffs" element={<AdminCommercialTariffs />} />
             <Route path="/admin/schedule/weekly" element={<AdminSchedule />} />
             <Route path="/admin/schedule/reports" element={<AdminReports />} />
+            <Route path="/admin/schedule/social-service-reports" element={<AdminMonthlySocialServices />} />
             <Route path="/admin/users" element={<AdminUsers />} />
 
             {/* Documents review */}

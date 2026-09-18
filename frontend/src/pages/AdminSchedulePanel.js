@@ -11,6 +11,7 @@ import {
 	Payments as TariffsIcon,
 	ArrowBack as BackIcon,
 	Assessment as ReportsIcon,
+	Description as SocialServicesIcon,
 	FactCheck as ValidityIcon,
 } from '@mui/icons-material'
 
@@ -77,6 +78,12 @@ const MODULES = [
 		description: 'Занятия по детям и преподавателям за выбранный период.',
 		icon: ReportsIcon,
 		path: '/admin/schedule/reports',
+	},
+	{
+		title: 'Отчёты по социальным услугам',
+		description: 'Услуги ребёнка и акты оказанных социальных услуг.',
+		icon: SocialServicesIcon,
+		path: '/admin/schedule/social-service-reports',
 	},
 ]
 

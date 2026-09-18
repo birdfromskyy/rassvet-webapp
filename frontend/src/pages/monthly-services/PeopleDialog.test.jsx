@@ -1,0 +1,45 @@
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import PeopleDialog from './PeopleDialog';
+import reporting from '../../services/monthlyReportingService';
+jest.mock('../../services/monthlyReportingService', () => ({ __esModule: true, default: { identity: jest.fn(), saveRepresentative: jest.fn(), saveLink: jest.fn() } }));
+const student = { id: 1, full_name: 'Старое имя', last_name: '', first_name: '', middle_name: '', birth_date: null, identity_revision: 4 };
+const props = { student, representatives: [], links: [], onSaved: jest.fn(), onClose: jest.fn() };
+beforeEach(() => jest.resetAllMocks());
+test('structured identity uses its revision and does not invent legacy name parts', async () => {
+  reporting.identity.mockResolvedValue({ ...student, last_name: 'Тестов', first_name: 'Иван', birth_date: '2016-02-29', identity_revision: 5 });
+  render(<PeopleDialog {...props} />);
+  expect(screen.getByLabelText(/Фамилия/).value).toBe('');
+  fireEvent.change(screen.getByLabelText(/Фамилия/), { target: { value: 'Тестов' } });
+  fireEvent.change(screen.getByLabelText(/^Имя/), { target: { value: 'Иван' } });
+  fireEvent.change(screen.getByLabelText('Дата рождения'), { target: { value: '2016-02-29' } });
+  fireEvent.click(screen.getByText('Сохранить ребёнка'));
+  await waitFor(() => expect(reporting.identity).toHaveBeenCalledWith(1, { revision: 4, last_name: 'Тестов', first_name: 'Иван', middle_name: '', birth_date: '2016-02-29' }));
+  expect(screen.queryByLabelText(/паспорт/i)).not.toBeInTheDocument();
+});
+test('failed identity save preserves user input', async () => {
+  reporting.identity.mockRejectedValue({ response: { status: 409 } });
+  render(<PeopleDialog {...props} />);
+  fireEvent.change(screen.getByLabelText(/Фамилия/), { target: { value: 'Не потерять' } });
+  fireEvent.click(screen.getByText('Сохранить ребёнка'));
+  await screen.findByText('Загрузить актуальные карточки');
+  expect(screen.getByLabelText(/Фамилия/).value).toBe('Не потерять');
+});
+test('a successfully created representative is reused when saving its link fails', async () => {
+  const rep = { id: 8, last_name: 'Тестова', first_name: 'Анна', middle_name: '', birth_date: null, revision: 1, is_active: true };
+  reporting.saveRepresentative.mockResolvedValueOnce(rep).mockResolvedValueOnce({ ...rep, revision: 2 });
+  reporting.saveLink.mockRejectedValueOnce(new Error('Нет связи')).mockResolvedValueOnce({ id: 3, legal_representative_id: 8, relationship: 'Мать', revision: 1 });
+  render(<PeopleDialog {...props} />);
+  fireEvent.click(screen.getByText('Новый представитель'));
+  fireEvent.change(screen.getAllByLabelText(/Фамилия/)[1], { target: { value: 'Тестова' } });
+  fireEvent.change(screen.getAllByLabelText(/^Имя/)[1], { target: { value: 'Анна' } });
+  fireEvent.change(screen.getByLabelText(/Кем приходится/), { target: { value: 'Мать' } });
+  fireEvent.click(screen.getByText('Сохранить представителя и связь'));
+  await screen.findByText('Нет связи');
+  fireEvent.click(screen.getByText('Сохранить представителя и связь'));
+  await screen.findByText('Сохранено');
+  expect(reporting.saveRepresentative.mock.calls[0][0]).toBeUndefined();
+  expect(reporting.saveRepresentative.mock.calls[1][0]).toBe(8);
+  expect(reporting.saveRepresentative.mock.calls[1][1].revision).toBe(1);
+  expect(reporting.saveLink).toHaveBeenLastCalledWith(1, 8, { revision: 0, relationship: 'Мать', valid_from: null, valid_until: null });
+});
