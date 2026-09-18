@@ -151,6 +151,7 @@ func buildTestRouter(db *gorm.DB, rdb *redis.Client, cfg *config.Config) *gin.En
 		adm := protected.Group("/admin")
 		adm.Use(middleware.AdminMiddleware())
 		RegisterMonthlyReportingRoutes(adm, db)
+		RegisterStaffDatesRoutes(adm, db)
 		student := NewStudentHandler(db)
 		adm.POST("/students", student.CreateStudent)
 		adm.GET("/students/:id", student.GetStudentByID)

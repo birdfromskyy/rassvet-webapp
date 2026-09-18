@@ -284,6 +284,7 @@ func main() {
 
 			// Students
 			handlers.RegisterMonthlyReportingRoutes(admin, db)
+			handlers.RegisterStaffDatesRoutes(admin, db)
 			admin.GET("/students", studentHandler.GetStudents)
 			admin.GET("/students/:id", studentHandler.GetStudentByID)
 			admin.POST("/students", studentHandler.CreateStudent)
@@ -492,6 +493,7 @@ func main() {
 
 	// Background context — cancelled on graceful shutdown to stop background workers.
 	bgCtx, bgCancel := context.WithCancel(context.Background())
+	go services.NewStaffEventService(db, vkNotificationService).Run(bgCtx)
 
 	// Background goroutine: checks expiring and expired validity dates once a day.
 	// The data is informational only: it is never read by schedule generation or

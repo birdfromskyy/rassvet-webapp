@@ -86,6 +86,9 @@ func Migrate(db *gorm.DB) {
 		// In-app notifications
 		&models.Notification{},
 		&models.VKNotificationRecipient{},
+		&models.StaffDates{},
+		&models.StaffReminderPreference{},
+		&models.StaffReminderDelivery{},
 
 		// Consultation requests (from public form)
 		&models.ConsultationRequest{},
