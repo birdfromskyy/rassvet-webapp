@@ -13,9 +13,12 @@ frontend/.env.production.local
 CLAUDE.md
 AGENTS.md
 /temp/
+/docs/
 deploy
 Skills
 prod_backups
+/infrastructure/ansible/inventory/production.yml
+/infrastructure/ansible/group_vars/vault.yml
 
 # Скрипты с кредами
 directus-init.sh

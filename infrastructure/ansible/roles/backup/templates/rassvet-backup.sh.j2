@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+readonly config_file="/etc/rassvet-backup/restic.env"
+readonly lock_file="/run/rassvet-backup/backup.lock"
+readonly state_dir="/var/lib/rassvet-backup"
+
+if [[ ! -r "$config_file" ]]; then
+  echo "Backup configuration is not readable: $config_file" >&2
+  exit 78
+fi
+
+# shellcheck disable=SC1090
+source "$config_file"
+export RESTIC_REPOSITORY RESTIC_PASSWORD_FILE RESTIC_CACHE_DIR
+
+install -d -m 0700 "$(dirname "$lock_file")" "$state_dir" "$RESTIC_CACHE_DIR"
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  echo "Another Rassvet backup operation is already running" >&2
+  exit 75
+fi
+
+log() {
+  printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
+}
+
+restic_cmd() {
+  /usr/local/bin/restic "$@"
+}
+
+backup_database() {
+  log "Creating encrypted PostgreSQL snapshot"
+  docker inspect postgres >/dev/null
+  docker exec postgres sh -lc \
+    'exec pg_dump --format=custom --compress=6 --username="$POSTGRES_USER" "$POSTGRES_DB"' \
+    | restic_cmd backup \
+        --stdin \
+        --stdin-filename /database/reviews_db.dump \
+        --host rassvet-production \
+        --tag production \
+        --tag database
+}
+
+backup_files() {
+  local -a sources=(
+    /opt/rassvet
+    /var/lib/docker/volumes/rassvet_uploads_data/_data
+    /var/lib/docker/volumes/rassvet_private_uploads_data/_data
+    /etc/nginx
+    /etc/fail2ban
+    /etc/ufw
+    /etc/ssh
+    /etc/docker
+    /etc/letsencrypt
+    /etc/logrotate.d
+    /etc/rassvet-backup/restic.env
+    /etc/systemd/system/rassvet.service
+    /etc/systemd/system/rassvet-backup.service
+    /etc/systemd/system/rassvet-backup.timer
+    /etc/systemd/system/rassvet-restic-maintenance.service
+    /etc/systemd/system/rassvet-restic-maintenance.timer
+    /usr/local/sbin/rassvet-backup
+    /var/spool/cron/crontabs/root
+  )
+
+  local source
+  for source in "${sources[@]}"; do
+    if [[ ! -e "$source" ]]; then
+      echo "Required backup source does not exist: $source" >&2
+      exit 66
+    fi
+  done
+
+  log "Creating encrypted application and uploads snapshot"
+  restic_cmd backup \
+    --host rassvet-production \
+    --tag production \
+    --tag files \
+    --exclude /opt/rassvet/backups \
+    --exclude /opt/rassvet/logs \
+    --exclude /opt/rassvet/frontend/node_modules \
+    --exclude /opt/rassvet/backend/tmp \
+    --exclude-caches \
+    "${sources[@]}"
+}
+
+apply_retention() {
+  log "Applying snapshot retention"
+  restic_cmd forget \
+    --host rassvet-production \
+    --tag production \
+    --group-by host,tags \
+    --keep-daily 7 \
+    --keep-weekly 4 \
+    --keep-monthly 6
+}
+
+run_backup() {
+  backup_database
+  backup_files
+  apply_retention
+  date --iso-8601=seconds >"$state_dir/last-success"
+  log "Backup completed successfully"
+}
+
+run_maintenance() {
+  log "Pruning unreferenced backup data"
+  restic_cmd prune
+  log "Checking a rotating 25 percent repository data subset"
+  restic_cmd check --read-data-subset=25%
+  date --iso-8601=seconds >"$state_dir/last-maintenance-success"
+  log "Repository maintenance completed successfully"
+}
+
+case "${1:-backup}" in
+  backup)
+    run_backup
+    ;;
+  maintenance)
+    run_maintenance
+    ;;
+  check-full)
+    restic_cmd check --read-data
+    ;;
+  snapshots)
+    restic_cmd snapshots --host rassvet-production --tag production
+    ;;
+  *)
+    echo "Usage: $0 {backup|maintenance|check-full|snapshots}" >&2
+    exit 64
+    ;;
+esac

@@ -1,0 +1,19 @@
+[Unit]
+Description=Rassvet production health checks
+After=docker.service nginx.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/rassvet-monitor
+ExecStart=/usr/local/sbin/rassvet-monitor
+RuntimeDirectory=rassvet-monitor
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+User=root
+Group=root
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/rassvet-monitor

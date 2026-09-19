@@ -1,0 +1,11 @@
+[Unit]
+Description=Run weekly Rassvet restic maintenance
+
+[Timer]
+OnCalendar={{ restic_maintenance_calendar }}
+AccuracySec=5min
+Persistent=true
+Unit=rassvet-restic-maintenance.service
+
+[Install]
+WantedBy=timers.target

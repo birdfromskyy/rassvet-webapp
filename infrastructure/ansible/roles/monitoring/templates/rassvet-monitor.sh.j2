@@ -1,0 +1,66 @@
+#!/bin/sh
+set -u
+
+issues=""
+add_issue() {
+    if [ -n "$issues" ]; then
+        issues="$issues,$1"
+    else
+        issues="$1"
+    fi
+}
+
+root_used=$(df -P / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')
+[ "${root_used:-100}" -lt {{ monitor_disk_warning_percent }} ] || add_issue "disk_root_${root_used:-unknown}pct"
+
+inode_used=$(df -Pi / | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')
+[ "${inode_used:-100}" -lt {{ monitor_inode_warning_percent }} ] || add_issue "inode_root_${inode_used:-unknown}pct"
+
+memory_available_percent=$(awk '/MemTotal:/ {total=$2} /MemAvailable:/ {available=$2} END {if (total > 0) printf "%d", available * 100 / total; else print 0}' /proc/meminfo)
+[ "${memory_available_percent:-0}" -ge {{ monitor_memory_available_min_percent }} ] || add_issue "memory_available_${memory_available_percent:-unknown}pct"
+
+failed_units=$(systemctl --failed --no-legend --plain | awk 'NF {count++} END {print count+0}')
+[ "$failed_units" -eq 0 ] || add_issue "failed_units_$failed_units"
+
+{% for container in monitor_expected_containers %}
+container_state=$(docker inspect --format '{% raw %}{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}{% endraw %}' {{ container | quote }} 2>/dev/null || true)
+[ "$container_state" = "running|healthy" ] || add_issue "container_{{ container }}_${container_state:-missing}"
+{% endfor %}
+
+curl --fail --silent --show-error --max-time 10 https://{{ rassvet_domain }}/api/health >/dev/null 2>&1 || add_issue "api_health"
+
+certificate_seconds=$(({{ monitor_certificate_warning_days }} * 86400))
+openssl x509 -checkend "$certificate_seconds" -noout -in /etc/letsencrypt/live/{{ rassvet_domain }}/fullchain.pem >/dev/null 2>&1 || add_issue "certificate_lt_{{ monitor_certificate_warning_days }}d"
+
+backup_result=$(systemctl show rassvet-backup.service -p Result --value 2>/dev/null || true)
+backup_finished=$(systemctl show rassvet-backup.service -p InactiveExitTimestamp --value 2>/dev/null || true)
+backup_epoch=$(date -d "$backup_finished" +%s 2>/dev/null || echo 0)
+now_epoch=$(date +%s)
+backup_age_hours=$(( (now_epoch - backup_epoch) / 3600 ))
+if [ "$backup_result" != "success" ] || [ "$backup_epoch" -le 0 ] || [ "$backup_age_hours" -gt {{ monitor_backup_max_age_hours }} ]; then
+    add_issue "backup_${backup_result:-unknown}_${backup_age_hours}h"
+fi
+
+oom_events=$(journalctl -k --since "10 minutes ago" --no-pager -q 2>/dev/null | grep -Eic 'out of memory|oom-kill|killed process' || true)
+[ "$oom_events" -eq 0 ] || add_issue "oom_$oom_events"
+
+status_file=/run/rassvet-monitor/status
+status_tmp=/run/rassvet-monitor/status.tmp
+checked_at=$(date --iso-8601=seconds)
+if [ -z "$issues" ]; then
+    printf 'status=ok checked_at=%s disk=%s%% inodes=%s%% memory_available=%s%% backup_age=%sh\n' \
+        "$checked_at" "$root_used" "$inode_used" "$memory_available_percent" "$backup_age_hours" >"$status_tmp"
+    mv "$status_tmp" "$status_file"
+    logger -t rassvet-monitor "status=ok disk=${root_used}% inodes=${inode_used}% memory_available=${memory_available_percent}% backup_age=${backup_age_hours}h"
+    if [ -n "${RASSVET_MONITOR_HEARTBEAT_URL:-}" ]; then
+        curl --fail --silent --show-error --max-time 10 "$RASSVET_MONITOR_HEARTBEAT_URL" >/dev/null 2>&1 || \
+            logger -p daemon.warning -t rassvet-monitor "status=warning issue=heartbeat_delivery_failed"
+    fi
+else
+    printf 'status=unhealthy checked_at=%s issues=%s\n' "$checked_at" "$issues" >"$status_tmp"
+    mv "$status_tmp" "$status_file"
+    logger -p daemon.err -t rassvet-monitor "status=unhealthy issues=$issues"
+fi
+
+chmod 0644 "$status_file"
+exit 0

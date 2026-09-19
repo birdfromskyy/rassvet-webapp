@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Rassvet encrypted backup every day at 02:00 Asia/Yekaterinburg
+
+[Timer]
+OnCalendar={{ restic_backup_calendar }}
+AccuracySec=1min
+Persistent=true
+Unit=rassvet-backup.service
+
+[Install]
+WantedBy=timers.target

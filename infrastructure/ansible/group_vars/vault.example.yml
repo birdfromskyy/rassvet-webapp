@@ -1,0 +1,10 @@
+---
+# Скопировать в group_vars/vault.yml, задать пароль и зашифровать ansible-vault.
+vault_restic_password: "REPLACE_WITH_EXISTING_RESTIC_PASSWORD"
+# SHA-512 crypt hash пароля sudo/консоли, не открытый пароль.
+# Получить локально: openssl passwd -6
+vault_admin_password_hash: "REPLACE_WITH_SHA512_CRYPT_HASH"
+
+# Optional external dead-man/heartbeat URL. Leave empty until an external
+# monitor has been created and a test alert has been received.
+vault_monitor_heartbeat_url: ""

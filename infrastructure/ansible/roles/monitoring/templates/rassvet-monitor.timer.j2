@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Rassvet production health checks every five minutes
+
+[Timer]
+OnCalendar={{ monitor_calendar }}
+Persistent=true
+RandomizedDelaySec=20
+Unit=rassvet-monitor.service
+
+[Install]
+WantedBy=timers.target

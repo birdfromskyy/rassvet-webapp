@@ -1,0 +1,23 @@
+[DEFAULT]
+bantime = {{ fail2ban_bantime }}
+bantime.increment = {{ fail2ban_bantime_increment | lower }}
+bantime.factor = {{ fail2ban_bantime_factor }}
+bantime.maxtime = {{ fail2ban_bantime_maxtime }}
+findtime = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+backend = systemd
+banaction = nftables
+
+[sshd]
+enabled = true
+port = ssh
+
+[rassvet-nginx-scanners]
+enabled = true
+port = http,https
+filter = rassvet-nginx-scanners
+logpath = /var/log/nginx/access.log
+backend = auto
+maxretry = 4
+findtime = 600
+bantime = 3600
