@@ -51,7 +51,11 @@ func TestReplaceDraftFromPreviousMonth(t *testing.T) {
 	copied, err := s.CopyPreviousIntoDraft(st.ID, "2027-01-01", target.Revision, nil)
 	require.NoError(t, err)
 	require.Equal(t, target.Revision+1, copied.Revision)
-	require.Equal(t, target.Snapshot, copied.Snapshot)
+	expectedSnapshot := target.Snapshot
+	actualSnapshot := copied.Snapshot
+	expectedSnapshot.Contract.UpdatedAt = expectedSnapshot.Contract.UpdatedAt.UTC()
+	actualSnapshot.Contract.UpdatedAt = actualSnapshot.Contract.UpdatedAt.UTC()
+	require.Equal(t, expectedSnapshot, actualSnapshot)
 	require.Nil(t, copied.Items[0].ActualMonthlyCount)
 	require.Equal(t, int64(35571), copied.Items[0].TariffKopecks)
 	require.Equal(t, "Синтетическая услуга", copied.Items[0].Name)
