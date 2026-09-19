@@ -4,73 +4,780 @@ import (
 	"backend/internal/config"
 	"backend/internal/database"
 	"backend/internal/handlers"
+	"backend/internal/logging"
 	"backend/internal/middleware"
+	"backend/internal/models"
+	"backend/internal/services"
+	"context"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func main() {
-	// Load config
+	// Tee logs to stdout + a rotating file so history survives redeploys
+	// (mount ./logs on a volume to persist). Must run before configuring Gin's logger.
+	logging.Setup("./logs")
+
 	cfg := config.Load()
 
-	// Initialize database
 	db, err := database.Initialize(cfg)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	// Auto migrate
+	rdb, err := database.InitializeRedis(cfg)
+	if err != nil {
+		log.Fatal("Failed to connect to redis:", err)
+	}
+
 	database.Migrate(db)
 
-	// Setup Gin
-	r := gin.Default()
+	r := gin.New()
+	r.Use(
+		logging.AccessLog(),
+		// Public endpoints remain public, but a valid session is attached when
+		// present so access logs identify the signed-in caller consistently.
+		middleware.OptionalAuthMiddleware(cfg.JWTSecret, rdb),
+		gin.Recovery(),
+	)
 
-	// CORS configuration
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowOrigins:     []string{cfg.FrontendURL},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
+	r.Use(middleware.SecurityHeaders())
+
+	// Serve uploaded files
+	r.Static("/uploads", "./uploads")
 
 	// Initialize handlers
-	authHandler := handlers.NewAuthHandler(db, cfg)
+	authHandler := handlers.NewAuthHandler(db, rdb, cfg)
 	reviewHandler := handlers.NewReviewHandler(db)
 	adminHandler := handlers.NewAdminHandler(db)
 
-	// Public routes
-	r.POST("/api/register", authHandler.Register)
-	r.POST("/api/login", authHandler.Login)
-	r.POST("/api/verify-email", authHandler.VerifyEmail)
-	r.POST("/api/resend-code", authHandler.ResendCode)
+	subjectHandler := handlers.NewSubjectHandler(db)
+	roomHandler := handlers.NewRoomHandler(db)
+	studentHandler := handlers.NewStudentHandler(db)
+	studentServiceValidityHandler := handlers.NewStudentServiceValidityHandler(db)
+	socialServiceHandler := handlers.NewSocialServiceHandler(db)
+	teacherHandler := handlers.NewTeacherHandler(db)
+	assignmentHandler := handlers.NewAssignmentHandler(db)
+	groupLessonHandler := handlers.NewGroupLessonHandler(db)
+	reportHandler := handlers.NewReportHandler(db)
 
-	// Protected routes
+	scheduleGenerator := services.NewScheduleGenerator(db)
+	userStudentHandler := handlers.NewUserStudentHandler(db, rdb)
+
+	// Document submissions handler
+	documentHandler := handlers.NewDocumentHandler(db)
+
+	// Notification handler
+	notificationHandler := handlers.NewNotificationHandler(db)
+	vkNotificationService := services.NewVKNotificationService(db, cfg.VKCommunityToken, cfg.VKAPIVersion, cfg.FrontendURL)
+	vkTeacherScheduleService, err := services.NewVKTeacherScheduleService(db, vkNotificationService)
+	if err != nil {
+		log.Fatal("Failed to initialize VK teacher schedule service:", err)
+	}
+	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator, vkTeacherScheduleService)
+	handlers.ConfigureAdminNotificationSender(vkNotificationService)
+	vkNotificationRecipientHandler := handlers.NewVKNotificationRecipientHandler(db, vkNotificationService, vkTeacherScheduleService)
+
+	// New feature handlers
+	consultationHandler := handlers.NewConsultationHandler(db)
+	achievementHandler := handlers.NewAchievementHandler(db)
+	awardHandler := handlers.NewAwardHandler(db)
+	questionnaireHandler := handlers.NewQuestionnaireHandler(db, rdb)
+
+	// Shorts (video) handler
+	shortHandler := handlers.NewShortHandler(db)
+
+	// Vacancies handler
+	vacancyHandler := handlers.NewVacancyHandler(db)
+
+	// Support (tech support tickets)
+	supportHandler := handlers.NewSupportHandler(db)
+
+	// Client-side error reporting (log-only, no DB)
+	clientErrorHandler := handlers.NewClientErrorHandler()
+
+	// CMS handlers
+	cmsFileHandler := handlers.NewCmsFileHandler(db)
+	cmsFileGroupHandler := handlers.NewCmsFileGroupHandler(db)
+	historyHandler := handlers.NewHistoryHandler(db)
+	articleHandler := handlers.NewArticleHandler(db)
+	serviceCmsHandler := handlers.NewServiceCmsHandler(db)
+	commercialTariffHandler := handlers.NewCommercialTariffHandler(db)
+	reportTariffRuleHandler := handlers.NewReportTariffRuleHandler(db)
+	finZoneHandler := handlers.NewFinZoneHandler(db)
+	siteSettingHandler := handlers.NewSiteSettingHandler(db)
+
+	// Health check
+	r.GET("/api/health", func(c *gin.Context) {
+		sqlDB, err := db.DB()
+		if err != nil || sqlDB.Ping() != nil {
+			c.JSON(503, gin.H{"status": "unhealthy", "db": "down"})
+			return
+		}
+		if err := rdb.Ping(c.Request.Context()).Err(); err != nil {
+			c.JSON(503, gin.H{"status": "unhealthy", "redis": "down"})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
+	// Public auth routes (rate limited per IP)
+	r.POST("/api/register", middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.Register)
+	r.POST("/api/login", middleware.IPRateLimit(rdb, 15, 5*time.Minute), authHandler.Login)
+	r.POST("/api/verify-email", middleware.IPRateLimit(rdb, 10, 5*time.Minute), authHandler.VerifyEmail)
+	r.POST("/api/resend-code", middleware.IPRateLimit(rdb, 5, 5*time.Minute), authHandler.ResendCode)
+	r.POST("/api/forgot-password", middleware.IPRateLimit(rdb, 5, 15*time.Minute), authHandler.ForgotPassword)
+	r.POST("/api/reset-password", middleware.IPRateLimit(rdb, 10, 15*time.Minute), authHandler.ResetPassword)
+	r.POST("/api/refresh", middleware.IPRateLimit(rdb, 30, 5*time.Minute), authHandler.Refresh)
+
+	// Consultation request — public (rate limited: 3 per hour per IP for guests).
+	// OptionalAuthMiddleware attaches user_id when the caller happens to be logged in,
+	// even though the frontend should normally use /consultations/auth in that case.
+	r.POST("/api/consultations", middleware.IPRateLimit(rdb, 3, 60*time.Minute), middleware.OptionalAuthMiddleware(cfg.JWTSecret, rdb), consultationHandler.Create)
+
+	// Client-side JS error reports — public, rate limited (logged only, no DB write)
+	r.POST("/api/client-error", middleware.IPRateLimit(rdb, 20, 10*time.Minute), clientErrorHandler.Report)
+
+	// Public CMS: achievements, awards, vacancies
+	r.GET("/api/achievements", achievementHandler.GetPublic)
+	r.GET("/api/achievements/:id", achievementHandler.GetPublicByID)
+	r.GET("/api/awards", awardHandler.GetPublic)
+	r.GET("/api/shorts", shortHandler.GetPublic)
+	r.GET("/api/vacancies", vacancyHandler.GetPublic)
+
+	// Public CMS routes (no auth required)
+	r.GET("/api/employees", teacherHandler.GetPublicTeachers)
+	r.GET("/api/cms-files", cmsFileHandler.GetBySection)
+	r.GET("/api/cms-file-groups", cmsFileGroupHandler.GetPublicBySection)
+	r.GET("/api/history", historyHandler.GetEvents)
+	r.GET("/api/articles", articleHandler.GetArticles)
+	r.GET("/api/articles/categories", articleHandler.GetCategories)
+	r.GET("/api/articles/:slug", articleHandler.GetArticleBySlug)
+	r.GET("/api/services", serviceCmsHandler.GetServices)
+	r.GET("/api/commercial-tariffs", commercialTariffHandler.GetCommercialTariffs)
+	r.GET("/api/fin-zones", finZoneHandler.GetFinZones)
+	r.GET("/api/site-settings", siteSettingHandler.GetAll)
+	r.GET("/api/site-settings/:key", siteSettingHandler.GetByKey)
+	r.GET("/api/reviews", reviewHandler.GetPublishedReviews)
+
+	// Protected API routes
 	protected := r.Group("/api")
-	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret, rdb))
 	{
+		protected.PUT("/profile", authHandler.UpdateProfile)
+		protected.DELETE("/me", authHandler.DeleteMyAccount)
 		protected.POST("/logout", authHandler.Logout)
 		protected.GET("/me", authHandler.GetMe)
 
-		// Review routes
-		protected.GET("/reviews", reviewHandler.GetPublishedReviews)
 		protected.POST("/reviews", reviewHandler.CreateReview)
 		protected.GET("/my-reviews", reviewHandler.GetMyReviews)
+		protected.GET("/reviews/check", reviewHandler.CheckUserReview)
+		protected.PUT("/reviews/my", reviewHandler.UpdateMyReview)
 
-		// Admin routes
 		admin := protected.Group("/admin")
 		admin.Use(middleware.AdminMiddleware())
 		{
+			// Reviews
 			admin.GET("/reviews", adminHandler.GetAllReviews)
 			admin.GET("/reviews/pending", adminHandler.GetPendingReviews)
 			admin.PUT("/reviews/:id", adminHandler.UpdateReview)
 			admin.DELETE("/reviews/:id", adminHandler.DeleteReview)
 			admin.PUT("/reviews/:id/approve", adminHandler.ApproveReview)
 			admin.PUT("/reviews/:id/reject", adminHandler.RejectReview)
+			admin.POST("/reviews/external", reviewHandler.AdminCreateReview)
+
+			// File upload
+			admin.POST("/upload", handlers.UploadFile)
+
+			// VK copies of administrator-wide notifications. The community token
+			// stays server-side and this API exposes no arbitrary VK method/text.
+			admin.GET("/vk-notification-recipients", vkNotificationRecipientHandler.GetAll)
+			admin.POST("/vk-notification-recipients", vkNotificationRecipientHandler.Create)
+			admin.PUT("/vk-notification-recipients/:id", vkNotificationRecipientHandler.Update)
+			admin.DELETE("/vk-notification-recipients/:id", vkNotificationRecipientHandler.Delete)
+			admin.POST("/vk-notification-recipients/:id/test", vkNotificationRecipientHandler.SendTest)
+			admin.POST("/vk-notification-recipients/:id/test-schedule", vkNotificationRecipientHandler.SendScheduleTest)
+
+			// CMS — Employees managed via /admin/teachers (CMS fields added to Teacher model)
+
+			// CMS — Files (docs, rules, rating)
+			admin.GET("/cms-files", cmsFileHandler.GetAllBySection)
+			admin.POST("/cms-files", cmsFileHandler.CreateFile)
+			admin.PUT("/cms-files/:id", cmsFileHandler.UpdateFile)
+			admin.DELETE("/cms-files/:id", cmsFileHandler.DeleteFile)
+			admin.GET("/cms-file-groups", cmsFileGroupHandler.GetAllBySection)
+			admin.POST("/cms-file-groups", cmsFileGroupHandler.Create)
+			admin.PUT("/cms-file-groups/:id", cmsFileGroupHandler.Update)
+			admin.DELETE("/cms-file-groups/:id", cmsFileGroupHandler.Delete)
+
+			// CMS — History
+			admin.GET("/history", historyHandler.GetEvents)
+			admin.POST("/history", historyHandler.CreateEvent)
+			admin.PUT("/history/:id", historyHandler.UpdateEvent)
+			admin.DELETE("/history/:id", historyHandler.DeleteEvent)
+
+			// CMS — Articles (news)
+			admin.GET("/articles", articleHandler.GetAllArticles)
+			admin.GET("/articles/:id", articleHandler.GetArticleByID)
+			admin.POST("/articles", articleHandler.CreateArticle)
+			admin.PUT("/articles/:id", articleHandler.UpdateArticle)
+			admin.PUT("/articles/:id/publication", articleHandler.SetPublicationStatus)
+			admin.DELETE("/articles/:id", articleHandler.DeleteArticle)
+
+			// CMS — Services (/about_services)
+			admin.GET("/services", serviceCmsHandler.GetAllServices)
+			admin.POST("/services", serviceCmsHandler.CreateService)
+			admin.PUT("/services/:id", serviceCmsHandler.UpdateService)
+			admin.DELETE("/services/:id", serviceCmsHandler.DeleteService)
+
+			// Commercial tariffs
+			admin.GET("/commercial-tariffs", commercialTariffHandler.GetAllCommercialTariffs)
+			admin.POST("/commercial-tariffs", commercialTariffHandler.CreateCommercialTariff)
+			admin.PUT("/commercial-tariffs/:id", commercialTariffHandler.UpdateCommercialTariff)
+			admin.DELETE("/commercial-tariffs/:id", commercialTariffHandler.DeleteCommercialTariff)
+			admin.GET("/report-tariff-rules", reportTariffRuleHandler.GetAll)
+			admin.POST("/report-tariff-rules/preview", reportTariffRuleHandler.PreviewSlotCoverage)
+			admin.POST("/report-tariff-rules", reportTariffRuleHandler.Create)
+			admin.PUT("/report-tariff-rules/:id", reportTariffRuleHandler.Update)
+			admin.DELETE("/report-tariff-rules/:id", reportTariffRuleHandler.Delete)
+
+			// CMS — Fin zones (/fin_activities)
+			admin.GET("/fin-zones", finZoneHandler.GetAllFinZones)
+			admin.POST("/fin-zones", finZoneHandler.CreateFinZone)
+			admin.PUT("/fin-zones/:id", finZoneHandler.UpdateFinZone)
+			admin.DELETE("/fin-zones/:id", finZoneHandler.DeleteFinZone)
+
+			// CMS — Site settings
+			admin.PUT("/site-settings", siteSettingHandler.Upsert)
+			admin.PUT("/site-settings/bulk", siteSettingHandler.UpsertBulk)
+
+			// Subjects
+			admin.GET("/subjects", subjectHandler.GetSubjects)
+			admin.GET("/subjects/:id", subjectHandler.GetSubjectByID)
+			admin.POST("/subjects", subjectHandler.CreateSubject)
+			admin.PUT("/subjects/:id", subjectHandler.UpdateSubject)
+			admin.PATCH("/subjects/:id/deactivate", subjectHandler.DeactivateSubject)
+			admin.DELETE("/subjects/:id", subjectHandler.DeleteSubject)
+			admin.PATCH("/subjects/:id/restore", subjectHandler.RestoreSubject)
+
+			// Rooms
+			admin.GET("/rooms", roomHandler.GetRooms)
+			admin.GET("/rooms/:id", roomHandler.GetRoomByID)
+			admin.POST("/rooms", roomHandler.CreateRoom)
+			admin.PUT("/rooms/:id", roomHandler.UpdateRoom)
+			admin.PATCH("/rooms/:id/deactivate", roomHandler.DeactivateRoom)
+			admin.DELETE("/rooms/:id", roomHandler.DeleteRoom)
+			admin.PATCH("/rooms/:id/restore", roomHandler.RestoreRoom)
+			admin.GET("/rooms/:id/subjects", roomHandler.GetRoomSubjects)
+			admin.PUT("/rooms/:id/subjects", roomHandler.UpdateRoomSubjects)
+
+			// Students
+			handlers.RegisterMonthlyReportingRoutes(admin, db)
+			handlers.RegisterStaffDatesRoutes(admin, db)
+			admin.GET("/students", studentHandler.GetStudents)
+			admin.GET("/students/:id", studentHandler.GetStudentByID)
+			admin.POST("/students", studentHandler.CreateStudent)
+			admin.PUT("/students/:id", studentHandler.UpdateStudent)
+			admin.PATCH("/students/:id/deactivate", studentHandler.DeactivateStudent)
+			admin.DELETE("/students/:id", studentHandler.DeleteStudent)
+			admin.PATCH("/students/:id/restore", studentHandler.RestoreStudent)
+			admin.GET("/students/:id/availability", studentHandler.GetStudentAvailability)
+			admin.POST("/students/:id/availability", studentHandler.CreateStudentAvailability)
+			admin.PUT("/students/:id/availability/:availabilityId", studentHandler.UpdateStudentAvailability)
+			admin.DELETE("/students/:id/availability/:availabilityId", studentHandler.DeleteStudentAvailability)
+			admin.GET("/students/:id/service-validities", studentServiceValidityHandler.GetByStudent)
+			admin.GET("/student-service-validities", studentServiceValidityHandler.List)
+			admin.PUT("/students/:id/service-validities", studentServiceValidityHandler.Upsert)
+			admin.DELETE("/students/:id/service-validities/:serviceType", studentServiceValidityHandler.Delete)
+			admin.GET("/students/:id/social-services", socialServiceHandler.GetForStudent)
+			admin.PUT("/students/:id/social-services", socialServiceHandler.SelectForStudent)
+			admin.PUT("/students/:id/social-services/:serviceId", socialServiceHandler.UpdateForStudent)
+			admin.DELETE("/students/:id/social-services/:serviceId", socialServiceHandler.DeleteForStudent)
+
+			// Legal social-service reporting directory. It is intentionally separate
+			// from schedule subjects and commercial lesson tariffs.
+			admin.GET("/social-services", socialServiceHandler.GetAll)
+			admin.POST("/social-services/initial-directory", socialServiceHandler.ImportInitialDirectory)
+			admin.POST("/social-services", socialServiceHandler.Create)
+			admin.PUT("/social-services/:id", socialServiceHandler.Update)
+			admin.DELETE("/social-services/:id", socialServiceHandler.Delete)
+
+			// Teachers
+			admin.GET("/teachers", teacherHandler.GetTeachers)
+			admin.GET("/teachers/:id", teacherHandler.GetTeacherByID)
+			admin.POST("/teachers", teacherHandler.CreateTeacher)
+			admin.PUT("/teachers/:id", teacherHandler.UpdateTeacher)
+			admin.PATCH("/teachers/:id/deactivate", teacherHandler.DeactivateTeacher)
+			admin.PATCH("/teachers/:id/activate", teacherHandler.ActivateTeacher)
+			admin.DELETE("/teachers/:id", teacherHandler.DeleteTeacher)
+			admin.PATCH("/teachers/:id/restore", teacherHandler.RestoreTeacher)
+			admin.GET("/teachers/:id/subjects", teacherHandler.GetTeacherSubjects)
+			admin.PUT("/teachers/:id/subjects", teacherHandler.UpdateTeacherSubjects)
+			admin.GET("/teachers/:id/availability", teacherHandler.GetTeacherAvailability)
+			admin.POST("/teachers/:id/availability", teacherHandler.CreateTeacherAvailability)
+			admin.PUT("/teachers/:id/availability/:availabilityId", teacherHandler.UpdateTeacherAvailability)
+			admin.DELETE("/teachers/:id/availability/:availabilityId", teacherHandler.DeleteTeacherAvailability)
+			admin.GET("/teachers/:id/rooms", teacherHandler.GetTeacherRooms)
+			admin.PUT("/teachers/:id/rooms", teacherHandler.UpdateTeacherRooms)
+
+			// Assignments
+			admin.GET("/assignments", assignmentHandler.GetAssignments)
+			admin.GET("/assignments/:id", assignmentHandler.GetAssignmentByID)
+			admin.GET("/teachers/:id/assignments", assignmentHandler.GetTeacherAssignments)
+			admin.POST("/assignments", assignmentHandler.CreateAssignment)
+			admin.PUT("/assignments/:id", assignmentHandler.UpdateAssignment)
+			admin.DELETE("/assignments/:id", assignmentHandler.DeleteAssignment)
+			admin.PATCH("/assignments/:id/restore", assignmentHandler.RestoreAssignment)
+
+			// Schedules
+			admin.GET("/schedules", scheduleHandler.GetScheduleByWeek)
+			admin.GET("/schedules/:id", scheduleHandler.GetScheduleByID)
+			admin.POST("/schedules", scheduleHandler.CreateEmptySchedule)
+			admin.POST("/schedules/generate", scheduleHandler.GenerateSchedule)
+			admin.POST("/schedules/generate/async", scheduleHandler.StartGenerateSchedule)
+			admin.GET("/schedule-generation-jobs/:jobId", scheduleHandler.GetGenerationJob)
+			admin.POST("/schedules/:id/approve", scheduleHandler.ApproveSchedule)
+			admin.POST("/schedules/:id/unapprove", scheduleHandler.UnapproveSchedule)
+			admin.POST("/schedules/:id/reset-auto", scheduleHandler.ResetAutoSchedule)
+			admin.POST("/schedules/:id/reset-auto/async", scheduleHandler.StartResetAutoSchedule)
+			admin.POST("/schedules/:id/slots", scheduleHandler.CreateScheduleSlot)
+			admin.PUT("/schedules/:id/slots/:slotId", scheduleHandler.UpdateScheduleSlot)
+			admin.PATCH("/schedules/:id/slots/:slotId/pin", scheduleHandler.PinScheduleSlot)
+			admin.PATCH("/schedules/:id/slots/:slotId/unpin", scheduleHandler.UnpinScheduleSlot)
+			admin.DELETE("/schedules/:id/slots/:slotId", scheduleHandler.DeleteScheduleSlot)
+			admin.GET("/schedules/:id/slots/:slotId/attendance", scheduleHandler.GetSlotAttendance)
+			admin.POST("/schedules/:id/slots/:slotId/attendance", scheduleHandler.AddSlotStudent)
+			admin.PATCH("/schedules/:id/slots/:slotId/attendance/:studentId", scheduleHandler.UpdateAttendance)
+			admin.DELETE("/schedules/:id/slots/:slotId/attendance/:studentId", scheduleHandler.RemoveSlotStudent)
+			admin.POST("/schedules/:id/clear-auto", scheduleHandler.ClearAutoSchedule)
+			admin.POST("/schedules/:id/refresh-diagnostics", scheduleHandler.RefreshDiagnostics)
+			admin.POST("/schedules/:id/clear-manual", scheduleHandler.ClearManualSlots)
+			admin.POST("/schedules/:id/copy-manual-from-prev-week", scheduleHandler.CopyManualSlotsFromPrevWeek)
+			admin.PATCH("/schedules/:id/slots/bulk-origin", scheduleHandler.BulkUpdateSlotsOrigin)
+
+			// Group lessons
+			admin.GET("/group-lessons", groupLessonHandler.GetGroupLessons)
+			admin.GET("/group-lessons/:id", groupLessonHandler.GetGroupLessonByID)
+			admin.POST("/group-lessons", groupLessonHandler.CreateGroupLesson)
+			admin.PUT("/group-lessons/:id", groupLessonHandler.UpdateGroupLesson)
+			admin.DELETE("/group-lessons/:id", groupLessonHandler.DeleteGroupLesson)
+			admin.PATCH("/group-lessons/:id/restore", groupLessonHandler.RestoreGroupLesson)
+			admin.GET("/group-lessons/:id/enrollments", groupLessonHandler.GetEnrollments)
+			admin.POST("/group-lessons/:id/enrollments", groupLessonHandler.AddEnrollment)
+			admin.DELETE("/group-lessons/:id/enrollments/:studentId", groupLessonHandler.RemoveEnrollment)
+
+			// Reports
+			admin.GET("/reports/monthly", reportHandler.GetMonthlyReport)
+
+			// Document submissions (admin review)
+			admin.GET("/documents", documentHandler.AdminListDocuments)
+			admin.PUT("/documents/submissions/:id/status", documentHandler.AdminUpdateSubmissionStatus)
+			admin.POST("/documents/submissions/:id/anonymize", documentHandler.AdminAnonymizeSubmission)
+			admin.DELETE("/documents/submissions/:id", documentHandler.AdminDeleteSubmission)
+			admin.PUT("/documents/parent/:userId/status", documentHandler.AdminUpdateParentStatus)
+			admin.POST("/documents/parent/:userId/anonymize", documentHandler.AdminAnonymizeParentProfile)
+			admin.DELETE("/documents/parent/:userId", documentHandler.AdminDeleteParentProfile)
+			admin.DELETE("/documents/user/:userId/personal-data", documentHandler.AdminDeletePersonalData)
+
+			// Users
+			admin.GET("/users", userStudentHandler.GetUsers)
+			admin.POST("/users", userStudentHandler.CreateUser)
+			admin.PUT("/users/:id", userStudentHandler.UpdateUser)
+			admin.DELETE("/users/:id", userStudentHandler.DeleteUser)
+			admin.GET("/users/:id/children", userStudentHandler.GetUserChildren)
+			admin.POST("/users/:id/children", userStudentHandler.AddUserChild)
+			admin.DELETE("/users/:id/children/:studentId", userStudentHandler.RemoveUserChild)
+			admin.GET("/users/:id/teacher", teacherHandler.GetLinkedTeacher)
+			admin.PUT("/users/:id/teacher", teacherHandler.LinkUserToTeacher)
+			admin.DELETE("/users/:id/teacher", teacherHandler.UnlinkUserFromTeacher)
+
+			// Consultations
+			admin.GET("/consultations", consultationHandler.AdminList)
+			admin.PUT("/consultations/:id", consultationHandler.AdminUpdate)
+			admin.POST("/consultations/:id/anonymize", consultationHandler.AdminAnonymize)
+			admin.DELETE("/consultations/:id", consultationHandler.AdminDelete)
+
+			// Achievements CMS
+			admin.GET("/achievements", achievementHandler.GetAll)
+			admin.GET("/achievements/:id", achievementHandler.GetByID)
+			admin.POST("/achievements", achievementHandler.Create)
+			admin.PUT("/achievements/:id", achievementHandler.Update)
+			admin.DELETE("/achievements/:id", achievementHandler.Delete)
+
+			// Awards CMS
+			admin.GET("/awards", awardHandler.GetAll)
+			admin.POST("/awards", awardHandler.Create)
+			admin.PUT("/awards/:id", awardHandler.Update)
+			admin.DELETE("/awards/:id", awardHandler.Delete)
+
+			// Shorts CMS (video stories on main page)
+			admin.GET("/shorts", shortHandler.GetAll)
+			admin.POST("/shorts", shortHandler.Create)
+			admin.PUT("/shorts/:id", shortHandler.Update)
+			admin.DELETE("/shorts/:id", shortHandler.Delete)
+
+			// Vacancies CMS
+			admin.GET("/vacancies", vacancyHandler.GetAll)
+			admin.POST("/vacancies", vacancyHandler.Create)
+			admin.PUT("/vacancies/:id", vacancyHandler.Update)
+			admin.DELETE("/vacancies/:id", vacancyHandler.Delete)
+
+			// Questionnaires review
+			admin.GET("/questionnaires", questionnaireHandler.AdminList)
+			admin.GET("/questionnaires/:id/file", questionnaireHandler.AdminServeFile)
+			admin.PUT("/questionnaires/:id/status", questionnaireHandler.AdminUpdateStatus)
+			admin.POST("/questionnaires/:id/anonymize", questionnaireHandler.AdminAnonymize)
+			admin.DELETE("/questionnaires/:id", questionnaireHandler.AdminDelete)
+
+			// Tech support (admin)
+			admin.GET("/support/tickets", supportHandler.AdminListTickets)
+			admin.GET("/support/tickets/:id", supportHandler.AdminGetTicket)
+			admin.POST("/support/tickets/:id/messages", supportHandler.AdminReplyToTicket)
+			admin.PUT("/support/tickets/:id/status", supportHandler.AdminUpdateStatus)
+			admin.GET("/support/unread-count", supportHandler.AdminUnreadCount)
 		}
+
+		protected.GET("/my-children", userStudentHandler.GetMyChildren)
+		protected.GET("/my-children/:studentId/schedule", userStudentHandler.GetChildSchedule)
+		protected.GET("/teacher/schedule", userStudentHandler.GetTeacherPublishedSchedule)
+		protected.GET("/teacher/schedule/options", userStudentHandler.GetTeacherScheduleOptions)
+
+		// Private file serving — cookie auth via AuthMiddleware
+		protected.GET("/documents/file/:filename", documentHandler.ServePrivateFile)
+
+		// Document submissions (parent + children docs)
+		protected.GET("/documents", documentHandler.GetMyDocuments)
+		protected.POST("/documents/parent", documentHandler.SaveParentDocs)
+		protected.DELETE("/documents/parent", documentHandler.DeleteMyParentProfile)
+		protected.POST("/documents/children", documentHandler.AddChildDocs)
+		protected.DELETE("/documents/children/:id", documentHandler.DeleteChildSubmission)
+		protected.PUT("/documents/children/:id", documentHandler.UpdateChildDocs)
+
+		// Notifications
+		protected.GET("/notifications", notificationHandler.GetMyNotifications)
+		protected.GET("/notifications/unread-count", notificationHandler.GetUnreadCount)
+		protected.PUT("/notifications/read-all", notificationHandler.MarkAllRead)
+		protected.PUT("/notifications/:id/read", notificationHandler.MarkOneRead)
+		protected.DELETE("/notifications/:id", notificationHandler.DeleteOne)
+		protected.DELETE("/notifications", notificationHandler.DeleteAll)
+
+		// Consultation (auth user — attaches user_id)
+		protected.POST("/consultations/auth", consultationHandler.Create)
+		protected.GET("/consultations/mine", consultationHandler.GetMine)
+		protected.PUT("/consultations/mine/:id", consultationHandler.UpdateMine)
+
+		// Questionnaire (anketa)
+		protected.GET("/questionnaire", questionnaireHandler.GetMine)
+		protected.POST("/questionnaire", questionnaireHandler.Upload)
+		protected.GET("/questionnaire/file", questionnaireHandler.ServeFile)
+
+		// Tech support (user)
+		protected.GET("/support/files/:filename", supportHandler.ServeFile)
+		protected.POST("/support/tickets", supportHandler.CreateTicket)
+		protected.GET("/support/tickets", supportHandler.ListMyTickets)
+		protected.GET("/support/tickets/:id", supportHandler.GetMyTicket)
+		protected.POST("/support/tickets/:id/messages", supportHandler.ReplyToTicket)
+		protected.PUT("/support/tickets/:id/close", supportHandler.CloseMyTicket)
 	}
 
-	r.Run(":" + cfg.Port)
+	// Background context — cancelled on graceful shutdown to stop background workers.
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	go services.NewStaffEventService(db, vkNotificationService).Run(bgCtx)
+	go vkTeacherScheduleService.Run(bgCtx)
+
+	// Background goroutine: checks expiring and expired validity dates once a day.
+	// The data is informational only: it is never read by schedule generation or
+	// by manual schedule editing.
+	go func() {
+		type row struct {
+			ID              uint
+			ChildName       string
+			IppsuExpiryDate *time.Time
+			UserID          uint
+		}
+		childReminderColumn := func(daysBefore int) string {
+			switch daysBefore {
+			case 21:
+				return "expiry_reminder21_notified"
+			case 7:
+				return "expiry_reminder7_notified"
+			case 1:
+				return "expiry_reminder1_notified"
+			default:
+				return ""
+			}
+		}
+		serviceReminderColumn := func(daysBefore int) string {
+			switch daysBefore {
+			case 21:
+				return "expiring21_days_notified_at"
+			case 7:
+				return "expiring7_days_notified_at"
+			case 1:
+				return "expiring1_day_notified_at"
+			default:
+				return ""
+			}
+		}
+
+		notifyChildDocument := func(r row, daysBefore int) error {
+			if r.IppsuExpiryDate == nil {
+				return nil
+			}
+			title, body := services.ExpiryNotificationContent("ИППСУ", r.ChildName, *r.IppsuExpiryDate, daysBefore)
+
+			return db.Transaction(func(tx *gorm.DB) error {
+				if daysBefore > 0 {
+					if err := handlers.CreateNotification(tx, r.UserID, "",
+						title,
+						body,
+						"/profile",
+					); err != nil {
+						return err
+					}
+					if err := handlers.CreateNotification(tx, 0, "admin",
+						title,
+						body,
+						"/admin/documents",
+					); err != nil {
+						return err
+					}
+					return tx.Model(&models.ChildDocSubmission{}).Where("id = ?", r.ID).
+						Update(childReminderColumn(daysBefore), true).Error
+				}
+
+				if err := handlers.CreateNotification(tx, r.UserID, "",
+					title,
+					body,
+					"/profile",
+				); err != nil {
+					return err
+				}
+				if err := handlers.CreateNotification(tx, 0, "admin",
+					title,
+					body,
+					"/admin/documents",
+				); err != nil {
+					return err
+				}
+				return tx.Model(&models.ChildDocSubmission{}).Where("id = ?", r.ID).
+					Update("expiry_notified", true).Error
+			})
+		}
+
+		type serviceValidityRow struct {
+			ID          uint
+			StudentID   uint
+			StudentName string
+			ServiceType string
+			ValidUntil  time.Time
+		}
+		serviceName := func(serviceType string) string {
+			switch serviceType {
+			case models.StudentServiceAdaptivePhysicalCulture:
+				return "Адаптивная физкультура"
+			case models.StudentServiceMassage:
+				return "Массаж"
+			default:
+				return "ИППСУ"
+			}
+		}
+		notifyServiceValidity := func(row serviceValidityRow, daysBefore int, now time.Time) error {
+			name := serviceName(row.ServiceType)
+			title, body := services.ExpiryNotificationContent(name, row.StudentName, row.ValidUntil, daysBefore)
+
+			return db.Transaction(func(tx *gorm.DB) error {
+				var parentIDs []uint
+				if err := tx.Model(&models.UserStudent{}).Where("student_id = ?", row.StudentID).
+					Pluck("user_id", &parentIDs).Error; err != nil {
+					return err
+				}
+
+				for _, parentID := range parentIDs {
+					if err := handlers.CreateNotification(tx, parentID, "", title, body, "/dashboard"); err != nil {
+						return err
+					}
+				}
+
+				if err := handlers.CreateNotification(tx, 0, "admin", title, body, "/admin/schedule/service-validities"); err != nil {
+					return err
+				}
+
+				if daysBefore > 0 {
+					return tx.Model(&models.StudentServiceValidity{}).Where("id = ?", row.ID).
+						Update(serviceReminderColumn(daysBefore), now).Error
+				}
+				return tx.Model(&models.StudentServiceValidity{}).Where("id = ?", row.ID).
+					Update("notified_at", now).Error
+			})
+		}
+
+		for {
+			now := time.Now()
+			reminderDates := services.ExpiryReminderDates(now)
+			reminderDays := []int{1, 7, 21}
+
+			var expiredRows []row
+			if err := db.Raw(`
+				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id
+				FROM child_doc_submissions c
+				WHERE c.deleted_at IS NULL
+				  AND c.status = 'approved'
+				  AND c.ippsu_expiry_date IS NOT NULL
+				  AND c.ippsu_expiry_date < NOW()
+				  AND c.expiry_notified = false
+			`).Scan(&expiredRows).Error; err != nil {
+				log.Printf("[JOB] ippsu_check query error: %v", err)
+			}
+
+			expiredNotified, expiringNotified, jobErrors := 0, 0, 0
+			for _, r := range expiredRows {
+				if err := notifyChildDocument(r, 0); err != nil {
+					jobErrors++
+					log.Printf("[JOB] ippsu_check notification error submission_id=%d: %v", r.ID, err)
+					continue
+				}
+				expiredNotified++
+			}
+			for index, daysBefore := range reminderDays {
+				var expiringRows []row
+				reminderDate := reminderDates[index].Format("2006-01-02")
+				if err := db.Raw(`
+					SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id
+					FROM child_doc_submissions c
+					WHERE c.deleted_at IS NULL
+					  AND c.status = 'approved'
+					  AND c.ippsu_expiry_date IS NOT NULL
+					  AND c.`+childReminderColumn(daysBefore)+` = false
+					  AND c.ippsu_expiry_date::date = ?::date
+				`, reminderDate).Scan(&expiringRows).Error; err != nil {
+					jobErrors++
+					log.Printf("[JOB] ippsu_reminder query error days_before=%d: %v", daysBefore, err)
+					continue
+				}
+				for _, r := range expiringRows {
+					if err := notifyChildDocument(r, daysBefore); err != nil {
+						jobErrors++
+						log.Printf("[JOB] ippsu_reminder notification error submission_id=%d days_before=%d: %v", r.ID, daysBefore, err)
+						continue
+					}
+					expiringNotified++
+				}
+			}
+			log.Printf("[JOB] ippsu_check expired_found=%d expired_notified=%d expiring_notified=%d errors=%d", len(expiredRows), expiredNotified, expiringNotified, jobErrors)
+
+			// Service validity is deliberately independent from child_doc_submissions:
+			// an administrator chooses the child, and the parent only receives an
+			// informational reminder. It never blocks the schedule or its editing.
+			var expiredServiceRows []serviceValidityRow
+			if err := db.Raw(`
+				SELECT v.id, v.student_id, s.full_name AS student_name,
+				       v.service_type, v.valid_until
+				FROM student_service_validities v
+				JOIN students s ON s.id = v.student_id
+				WHERE v.notified_at IS NULL
+				  AND v.valid_until < NOW()
+				  AND v.service_type IN (?, ?, ?)
+			`, models.StudentServiceIppsu, models.StudentServiceAdaptivePhysicalCulture, models.StudentServiceMassage).Scan(&expiredServiceRows).Error; err != nil {
+				log.Printf("[JOB] student_service_validity_check query error: %v", err)
+			}
+
+			expiredServiceNotified, expiringServiceNotified, serviceErrors := 0, 0, 0
+			for _, row := range expiredServiceRows {
+				if err := notifyServiceValidity(row, 0, now); err != nil {
+					serviceErrors++
+					log.Printf("[JOB] student_service_validity_check notification error validity_id=%d: %v", row.ID, err)
+					continue
+				}
+				expiredServiceNotified++
+			}
+			for index, daysBefore := range reminderDays {
+				var expiringServiceRows []serviceValidityRow
+				reminderDate := reminderDates[index].Format("2006-01-02")
+				reminderQuery := `
+					SELECT v.id, v.student_id, s.full_name AS student_name,
+					       v.service_type, v.valid_until
+					FROM student_service_validities v
+					JOIN students s ON s.id = v.student_id
+					WHERE v.` + serviceReminderColumn(daysBefore) + ` IS NULL
+					  AND v.valid_until = ?::date`
+				reminderArgs := []any{reminderDate}
+				reminderQuery += " AND v.service_type IN (?, ?, ?)"
+				reminderArgs = append(reminderArgs,
+					models.StudentServiceIppsu,
+					models.StudentServiceAdaptivePhysicalCulture,
+					models.StudentServiceMassage,
+				)
+				if err := db.Raw(reminderQuery, reminderArgs...).Scan(&expiringServiceRows).Error; err != nil {
+					serviceErrors++
+					log.Printf("[JOB] student_service_validity_reminder query error days_before=%d: %v", daysBefore, err)
+					continue
+				}
+				for _, row := range expiringServiceRows {
+					if err := notifyServiceValidity(row, daysBefore, now); err != nil {
+						serviceErrors++
+						log.Printf("[JOB] student_service_validity_reminder notification error validity_id=%d days_before=%d: %v", row.ID, daysBefore, err)
+						continue
+					}
+					expiringServiceNotified++
+				}
+			}
+			log.Printf("[JOB] student_service_validity_check expired_found=%d expired_notified=%d expiring_notified=%d errors=%d", len(expiredServiceRows), expiredServiceNotified, expiringServiceNotified, serviceErrors)
+
+			select {
+			case <-bgCtx.Done():
+				return
+			case <-time.After(24 * time.Hour):
+			}
+		}
+	}()
+
+	// HTTP server with explicit timeouts.
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	go func() {
+		log.Printf("Server listening on :%s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Block until SIGINT or SIGTERM.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Shutdown signal received, draining connections...")
+
+	bgCancel() // Stop background workers.
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	log.Println("Server stopped cleanly")
 }

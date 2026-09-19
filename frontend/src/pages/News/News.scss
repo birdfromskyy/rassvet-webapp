@@ -1,0 +1,219 @@
+/* /news — "Rassvet 2.0" design (Skills/Design2.md).
+   Reuses the shared <NewsCard>, restyled within this page's scope. */
+
+@use "../../styles/design2" as *;
+
+.news-page {
+  @include design2-base;
+
+  /* Compact hero band (like /support, /consultation-request) instead of
+     a full screen, so the news grid + search results sit right below. */
+  .d2-hero {
+    min-height: auto;
+    padding: 140px 0 52px;
+  }
+
+  .d2-hero__inner--solo {
+    max-width: 720px;
+  }
+
+  /* ---- live search (inside the compact dark hero) ---------- */
+
+  .np-search {
+    max-width: 480px;
+    margin-top: 30px;
+  }
+
+  .np-search__field {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    input {
+      width: 100%;
+      height: 54px;
+      padding: 0 44px 0 46px;
+      border-radius: 16px;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 16px;
+      outline: none;
+      transition: border-color 0.2s ease, background 0.2s ease;
+
+      &::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+      }
+
+      &:focus {
+        border-color: $yellow;
+        background: rgba(255, 255, 255, 0.12);
+      }
+    }
+  }
+
+  .np-search__icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+  }
+
+  .np-search__clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  }
+
+  /* ---- grid ------------------------------------------------- */
+
+  .np-section {
+    background: $paper;
+  }
+
+  .np-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 22px;
+  }
+
+  .np-cell {
+    display: flex;
+  }
+
+  /* ---- NewsCard restyle (scoped) ---------------------------- */
+
+  .news-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border-radius: 24px;
+    overflow: hidden;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.06);
+    cursor: pointer;
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 22px 46px rgba(7, 68, 98, 0.12);
+    }
+  }
+
+  .news-card__image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: $paper;
+  }
+
+  .news-card__content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 22px 24px 20px;
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 19px;
+      font-weight: 800;
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+      color: $ink;
+    }
+
+    p {
+      margin: 0 0 16px;
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: $muted;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  .news-card__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: auto;
+    font-size: 13px;
+    color: $muted;
+  }
+
+  .news-card__link {
+    align-self: flex-start;
+    margin-top: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(244, 223, 0, 0.24);
+    color: $ink;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: $yellow;
+    }
+  }
+
+  /* ---- pagination ------------------------------------------- */
+
+  .np-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 36px;
+
+    button {
+      min-width: 44px;
+      height: 44px;
+      padding: 0 12px;
+      border: 1.5px solid rgba(7, 68, 98, 0.18);
+      border-radius: 12px;
+      background: #ffffff;
+      color: $ink;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+
+      &:hover {
+        border-color: $ink;
+      }
+
+      &.is-active {
+        background: $ink;
+        border-color: $ink;
+        color: #ffffff;
+      }
+    }
+  }
+}

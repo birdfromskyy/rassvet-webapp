@@ -1,0 +1,23 @@
+# Development overrides — exposes ports and overrides production env values.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  postgres:
+    ports:
+      - '5433:5432'
+
+  backend:
+    ports:
+      - '8080:8080'
+    environment:
+      - GIN_MODE=debug
+      - IS_PRODUCTION=false
+      - FRONTEND_URL=http://localhost:3000
+      - REDIS_PASSWORD=
+
+  frontend:
+    ports:
+      - '3000:80'
+
+  redis:
+    ports:
+      - '6379:6379'

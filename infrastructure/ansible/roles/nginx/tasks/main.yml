@@ -1,0 +1,37 @@
+---
+- name: Configure authentication rate-limit zone
+  ansible.builtin.template:
+    src: 00-rassvet-rate-limits.conf.j2
+    dest: /etc/nginx/conf.d/00-rassvet-rate-limits.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Nginx
+
+- name: Install current Rassvet Nginx virtual host
+  ansible.builtin.template:
+    src: rassvethm.ru.j2
+    dest: /etc/nginx/sites-available/rassvethm.ru
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Nginx
+
+- name: Enable Rassvet Nginx virtual host
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/rassvethm.ru
+    dest: /etc/nginx/sites-enabled/rassvethm.ru
+    state: link
+  notify: Reload Nginx
+
+- name: Disable default Nginx virtual host
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload Nginx
+
+- name: Enable Nginx
+  ansible.builtin.systemd_service:
+    name: nginx
+    enabled: true
+    state: started

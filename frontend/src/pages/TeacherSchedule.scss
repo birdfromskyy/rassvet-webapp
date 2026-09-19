@@ -1,0 +1,268 @@
+/* /my-schedule (teacher + child views share these styles) —
+   "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../styles/design2" as *;
+
+.schedule-page {
+  background: $paper;
+  color: $ink;
+  font-family: $font;
+  min-height: 100vh;
+
+  /* header: pinned + translucent (see Design2.md §4) */
+  .header {
+    background: #f3efe3;
+  }
+  .header--hidden { transform: none; opacity: 1; pointer-events: auto; }
+  @media (min-width: 993px) {
+    .header { position: fixed; top: 0; left: 0; right: 0; }
+  }
+}
+
+.schedule {
+  padding: 118px 0 72px;
+}
+
+.schedule__container {
+  width: min(100% - 40px, 1400px);
+  margin: 0 auto;
+}
+
+/* ---- hero (dark rounded band) ------------------------------- */
+
+.schedule__hero {
+  position: relative;
+  padding: 40px clamp(24px, 3vw, 44px);
+  margin-bottom: 24px;
+  border-radius: 28px;
+  background:
+    radial-gradient(60% 120% at 90% -20%, rgba(11, 95, 136, 0.5), transparent 70%),
+    $night;
+  color: #ffffff;
+  overflow: hidden;
+
+  .section-badge {
+    background: rgba(244, 223, 0, 0.9) !important;
+  }
+}
+
+.schedule__title {
+  margin: 14px 0 8px;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.schedule__subtitle {
+  margin: 0;
+  font-size: clamp(15px, 1.3vw, 18px);
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* ---- filters ------------------------------------------------ */
+
+.schedule__filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+/* ---- week nav ----------------------------------------------- */
+
+.schedule__week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-bottom: 18px;
+
+  button {
+    width: 44px;
+    height: 44px;
+    border: 1.5px solid rgba(7, 68, 98, 0.2);
+    border-radius: 14px;
+    background: #ffffff;
+    color: $ink;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+
+    &:hover {
+      background: $ink;
+      color: #ffffff;
+    }
+  }
+}
+
+.schedule__week-label {
+  min-width: 260px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 800;
+  color: $ink;
+}
+
+/* ---- legend ------------------------------------------------- */
+
+.schedule__legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 26px;
+  font-size: 14px;
+  color: $muted;
+}
+
+.schedule__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule__legend-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 6px;
+}
+
+/* ---- states ------------------------------------------------- */
+
+.schedule__loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px;
+}
+
+.schedule__empty {
+  padding: 48px 24px;
+  text-align: center;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid $border;
+  color: $muted;
+
+  h2 {
+    color: $ink;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 8px 0 0;
+  }
+}
+
+/* ---- day + slots -------------------------------------------- */
+
+.schedule__day {
+  margin-bottom: 28px;
+}
+
+.schedule__day-title {
+  margin: 0 0 14px;
+  font-size: clamp(20px, 1.8vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: $ink;
+}
+
+.schedule__day-date {
+  color: $muted;
+  font-weight: 600;
+  font-size: 0.7em;
+}
+
+.schedule__slots {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule__slot {
+  display: grid;
+  grid-template-columns: 150px repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  align-items: center;
+  padding: 18px 22px;
+  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid $border;
+  box-shadow: 0 10px 26px rgba(7, 68, 98, 0.05);
+  border-left: 4px solid rgba(7, 68, 98, 0.25);
+
+  &--group {
+    border-left-color: #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+  }
+}
+
+.schedule__slot-time {
+  font-size: 16px;
+  font-weight: 800;
+  color: $ink;
+}
+
+.schedule__slot-label {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(7, 68, 98, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  color: $muted;
+
+  &--group {
+    background: rgba(76, 175, 80, 0.16);
+    color: #2e7d32;
+  }
+}
+
+.schedule__slot-cell {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: $content;
+
+  small {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $muted;
+  }
+}
+
+/* ---- responsive --------------------------------------------- */
+
+@media (max-width: 900px) {
+  .schedule__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule__slot {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .schedule__slot {
+    grid-template-columns: 1fr;
+  }
+
+  /* keep the week navigation from overflowing narrow screens */
+  .schedule__week-label {
+    min-width: 0;
+    font-size: 15px;
+  }
+
+  .schedule__week-nav {
+    gap: 10px;
+  }
+}

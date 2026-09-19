@@ -7,18 +7,29 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const minJWTSecretLen = 32
+
 type Config struct {
-	DBHost        string
-	DBUser        string
-	DBPassword    string
-	DBName        string
-	DBPort        string
-	JWTSecret     string
-	Port          string
-	EmailFrom     string
-	EmailPassword string
-	SMTPHost      string
-	SMTPPort      string
+	DBHost           string
+	DBUser           string
+	DBPassword       string
+	DBName           string
+	DBPort           string
+	JWTSecret        string
+	Port             string
+	FrontendURL      string
+	IsProduction     bool
+	EmailFrom        string
+	EmailPassword    string
+	SMTPHost         string
+	SMTPPort         string
+	VKCommunityToken string
+	VKAPIVersion     string
+
+	RedisHost     string
+	RedisPort     string
+	RedisPassword string
+	RedisDB       string
 }
 
 func Load() *Config {
@@ -28,17 +39,26 @@ func Load() *Config {
 	}
 
 	return &Config{
-		DBHost:        getEnv("DB_HOST", "localhost"),
-		DBUser:        getEnv("DB_USER", "postgres"),
-		DBPassword:    getEnv("DB_PASSWORD", "postgres"),
-		DBName:        getEnv("DB_NAME", "reviews_db"),
-		DBPort:        getEnv("DB_PORT", "5432"),
-		JWTSecret:     getEnv("JWT_SECRET", "secret"),
-		Port:          getEnv("PORT", "8080"),
-		EmailFrom:     getEnv("EMAIL_FROM", ""),
-		EmailPassword: getEnv("EMAIL_PASSWORD", ""),
-		SMTPHost:      getEnv("SMTP_HOST", "smtp.gmail.com"),
-		SMTPPort:      getEnv("SMTP_PORT", "587"),
+		DBHost:           getEnv("DB_HOST", "localhost"),
+		DBUser:           getEnv("DB_USER", "postgres"),
+		DBPassword:       getEnv("DB_PASSWORD", "postgres"),
+		DBName:           getEnv("DB_NAME", "reviews_db"),
+		DBPort:           getEnv("DB_PORT", "5432"),
+		JWTSecret:        requireEnv("JWT_SECRET"),
+		Port:             getEnv("PORT", "8080"),
+		FrontendURL:      getEnv("FRONTEND_URL", "http://localhost:3000"),
+		IsProduction:     getEnv("IS_PRODUCTION", "") == "true",
+		EmailFrom:        getEnv("EMAIL_FROM", ""),
+		EmailPassword:    getEnv("EMAIL_PASSWORD", ""),
+		SMTPHost:         getEnv("SMTP_HOST", "smtp.gmail.com"),
+		SMTPPort:         getEnv("SMTP_PORT", "587"),
+		VKCommunityToken: getEnv("VK_COMMUNITY_TOKEN", ""),
+		VKAPIVersion:     getEnv("VK_API_VERSION", "5.199"),
+
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnv("REDIS_PORT", "6379"),
+		RedisPassword: getEnv("REDIS_PASSWORD", ""),
+		RedisDB:       getEnv("REDIS_DB", "0"),
 	}
 }
 
@@ -47,4 +67,12 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func requireEnv(key string) string {
+	value := os.Getenv(key)
+	if len(value) < minJWTSecretLen {
+		log.Fatalf("env %s must be set and at least %d characters long", key, minJWTSecretLen)
+	}
+	return value
 }

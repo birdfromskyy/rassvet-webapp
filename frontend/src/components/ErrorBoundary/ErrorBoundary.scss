@@ -1,0 +1,36 @@
+.error-boundary {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.error-boundary__card {
+  max-width: 420px;
+
+  h1 {
+    color: #074462;
+    font-size: 24px;
+    margin-bottom: 12px;
+  }
+
+  p {
+    color: #4b5563;
+    font-size: 15px;
+    margin-bottom: 24px;
+  }
+
+  button {
+    background: #f7df00;
+    color: #074462;
+    border: none;
+    cursor: pointer;
+    border-radius: 999px;
+    min-height: 48px;
+    padding: 0 28px;
+    font-weight: 800;
+    font-size: 15px;
+  }
+}

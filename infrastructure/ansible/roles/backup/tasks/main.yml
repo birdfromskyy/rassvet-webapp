@@ -1,0 +1,107 @@
+---
+- name: Require a real restic recovery password
+  ansible.builtin.assert:
+    that:
+      - vault_restic_password is defined
+      - vault_restic_password | length >= 32
+      - vault_restic_password != 'REPLACE_WITH_EXISTING_RESTIC_PASSWORD'
+    fail_msg: Configure encrypted group_vars/vault.yml before applying the backup role.
+  no_log: true
+
+- name: Install restic extraction dependency
+  ansible.builtin.apt:
+    name: bzip2
+    state: present
+
+- name: Ensure local source directory exists
+  ansible.builtin.file:
+    path: /usr/local/src
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Download pinned restic release
+  ansible.builtin.get_url:
+    url: "https://github.com/restic/restic/releases/download/v{{ restic_version }}/restic_{{ restic_version }}_linux_amd64.bz2"
+    dest: "/usr/local/src/restic_{{ restic_version }}_linux_amd64.bz2"
+    checksum: "sha256:{{ restic_linux_amd64_sha256 }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Install restic binary
+
+- name: Flush restic installation handler
+  ansible.builtin.meta: flush_handlers
+
+- name: Create protected backup directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/rassvet-backup
+    - "{{ restic_repository }}"
+    - "{{ restic_cache_dir }}"
+    - /var/lib/rassvet-backup
+
+- name: Store restic repository password
+  ansible.builtin.copy:
+    content: "{{ vault_restic_password }}\n"
+    dest: "{{ restic_password_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Configure restic environment
+  ansible.builtin.template:
+    src: restic.env.j2
+    dest: /etc/rassvet-backup/restic.env
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Initialize restic repository once
+  ansible.builtin.command: /usr/local/bin/restic init --repository-version 2
+  environment:
+    RESTIC_REPOSITORY: "{{ restic_repository }}"
+    RESTIC_PASSWORD_FILE: "{{ restic_password_file }}"
+    RESTIC_CACHE_DIR: "{{ restic_cache_dir }}"
+  args:
+    creates: "{{ restic_repository }}/config"
+  no_log: true
+
+- name: Install backup command
+  ansible.builtin.template:
+    src: rassvet-backup.sh.j2
+    dest: /usr/local/sbin/rassvet-backup
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install backup systemd units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - rassvet-backup.service
+    - rassvet-backup.timer
+    - rassvet-restic-maintenance.service
+    - rassvet-restic-maintenance.timer
+  notify: Reload systemd for backup
+
+- name: Enable backup timers
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - rassvet-backup.timer
+    - rassvet-restic-maintenance.timer

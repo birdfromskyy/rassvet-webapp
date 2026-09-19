@@ -1,0 +1,15 @@
+---
+- name: Install restic binary
+  ansible.builtin.shell: |
+    set -o pipefail
+    bzip2 -dc /usr/local/src/restic_{{ restic_version }}_linux_amd64.bz2 > /usr/local/bin/restic.new
+    chmod 0755 /usr/local/bin/restic.new
+    chown root:root /usr/local/bin/restic.new
+    mv /usr/local/bin/restic.new /usr/local/bin/restic
+  args:
+    executable: /bin/bash
+  changed_when: true
+
+- name: Reload systemd for backup
+  ansible.builtin.systemd_service:
+    daemon_reload: true

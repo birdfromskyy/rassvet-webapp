@@ -1,0 +1,426 @@
+/* ============================================================
+   Rassvet 2.0 — shared design foundation (Skills/Design2.md).
+   Tokens + `base` mixin with the primitives every redesigned page
+   uses (header, section, tag, button, hero, reveal). Include the
+   mixin at a page's root scope so all rules stay scoped to it:
+
+     @use "../../styles/design2" as *;
+     .my-page { @include design2-base; ...page specifics... }
+
+   Shared class names are prefixed `d2-`.
+   ============================================================ */
+
+$ink: #074462;
+$night: #052c40;
+$night-2: #0a3a55;
+$paper: #f7f4ec;
+$yellow: #f4df00;
+$muted: #55707f;
+$content: #2a4050;
+$border: rgba(7, 68, 98, 0.1);
+$font: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+@mixin design2-base {
+  background: $paper;
+  color: $ink;
+  font-family: $font;
+
+  /* ---- header: pinned, opaque cream (identical on every page) ----- */
+  /* Opaque (not translucent) so the header looks the same regardless of
+     what content sits behind it — otherwise the same CSS reads as a
+     different colour over a dark hero vs a light page. */
+
+  .header {
+    background: #f3efe3;
+  }
+
+  .header--hidden {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @media (min-width: 993px) {
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+  }
+
+  /* ---- section + typography ------------------------------------- */
+
+  .d2-section {
+    position: relative;
+    min-height: 100vh; /* fallback for browsers without svh */
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 118px 0 72px;
+    overflow: hidden;
+
+    /* Content sections may grow past a screen — never trap content. */
+    &--auto {
+      min-height: auto;
+    }
+  }
+
+  .d2-h2 {
+    margin: 0;
+    font-size: clamp(32px, 3.6vw, 54px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    color: $ink;
+
+    &--light {
+      color: #ffffff;
+    }
+  }
+
+  .d2-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    &::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: $yellow;
+    }
+
+    &--dark {
+      border-color: rgba(7, 68, 98, 0.25);
+      color: $muted;
+    }
+  }
+
+  .d2-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 54px;
+    padding: 0 30px;
+    border-radius: 16px;
+    border: 1.5px solid transparent;
+    font-family: $font;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      transform 0.22s ease,
+      box-shadow 0.22s ease,
+      background-color 0.22s ease,
+      border-color 0.22s ease,
+      color 0.22s ease;
+
+    &--yellow {
+      background: $yellow;
+      color: $ink;
+      box-shadow: 0 12px 30px rgba(244, 223, 0, 0.22);
+
+      &:hover {
+        transform: translateY(-2px);
+        background: #f7e62e;
+        box-shadow: 0 18px 38px rgba(244, 223, 0, 0.3);
+      }
+    }
+
+    &--ink {
+      background: $ink;
+      color: #ffffff;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 32px rgba(7, 68, 98, 0.26);
+      }
+    }
+
+    &--outline-light {
+      border-color: rgba(255, 255, 255, 0.35);
+      color: #ffffff;
+      background: transparent;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.6);
+      }
+    }
+  }
+
+  /* ---- reveal-on-scroll ----------------------------------------- */
+
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(26px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: opacity, transform;
+
+    &.is-in {
+      opacity: 1;
+      transform: none;
+      /* Drop will-change once revealed: `will-change: transform` keeps a
+         containing block that would make a descendant's position:fixed
+         (e.g. the Stories modal) anchor here instead of the viewport. */
+      will-change: auto;
+    }
+  }
+
+  [data-reveal-delay="1"] { transition-delay: 0.12s; }
+  [data-reveal-delay="2"] { transition-delay: 0.24s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  /* ---- hero (dark screen) --------------------------------------- */
+
+  .d2-hero {
+    background: $night;
+    color: #ffffff;
+  }
+
+  .d2-hero__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(56% 46% at 20% 108%, rgba(244, 223, 0, 0.2), transparent 70%),
+      radial-gradient(44% 38% at 62% 112%, rgba(244, 223, 0, 0.1), transparent 70%),
+      radial-gradient(70% 60% at 88% -12%, rgba(11, 95, 136, 0.4), transparent 75%);
+  }
+
+  .d2-hero__inner {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1.12fr 0.88fr;
+    align-items: center;
+    gap: clamp(32px, 5vw, 80px);
+  }
+
+  /* Single-column hero (no side visual) */
+  .d2-hero__inner--solo {
+    display: block;
+    max-width: 900px;
+  }
+
+  .d2-hero__title {
+    margin: 26px 0 22px;
+    font-size: clamp(36px, 4.4vw, 64px);
+    font-weight: 800;
+    line-height: 1.04;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+
+  .d2-hero__text {
+    margin: 0;
+    max-width: 640px;
+    font-size: clamp(17px, 1.4vw, 21px);
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .d2-hero__visual {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* Light "framed illustration": the brand line-art assets are dark,
+     so a light panel keeps them visible on the dark hero. */
+  .d2-hero__card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 420px);
+    padding: clamp(28px, 4vw, 52px);
+    border-radius: 28px;
+    background: #faf6ee;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+
+    img {
+      width: 100%;
+      max-width: 300px;
+      height: auto;
+      object-fit: contain;
+    }
+  }
+
+  /* ---- light content section head ------------------------------- */
+
+  .d2-head {
+    margin-bottom: clamp(28px, 4vh, 52px);
+
+    .d2-h2 {
+      margin-top: 16px;
+    }
+  }
+
+  .d2-lead {
+    margin: 12px 0 0;
+    max-width: 720px;
+    font-size: clamp(16px, 1.3vw, 19px);
+    line-height: 1.6;
+    color: $muted;
+  }
+
+  .d2-empty {
+    margin: 0;
+    color: $muted;
+    font-size: 16px;
+  }
+
+  /* ---- file cards (docs / rules / rating) ----------------------- */
+  /* Full title always shown; footer pinned to the bottom so cards in
+     a row line up to equal height regardless of title length. */
+
+  .d2-files {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .d2-file {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    padding: 24px;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 10px 26px rgba(7, 68, 98, 0.05);
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      border-color: rgba(7, 68, 98, 0.2);
+      box-shadow: 0 18px 40px rgba(7, 68, 98, 0.12);
+
+      .d2-file__arrow {
+        background: $ink;
+        color: #ffffff;
+      }
+    }
+  }
+
+  .d2-file__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: rgba(244, 223, 0, 0.24);
+    color: $ink;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .d2-file__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.35;
+    color: $ink;
+  }
+
+  .d2-file__desc {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: $muted;
+  }
+
+  .d2-file__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 6px;
+  }
+
+  .d2-file__open {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: $ink;
+  }
+
+  .d2-file__arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: rgba(7, 68, 98, 0.08);
+    color: $ink;
+    font-size: 15px;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  /* ---- responsive ----------------------------------------------- */
+
+  @media (max-width: 992px) {
+    .d2-section {
+      min-height: auto;
+      padding: 96px 0 56px;
+    }
+
+    /* Mobile header stays sticky (menu); size the hero to content. */
+    .d2-hero {
+      min-height: auto;
+    }
+
+    .d2-hero__inner {
+      grid-template-columns: 1fr;
+      gap: 34px;
+    }
+
+    .d2-hero__visual {
+      order: -1;
+    }
+
+    .d2-hero__card {
+      width: min(320px, 78vw);
+      padding: 28px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .d2-hero__title {
+      font-size: clamp(30px, 8vw, 40px);
+    }
+
+    .d2-btn {
+      min-height: 50px;
+      padding: 0 24px;
+      font-size: 15px;
+    }
+  }
+}

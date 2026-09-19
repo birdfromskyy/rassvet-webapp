@@ -28,7 +28,7 @@ func (h *AdminHandler) GetAllReviews(c *gin.Context) {
 	}
 
 	if err := query.Find(&reviews).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reviews"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *AdminHandler) GetPendingReviews(c *gin.Context) {
 	var reviews []models.Review
 
 	if err := h.db.Preload("User").Where("status = ?", models.StatusPending).Find(&reviews).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch pending reviews"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
 
@@ -49,7 +49,7 @@ func (h *AdminHandler) GetPendingReviews(c *gin.Context) {
 func (h *AdminHandler) UpdateReview(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid review ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID отзыва"})
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *AdminHandler) UpdateReview(c *gin.Context) {
 
 	var review models.Review
 	if err := h.db.First(&review, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Отзыв не найден"})
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *AdminHandler) UpdateReview(c *gin.Context) {
 	review.Rating = req.Rating
 
 	if err := h.db.Save(&review).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update review"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить отзыв"})
 		return
 	}
 
@@ -86,12 +86,12 @@ func (h *AdminHandler) UpdateReview(c *gin.Context) {
 func (h *AdminHandler) DeleteReview(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid review ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID отзыва"})
 		return
 	}
 
 	if err := h.db.Delete(&models.Review{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete review"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить отзыв"})
 		return
 	}
 
@@ -101,20 +101,20 @@ func (h *AdminHandler) DeleteReview(c *gin.Context) {
 func (h *AdminHandler) ApproveReview(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid review ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID отзыва"})
 		return
 	}
 
 	var review models.Review
 	if err := h.db.First(&review, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Отзыв не найден"})
 		return
 	}
 
 	review.Status = models.StatusApproved
 
 	if err := h.db.Save(&review).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to approve review"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 
@@ -127,20 +127,20 @@ func (h *AdminHandler) ApproveReview(c *gin.Context) {
 func (h *AdminHandler) RejectReview(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid review ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный ID отзыва"})
 		return
 	}
 
 	var review models.Review
 	if err := h.db.First(&review, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Review not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Отзыв не найден"})
 		return
 	}
 
 	review.Status = models.StatusRejected
 
 	if err := h.db.Save(&review).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reject review"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
 		return
 	}
 

@@ -1,0 +1,29 @@
+---
+- name: Ensure application directory exists
+  ansible.builtin.file:
+    path: "{{ rassvet_app_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Rassvet systemd unit
+  ansible.builtin.template:
+    src: rassvet.service.j2
+    dest: /etc/systemd/system/rassvet.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+
+- name: Enable Rassvet service without forcing a deployment
+  ansible.builtin.systemd_service:
+    name: rassvet
+    enabled: true
+    daemon_reload: true
+
+- name: Start Rassvet service only when explicitly requested
+  ansible.builtin.systemd_service:
+    name: rassvet
+    state: started
+  when: rassvet_service_start | bool

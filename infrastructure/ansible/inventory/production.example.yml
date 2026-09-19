@@ -1,0 +1,6 @@
+---
+all:
+  hosts:
+    production:
+      ansible_host: 157.22.193.21
+      ansible_user: birdfromsky

@@ -1,0 +1,21 @@
+---
+- name: Configure Rassvet production host
+  hosts: production
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: common
+      tags: [common]
+    - role: docker
+      tags: [docker]
+    - role: security
+      tags: [security]
+    - role: nginx
+      tags: [nginx]
+    - role: application
+      tags: [application]
+    - role: backup
+      tags: [backup]
+    - role: monitoring
+      tags: [monitoring]

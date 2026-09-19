@@ -1,0 +1,146 @@
+---
+- name: Validate administrative account inputs
+  ansible.builtin.assert:
+    that:
+      - admin_user_name | length > 0
+      - admin_password_hash | length > 20
+      - lookup('ansible.builtin.file', admin_authorized_key_file) | trim | length > 40
+    fail_msg: >-
+      Set a valid vault_admin_password_hash and ensure the administrative
+      public key exists on the Ansible controller before changing SSH access.
+  when: manage_admin_user | bool
+  no_log: true
+
+- name: Create the personal administrative account
+  ansible.builtin.user:
+    name: "{{ admin_user_name }}"
+    groups: sudo
+    append: true
+    create_home: true
+    home: "/home/{{ admin_user_name }}"
+    shell: "{{ admin_user_shell }}"
+    password: "{{ admin_password_hash }}"
+    update_password: on_create
+    password_lock: false
+  when: manage_admin_user | bool
+
+- name: Install the administrative SSH public key
+  ansible.posix.authorized_key:
+    user: "{{ admin_user_name }}"
+    key: "{{ lookup('ansible.builtin.file', admin_authorized_key_file) }}"
+    state: present
+    exclusive: false
+    manage_dir: true
+  when: manage_admin_user | bool
+
+- name: Validate restricted deploy account inputs
+  ansible.builtin.assert:
+    that:
+      - deploy_user_name | length > 0
+      - lookup('ansible.builtin.file', deploy_authorized_key_file) | trim | length > 40
+      - deploy_forced_command_path.startswith('/usr/local/')
+    fail_msg: >-
+      Ensure the dedicated deploy public key exists on the Ansible controller
+      before enabling the restricted production account.
+  when: manage_deploy_user | bool
+
+- name: Create the locked deploy account
+  ansible.builtin.user:
+    name: "{{ deploy_user_name }}"
+    create_home: true
+    home: "/home/{{ deploy_user_name }}"
+    shell: "{{ deploy_user_shell }}"
+    password_lock: true
+  when: manage_deploy_user | bool
+
+- name: Install the restricted deploy command directory
+  ansible.builtin.file:
+    path: "{{ deploy_forced_command_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: manage_deploy_user | bool
+
+- name: Install the restricted deploy SSH command
+  ansible.builtin.template:
+    src: rassvet-deploy-ssh.j2
+    dest: "{{ deploy_forced_command_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+  when: manage_deploy_user | bool
+
+- name: Install the dedicated restricted deploy key
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user_name }}"
+    key: "{{ lookup('ansible.builtin.file', deploy_authorized_key_file) }}"
+    key_options: 'restrict,command="{{ deploy_forced_command_path }}"'
+    state: present
+    exclusive: true
+    manage_dir: true
+  when: manage_deploy_user | bool
+
+- name: Configure primary SSH hardening
+  ansible.builtin.template:
+    src: 00-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Reload SSH
+
+- name: Remove the superseded late SSH override
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d/99-hardening.conf
+    state: absent
+  notify: Reload SSH
+
+- name: Configure fail2ban
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Install the Rassvet Nginx scanner filter
+  ansible.builtin.template:
+    src: rassvet-nginx-scanners.conf.j2
+    dest: /etc/fail2ban/filter.d/rassvet-nginx-scanners.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+
+- name: Enable fail2ban
+  ansible.builtin.systemd_service:
+    name: fail2ban
+    enabled: true
+    state: started
+
+- name: Set UFW default incoming policy
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Set UFW default outgoing policy
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Allow required public TCP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "{{ ssh_port }}"
+    - "80"
+    - "443"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

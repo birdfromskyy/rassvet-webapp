@@ -1,0 +1,116 @@
+/* /history — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.history-page {
+  @include design2-base;
+
+  .hp-timeline {
+    background: $paper;
+  }
+
+  /* Vertical timeline: yellow rail, year markers, content cards. */
+  .hp-line {
+    position: relative;
+    margin: 0;
+    padding: 0 0 0 0;
+    list-style: none;
+  }
+
+  .hp-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 140px minmax(0, 1fr);
+    gap: clamp(20px, 3vw, 44px);
+    padding: 0 0 34px 0;
+
+    &:last-child {
+      padding-bottom: 0;
+    }
+
+    /* the rail runs through the marker column */
+    &::before {
+      content: "";
+      position: absolute;
+      left: 139px;
+      top: 14px;
+      bottom: -6px;
+      width: 2px;
+      background: rgba(7, 68, 98, 0.14);
+    }
+
+    &:last-child::before {
+      display: none;
+    }
+  }
+
+  .hp-item__marker {
+    position: absolute;
+    left: 132px;
+    top: 8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: $yellow;
+    border: 3px solid $paper;
+    box-shadow: 0 0 0 2px rgba(7, 68, 98, 0.14);
+  }
+
+  .hp-item__year {
+    justify-self: start;
+    padding-top: 2px;
+    font-size: clamp(24px, 2.4vw, 34px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $ink;
+  }
+
+  .hp-item__card {
+    padding: 24px 26px;
+    border-radius: 22px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 18px 40px rgba(7, 68, 98, 0.1);
+    }
+
+    p {
+      margin: 0;
+      font-size: clamp(15px, 1.2vw, 17px);
+      line-height: 1.55;
+      color: $content;
+
+      + p {
+        margin-top: 10px;
+      }
+    }
+  }
+
+  @media (max-width: 768px) {
+    .hp-item {
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding-left: 26px;
+    }
+
+    /* rail moves to the far left on mobile */
+    .hp-item::before {
+      left: 7px;
+      top: 30px;
+      bottom: -18px;
+    }
+
+    .hp-item__marker {
+      left: 0;
+      top: 8px;
+    }
+
+    .hp-item__year {
+      padding-top: 0;
+    }
+  }
+}

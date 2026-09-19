@@ -1,0 +1,54 @@
+---
+- name: Configure bounded persistent journal storage
+  ansible.builtin.template:
+    src: 60-rassvet-limits.conf.j2
+    dest: /etc/systemd/journald.conf.d/60-rassvet-limits.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart systemd-journald
+
+- name: Install production health checker
+  ansible.builtin.template:
+    src: rassvet-monitor.sh.j2
+    dest: /usr/local/sbin/rassvet-monitor
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install optional heartbeat environment
+  ansible.builtin.template:
+    src: rassvet-monitor.env.j2
+    dest: /etc/default/rassvet-monitor
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Install monitoring service
+  ansible.builtin.template:
+    src: rassvet-monitor.service.j2
+    dest: /etc/systemd/system/rassvet-monitor.service
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install monitoring timer
+  ansible.builtin.template:
+    src: rassvet-monitor.timer.j2
+    dest: /etc/systemd/system/rassvet-monitor.timer
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable the monitoring timer
+  ansible.builtin.systemd_service:
+    name: rassvet-monitor.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Run the initial production health check
+  ansible.builtin.systemd_service:
+    name: rassvet-monitor.service
+    state: started

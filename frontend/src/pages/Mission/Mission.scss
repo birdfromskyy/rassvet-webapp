@@ -1,0 +1,290 @@
+/* ============================================================
+   /mission — "Rassvet 2.0" design (Skills/Design2.md).
+   Brand palette, Manrope, dark statement screen + light goals.
+   Natural scroll. Scoped under .mission-page — nothing leaks.
+   ============================================================ */
+
+$mp-ink: #074462;
+$mp-night: #052c40;
+$mp-night-2: #0a3a55;
+$mp-paper: #f7f4ec;
+$mp-yellow: #f4df00;
+$mp-muted: #55707f;
+$mp-border: rgba(7, 68, 98, 0.1);
+$mp-font: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+.mission-page {
+  background: $mp-paper;
+  color: $mp-ink;
+  font-family: $mp-font;
+
+  /* ---- header: pinned, opaque cream (identical on every page) ---- */
+
+  .header {
+    background: #f3efe3;
+  }
+
+  .header--hidden {
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Desktop: float the header over the first screen (see the note in
+     ThirdMain.scss) so the hero doesn't sit low on first paint. */
+  @media (min-width: 993px) {
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+  }
+
+  /* ---- shared primitives ------------------------------------ */
+
+  .mp-section {
+    position: relative;
+    min-height: 100vh; /* fallback for browsers without svh */
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 118px 0 72px;
+    overflow: hidden;
+  }
+
+  .mp-h2 {
+    margin: 0;
+    font-size: clamp(32px, 3.6vw, 54px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    color: $mp-ink;
+  }
+
+  .mp-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    &::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: $mp-yellow;
+    }
+
+    &--dark {
+      border-color: rgba(7, 68, 98, 0.25);
+      color: $mp-muted;
+    }
+  }
+
+  /* ---- reveal-on-scroll ------------------------------------- */
+
+  [data-reveal] {
+    opacity: 0;
+    transform: translateY(26px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 0.61, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+    will-change: opacity, transform;
+
+    &.is-in {
+      opacity: 1;
+      transform: none;
+      will-change: auto;
+    }
+  }
+
+  [data-reveal-delay="1"] { transition-delay: 0.12s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+
+  /* ---- screen 1: hero (dark) --------------------------------- */
+
+  .mp-hero {
+    background: $mp-night;
+    color: #ffffff;
+  }
+
+  .mp-hero__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(58% 46% at 20% 108%, rgba(244, 223, 0, 0.2), transparent 70%),
+      radial-gradient(46% 40% at 62% 112%, rgba(244, 223, 0, 0.1), transparent 70%),
+      radial-gradient(70% 60% at 88% -12%, rgba(11, 95, 136, 0.4), transparent 75%);
+  }
+
+  .mp-hero__inner {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: center;
+    gap: clamp(32px, 5vw, 80px);
+  }
+
+  .mp-hero__title {
+    margin: 26px 0 22px;
+    font-size: clamp(36px, 4.2vw, 62px);
+    font-weight: 800;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+  }
+
+  .mp-hero__text {
+    margin: 0;
+    max-width: 640px;
+    font-size: clamp(17px, 1.4vw, 21px);
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .mp-hero__visual {
+    display: flex;
+    justify-content: center;
+  }
+
+  .mp-hero__card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: min(100%, 420px);
+    padding: clamp(28px, 4vw, 52px);
+    border-radius: 28px;
+    background: #faf6ee;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+
+    img {
+      width: 100%;
+      max-width: 300px;
+      height: auto;
+      object-fit: contain;
+    }
+  }
+
+  /* ---- screen 2: goals (light) ------------------------------- */
+
+  .mp-goals {
+    background: $mp-paper;
+  }
+
+  .mp-goals__head {
+    margin-bottom: clamp(28px, 4vh, 52px);
+
+    .mp-h2 {
+      margin-top: 16px;
+    }
+  }
+
+  .mp-goals__grid {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .mp-goal {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 28px 26px;
+    border-radius: 22px;
+    background: #ffffff;
+    border: 1px solid $mp-border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 42px rgba(7, 68, 98, 0.1);
+    }
+
+    p {
+      margin: 0;
+      font-size: clamp(15px, 1.2vw, 17px);
+      line-height: 1.55;
+      color: #2a4050;
+      font-weight: 500;
+    }
+  }
+
+  .mp-goal__num {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: 15px;
+    font-weight: 800;
+    color: rgba(7, 68, 98, 0.5);
+    letter-spacing: 0.1em;
+    padding-bottom: 6px;
+    border-bottom: 2px solid $mp-yellow;
+  }
+
+  .mp-goals__empty {
+    margin: 0;
+    color: $mp-muted;
+    font-size: 16px;
+  }
+
+  /* ---- responsive -------------------------------------------- */
+
+  @media (max-width: 992px) {
+    .mp-section {
+      min-height: auto;
+      padding: 96px 0 56px;
+    }
+
+    /* Mobile keeps the header sticky, so size the hero to content
+       (see the note in ThirdMain.scss). */
+    .mp-hero {
+      min-height: auto;
+    }
+
+    .mp-hero__inner {
+      grid-template-columns: 1fr;
+      gap: 34px;
+    }
+
+    .mp-hero__visual {
+      order: -1;
+    }
+
+    .mp-hero__card {
+      width: min(320px, 78vw);
+      padding: 28px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .mp-goals__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .mp-hero__title {
+      font-size: clamp(30px, 8vw, 40px);
+    }
+  }
+}

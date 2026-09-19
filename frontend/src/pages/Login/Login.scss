@@ -1,0 +1,6 @@
+/* /login — "Rassvet 2.0" auth design (Skills/Design2.md). */
+@use "../../styles/auth" as *;
+
+.login-page {
+  @include auth-base;
+}

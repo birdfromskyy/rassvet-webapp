@@ -1,0 +1,99 @@
+.review-card {
+  background: #ffffff;
+
+  border-radius: 28px;
+
+  padding: 28px;
+
+  box-shadow: 0 16px 36px rgba(7, 68, 98, 0.12);
+}
+
+.review-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+
+  margin-bottom: 20px;
+}
+
+.review-card__top h2 {
+  margin: 0 0 10px;
+
+  color: #074462;
+  font-size: 24px;
+}
+
+.review-card__rating {
+  color: #f7c600;
+
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+
+.review-card__status {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 38px;
+
+  padding: 0 16px;
+
+  border-radius: 999px;
+
+  font-size: 13px;
+  font-weight: 800;
+
+  white-space: nowrap;
+}
+
+.review-card__status--approved {
+  background: #d9f3df;
+  color: #1b7d36;
+}
+
+.review-card__status--pending {
+  background: #fff3cd;
+  color: #8b6a00;
+}
+
+.review-card__status--rejected {
+  background: #ffdede;
+  color: #b42323;
+}
+
+.review-card__content {
+  margin: 0;
+
+  color: #264757;
+
+  font-size: 17px;
+  line-height: 1.8;
+}
+
+.review-card__bottom {
+  margin-top: 24px;
+
+  color: #6f858f;
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .review-card {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .review-card__top {
+    flex-direction: column;
+  }
+
+  .review-card__top h2 {
+    font-size: 21px;
+  }
+
+  .review-card__content {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+}

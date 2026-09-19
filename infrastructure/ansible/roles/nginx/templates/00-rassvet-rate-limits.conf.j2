@@ -1,0 +1,6 @@
+map $uri $rassvet_auth_limit_key {
+    default "";
+    ~^/api/(?:login|register|verify-email|resend-code|forgot-password|reset-password|refresh)$ $binary_remote_addr;
+}
+
+limit_req_zone $rassvet_auth_limit_key zone=rassvet_auth:10m rate=60r/m;

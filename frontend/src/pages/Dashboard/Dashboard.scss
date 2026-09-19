@@ -1,0 +1,326 @@
+/* /dashboard — "Rassvet 2.0" design (Skills/Design2.md).
+   Compact dark hero band + brand-styled widgets. Widget markup and
+   all logic are unchanged — only the look is restyled here. */
+
+@use "../../styles/design2" as *;
+
+.dashboard-page {
+  @include design2-base;
+
+  /* ---- hero band (compact, not full screen) ----------------- */
+
+  .dash-hero {
+    position: relative;
+    background: $night;
+    color: #ffffff;
+    padding: 140px 0 52px;
+    overflow: hidden;
+  }
+
+  .dash-hero__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(50% 60% at 90% -10%, rgba(11, 95, 136, 0.4), transparent 70%),
+      radial-gradient(50% 55% at 6% 120%, rgba(244, 223, 0, 0.12), transparent 70%);
+  }
+
+  .dash-hero__inner {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .dash-hero__title {
+    margin: 18px 0 12px;
+    font-size: clamp(30px, 3.4vw, 48px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+
+  .dash-hero__subtitle {
+    margin: 0;
+    max-width: 640px;
+    font-size: clamp(15px, 1.3vw, 18px);
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .dash-hero__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  /* ---- body ------------------------------------------------- */
+
+  .dash-body {
+    padding: clamp(32px, 5vh, 56px) 0 72px;
+
+    > .page-container {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+  }
+
+  .dashboard__main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ---- info cards (admin / user) ---------------------------- */
+
+  .dashboard__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px;
+    align-content: start;
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .dashboard-card {
+    display: flex;
+    flex-direction: column;
+    padding: 26px;
+    border-radius: 22px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 42px rgba(7, 68, 98, 0.1);
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: $ink;
+    }
+
+    p {
+      margin: 0 0 20px;
+      flex: 1;
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: $muted;
+    }
+
+    button {
+      align-self: flex-start;
+      min-height: 44px;
+      padding: 0 22px;
+      border: none;
+      border-radius: 999px;
+      background: $yellow;
+      color: $ink;
+      font-family: $font;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px rgba(244, 223, 0, 0.3);
+      }
+    }
+  }
+
+  /* ---- schedule + document widgets -------------------------- */
+
+  .dashboard-schedule,
+  .dashboard-documents {
+    padding: clamp(24px, 2.6vw, 34px);
+    border-radius: 26px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 14px 34px rgba(7, 68, 98, 0.06);
+
+    h2 {
+      margin: 8px 0 0;
+      font-size: clamp(20px, 1.8vw, 26px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: $ink;
+    }
+  }
+
+  .dashboard-documents {
+    h2 {
+      margin-bottom: 12px;
+    }
+
+    p {
+      font-size: 15px;
+      line-height: 1.6;
+      color: $content;
+    }
+
+    ul {
+      margin: 14px 0;
+      padding-left: 20px;
+      color: $content;
+      line-height: 1.7;
+    }
+
+    > button {
+      min-height: 46px;
+      margin-top: 8px;
+      padding: 0 24px;
+      border: none;
+      border-radius: 999px;
+      background: $ink;
+      color: #ffffff;
+      font-family: $font;
+      font-weight: 700;
+      cursor: pointer;
+
+      &:hover {
+        background: #0b5f88;
+      }
+    }
+  }
+
+  .dashboard-schedule__top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+
+    button {
+      min-height: 42px;
+      padding: 0 18px;
+      border: 1.5px solid rgba(7, 68, 98, 0.25);
+      border-radius: 999px;
+      background: transparent;
+      color: $ink;
+      font-family: $font;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+
+      &:hover {
+        background: $ink;
+        color: #ffffff;
+      }
+    }
+  }
+
+  .dashboard-schedule__switcher {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    font-weight: 700;
+    color: $ink;
+
+    button {
+      width: 38px;
+      height: 38px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(7, 68, 98, 0.08);
+      color: $ink;
+      font-size: 16px;
+      cursor: pointer;
+
+      &:hover {
+        background: $yellow;
+      }
+    }
+  }
+
+  .dashboard-schedule__list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dashboard-schedule__item {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px 18px;
+    border-radius: 18px;
+    background: $paper;
+    border: 1px solid $border;
+  }
+
+  .dashboard-schedule__time {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 15px;
+    font-weight: 800;
+    color: $ink;
+  }
+
+  .dashboard-schedule__duration {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: $muted;
+  }
+
+  .dashboard-schedule__info {
+    h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 800;
+      color: $ink;
+    }
+
+    p {
+      margin: 0 0 3px;
+      font-size: 13.5px;
+      color: $content;
+    }
+  }
+
+  .dashboard-schedule__label {
+    color: $muted;
+  }
+
+  .dashboard-schedule__secondary {
+    color: $muted;
+  }
+
+  .dashboard-schedule__empty {
+    padding: 26px;
+    text-align: center;
+    color: $muted;
+    background: $paper;
+    border-radius: 16px;
+  }
+
+  /* ---- news at the bottom ----------------------------------- */
+
+  .dashboard-news {
+    margin-top: 8px;
+  }
+
+  @media (max-width: 900px) {
+    .dashboard__main-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}

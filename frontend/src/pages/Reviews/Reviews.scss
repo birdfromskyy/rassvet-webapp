@@ -1,0 +1,123 @@
+/* /reviews — "Rassvet 2.0" design (Skills/Design2.md).
+   Reuses the shared <ReviewCard>, restyled within this scope. */
+
+@use "../../styles/design2" as *;
+
+.reviews-page {
+  @include design2-base;
+
+  .rv-hero-actions {
+    margin-top: 30px;
+  }
+
+  .rv-section {
+    background: $paper;
+  }
+
+  .rv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+  }
+
+  .rv-cell {
+    display: flex;
+  }
+
+  /* ReviewCard restyle (scoped) */
+  .review-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding: 28px 26px;
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.06);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 44px rgba(7, 68, 98, 0.11);
+    }
+  }
+
+  .review-card__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+
+    h2 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      font-weight: 800;
+      color: $ink;
+    }
+  }
+
+  .review-card__rating {
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: #e3b800;
+  }
+
+  .review-card__content {
+    margin: 0 0 18px;
+    flex: 1;
+    font-size: 15px;
+    line-height: 1.6;
+    color: $content;
+  }
+
+  .review-card__bottom {
+    font-size: 13px;
+    color: $muted;
+  }
+
+  /* ---- pagination (4 per page) -------------------------------- */
+  .rv-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 40px;
+  }
+
+  .rv-pagination__num,
+  .rv-pagination__arrow {
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border: 1.5px solid $border;
+    border-radius: 14px;
+    background: #ffffff;
+    color: $ink;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+
+    &:hover:not(:disabled) {
+      background: rgba(7, 68, 98, 0.06);
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
+  .rv-pagination__num--active {
+    background: $ink;
+    border-color: $ink;
+    color: #ffffff;
+
+    &:hover {
+      background: $ink;
+    }
+  }
+}

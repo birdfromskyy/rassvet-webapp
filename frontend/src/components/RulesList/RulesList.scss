@@ -1,0 +1,179 @@
+.rules-list {
+  background: #dfe7ee;
+  padding: 30px 0 120px;
+  color: #074462;
+}
+
+.rules-list .container {
+  width: min(94%, 1440px);
+  margin: 0 auto;
+}
+
+.rules-list__heading {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.rules-list__subtitle {
+  display: inline-block;
+  background: #f4df00;
+  color: #074462;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-size: 20px;
+  margin-bottom: 24px;
+}
+
+.rules-list__title {
+  font-family: "Merriweather", serif;
+  font-size: clamp(34px, 5vw, 62px);
+  line-height: 1.1;
+}
+
+.rules-list__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.rules-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  min-width: 0;
+  background: #ffffff;
+  border-radius: 32px;
+  padding: 25px;
+  text-decoration: none;
+  box-shadow: 10px 12px 0 rgba(7, 68, 98, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 12px 16px 0 rgba(7, 68, 98, 0.16);
+  }
+}
+
+.rules-card__icon {
+  flex: 0 0 68px;
+  width: 68px;
+  min-width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #f4df00;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Merriweather", serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: #074462;
+  box-sizing: border-box;
+}
+
+.rules-card__content {
+  min-width: 0;
+
+  h3 {
+    font-size: 23px;
+    line-height: 1.35;
+    color: #074462;
+    margin-bottom: 10px;
+    overflow-wrap: anywhere;
+  }
+
+  p {
+    font-size: 18px;
+    color: #2a617f;
+  }
+}
+
+@media (max-width: 900px) {
+  .rules-list {
+    padding: 40px 0 100px;
+  }
+
+  .rules-list__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rules-list__heading {
+    margin-bottom: 40px;
+  }
+}
+
+@media (max-width: 560px) {
+  .rules-list {
+    padding: 50px 0 80px;
+  }
+
+  .rules-list .container {
+    width: min(94%, 100% - 24px);
+  }
+
+  .rules-list__heading {
+    margin-bottom: 30px;
+  }
+
+  .rules-list__subtitle {
+    padding: 10px 18px;
+    font-size: 15px;
+    margin-bottom: 18px;
+  }
+
+  .rules-list__title {
+    font-size: 32px;
+  }
+
+  .rules-list__grid {
+    gap: 22px;
+  }
+
+  .rules-card {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 16px;
+    border-radius: 24px;
+    box-shadow: 7px 9px 0 rgba(7, 68, 98, 0.12);
+  }
+
+  .rules-card__icon {
+    flex: 0 0 44px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    font-size: 11px;
+  }
+
+  .rules-card__content h3 {
+    font-size: 16px;
+    line-height: 1.25;
+    margin-bottom: 8px;
+  }
+
+  .rules-card__content p {
+    font-size: 14px;
+    line-height: 1.3;
+  }
+}
+
+@media (max-width: 360px) {
+  .rules-card {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+
+  .rules-card__icon {
+    flex-basis: 40px;
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    font-size: 10px;
+  }
+
+  .rules-card__content h3 {
+    font-size: 15px;
+  }
+}

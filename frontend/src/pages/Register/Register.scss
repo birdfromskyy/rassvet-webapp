@@ -1,0 +1,9 @@
+/* /register — "Rassvet 2.0" auth design (Skills/Design2.md). */
+@use "../../styles/auth" as *;
+
+.register-page {
+  @include auth-base;
+
+  /* Six fields, one per row (single column). */
+  .register-form__grid { grid-template-columns: 1fr; }
+}

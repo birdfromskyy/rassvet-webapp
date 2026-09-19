@@ -1,0 +1,188 @@
+/* /service-algorithm — "Rassvet 2.0" design (Skills/Design2.md).
+   Vertical connected steps with big numbers and gated actions. */
+
+@use "../../styles/design2" as *;
+
+.algo-page {
+  @include design2-base;
+
+  .algo-section {
+    background: $paper;
+  }
+
+  /* 3 tiles per row → two rows (01-02-03 / 04-05-06). */
+  .algo-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  .algo-step {
+    display: flex;
+    flex-direction: column;
+    padding: 28px;
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 42px rgba(7, 68, 98, 0.1);
+    }
+  }
+
+  .algo-step__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 18px;
+    border-radius: 18px;
+    background: $ink;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    box-shadow: 0 12px 26px rgba(7, 68, 98, 0.2);
+  }
+
+  .algo-step__card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: clamp(18px, 1.6vw, 22px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: $ink;
+    }
+
+    p {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.6;
+      color: $content;
+    }
+  }
+
+  /* interactive step states */
+  .algo-step--done {
+    border-color: rgba(46, 158, 91, 0.4);
+
+    .algo-step__num {
+      background: #2e9e5b;
+      box-shadow: 0 12px 26px rgba(46, 158, 91, 0.28);
+    }
+  }
+
+  .algo-step--active .algo-step__num {
+    background: #d8a800;
+    color: $ink;
+    box-shadow: 0 12px 26px rgba(216, 168, 0, 0.3);
+  }
+
+  .algo-step--locked {
+    background: #fbfaf6;
+
+    .algo-step__num {
+      background: #8a9fb0;
+      box-shadow: none;
+    }
+  }
+
+  @media (max-width: 900px) {
+    .algo-steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 600px) {
+    .algo-steps {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* actions */
+  .algo-step__action {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 18px;
+  }
+
+  .algo-btn {
+    min-height: 46px;
+    padding: 0 22px;
+    font-size: 15px;
+  }
+
+  .algo-btn--locked {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 46px;
+    padding: 0 22px;
+    border: 1.5px dashed rgba(7, 68, 98, 0.3);
+    border-radius: 16px;
+    background: transparent;
+    color: $muted;
+    font-family: $font;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: not-allowed;
+  }
+
+  .algo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 14.5px;
+    font-weight: 800;
+
+    &--done {
+      background: rgba(46, 158, 91, 0.15);
+      color: #1f7a45;
+    }
+
+    &--wait {
+      background: rgba(216, 168, 0, 0.18);
+      color: #8a6d00;
+    }
+
+    &--warn {
+      background: rgba(232, 104, 74, 0.16);
+      color: #c0472c;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .algo-step {
+      grid-template-columns: 64px minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .algo-step__num {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      font-size: 22px;
+    }
+
+    .algo-step::before {
+      left: 31px;
+      top: 66px;
+    }
+  }
+}

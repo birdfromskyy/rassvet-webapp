@@ -27,7 +27,27 @@ const authService = {
 	},
 
 	getMe: async () => {
-		const response = await api.get('/me')
+		const response = await api.get('/me', { _isInitialCheck: true })
+		return response.data
+	},
+
+	forgotPassword: async email => {
+		const response = await api.post('/forgot-password', { email })
+		return response.data
+	},
+
+	resetPassword: async (email, code) => {
+		const response = await api.post('/reset-password', { email, code })
+		return response.data
+	},
+
+	updateProfile: async data => {
+		const response = await api.put('/profile', data)
+		return response.data
+	},
+
+	deleteAccount: async () => {
+		const response = await api.delete('/me')
 		return response.data
 	},
 }

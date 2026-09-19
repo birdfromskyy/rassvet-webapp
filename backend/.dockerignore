@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+coverage
+logs
+uploads
+private_uploads
+.git
+*.log

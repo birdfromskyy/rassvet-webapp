@@ -1,0 +1,134 @@
+/* /vacancies — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.vacancies-page {
+  @include design2-base;
+
+  .vp-section {
+    background: $paper;
+  }
+
+  /* One vacancy per row — full-width cards read better. */
+  .vp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .vp-card {
+    border-radius: 26px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 14px 34px rgba(7, 68, 98, 0.06);
+    overflow: hidden;
+  }
+
+  .vp-card__head {
+    padding: clamp(22px, 2.4vw, 30px);
+    background: $night;
+    color: #ffffff;
+
+    h3 {
+      margin: 10px 0 0;
+      font-size: clamp(20px, 1.8vw, 26px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+  }
+
+  .vp-card__badge {
+    display: inline-block;
+    padding: 5px 13px;
+    border-radius: 999px;
+    background: rgba(244, 223, 0, 0.2);
+    color: $yellow;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* CSS columns (not grid): sections flow and fill both columns
+     evenly, so short sections don't leave big empty gaps. */
+  .vp-card__body {
+    padding: clamp(22px, 2.2vw, 32px);
+    columns: 2;
+    column-gap: 40px;
+  }
+
+  .vp-block {
+    break-inside: avoid;
+    margin-bottom: 22px;
+  }
+
+  @media (max-width: 640px) {
+    .vp-card__body {
+      columns: 1;
+    }
+  }
+
+  .vp-block__title {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: $muted;
+  }
+
+  .vp-block__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      position: relative;
+      padding-left: 18px;
+      margin-bottom: 8px;
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: $content;
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 8px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: $yellow;
+      }
+    }
+  }
+
+  .vp-cta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-top: clamp(28px, 4vh, 48px);
+    padding: clamp(28px, 3vw, 44px);
+    border-radius: 26px;
+    background: $night;
+    color: #ffffff;
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: clamp(20px, 2vw, 28px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    p {
+      margin: 0;
+      max-width: 640px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.78);
+    }
+  }
+}

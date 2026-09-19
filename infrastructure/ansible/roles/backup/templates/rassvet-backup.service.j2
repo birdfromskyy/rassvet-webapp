@@ -1,0 +1,36 @@
+[Unit]
+Description=Rassvet encrypted production backup
+Documentation=https://restic.readthedocs.io/
+Requires=docker.service
+After=docker.service
+ConditionPathExists=/etc/rassvet-backup/restic.env
+ConditionPathExists=/etc/rassvet-backup/restic-password
+
+[Service]
+Type=oneshot
+Environment=TZ=Asia/Yekaterinburg
+ExecStart=/usr/local/sbin/rassvet-backup backup
+UMask=0077
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUWeight=20
+IOWeight=20
+MemoryHigh=650M
+MemoryMax=850M
+TasksMax=100
+TimeoutStartSec=infinity
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+RuntimeDirectory=rassvet-backup
+RuntimeDirectoryMode=0700
+StateDirectory=rassvet-backup
+StateDirectoryMode=0700
+CacheDirectory=restic
+CacheDirectoryMode=0700
+ReadWritePaths=/var/backups/rassvet-restic
+
+[Install]
+WantedBy=multi-user.target

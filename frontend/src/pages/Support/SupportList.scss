@@ -1,0 +1,160 @@
+/* /support (list) — "Rassvet 2.0" design (Skills/Design2.md).
+   Scoped so the shared Support.scss (ticket/new pages) is untouched. */
+
+@use "../../styles/design2" as *;
+
+.support-list-page {
+  @include design2-base;
+  background: $paper;
+
+  .sup-hero {
+    position: relative;
+    background: $night;
+    color: #ffffff;
+    padding: 140px 0 52px;
+    overflow: hidden;
+  }
+
+  .sup-hero__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(50% 60% at 90% -10%, rgba(11, 95, 136, 0.4), transparent 70%),
+      radial-gradient(50% 55% at 6% 120%, rgba(244, 223, 0, 0.12), transparent 70%);
+  }
+
+  .sup-hero__inner {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .sup-hero__title {
+    margin: 18px 0 12px;
+    font-size: clamp(30px, 3.4vw, 48px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+
+  .sup-hero__text {
+    margin: 0;
+    max-width: 560px;
+    font-size: clamp(15px, 1.3vw, 18px);
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  .sup-body {
+    padding: clamp(32px, 5vh, 56px) 0 72px;
+  }
+
+  .sup-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 56px 24px;
+    text-align: center;
+    border-radius: 26px;
+    background: #ffffff;
+    border: 1px solid $border;
+
+    p {
+      margin: 0;
+      color: $muted;
+      font-size: 16px;
+    }
+  }
+
+  .sup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .sup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 10px 26px rgba(7, 68, 98, 0.05);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+    &:hover {
+      transform: translateY(-3px);
+      border-color: rgba(7, 68, 98, 0.2);
+      box-shadow: 0 18px 40px rgba(7, 68, 98, 0.12);
+    }
+  }
+
+  .sup-item__subject {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 800;
+    color: $ink;
+  }
+
+  .sup-item__meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: $muted;
+  }
+
+  .sup-item__cat {
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(244, 223, 0, 0.22);
+    color: $ink;
+    font-weight: 700;
+  }
+
+  .sup-status {
+    flex: 0 0 auto;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+    background: rgba(7, 68, 98, 0.08);
+    color: $ink;
+
+    &--open,
+    &--new {
+      background: rgba(216, 168, 0, 0.18);
+      color: #8a6d00;
+    }
+
+    &--answered,
+    &--in_progress {
+      background: rgba(11, 95, 136, 0.14);
+      color: #0b5f88;
+    }
+
+    &--closed,
+    &--resolved {
+      background: rgba(46, 158, 91, 0.16);
+      color: #1f7a45;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .sup-item {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+}

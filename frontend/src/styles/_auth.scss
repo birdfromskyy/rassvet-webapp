@@ -1,0 +1,284 @@
+/* Shared auth-page look — "Rassvet 2.0" design (Skills/Design2.md).
+   A dark "dawn" branded background with a centered white card.
+   Included under each auth page's root class; targets the parallel
+   BEM structure via ends-with selectors so no JSX changes are needed. */
+
+@forward "./design2";
+@use "./design2" as *;
+
+@mixin auth-base {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: $night;
+  color: $ink;
+  font-family: $font;
+  overflow: hidden;
+
+  /* dawn glow */
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(48% 52% at 16% 110%, rgba(244, 223, 0, 0.18), transparent 70%),
+      radial-gradient(46% 50% at 84% -12%, rgba(11, 95, 136, 0.5), transparent 72%);
+  }
+
+  .page-container,
+  [class$="__wrapper"] {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* ---- card ---- */
+  [class$="-card"],
+  [class$="__card"] {
+    width: min(100%, 480px);
+    padding: clamp(30px, 4vw, 48px);
+    border-radius: 28px;
+    background: #ffffff;
+    border: 1px solid rgba(7, 68, 98, 0.08);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  }
+
+  [class$="__top"] {
+    margin-bottom: 26px;
+    text-align: center;
+  }
+
+  h1,
+  h2 {
+    margin: 0 0 10px;
+    font-size: clamp(24px, 2.6vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $ink;
+  }
+
+  [class$="__top"] p,
+  [class$="__text"] {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: $muted;
+  }
+
+  /* ---- form ---- */
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  [class$="__grid"] {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  [class$="__field"] {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    small {
+      font-size: 12.5px;
+      color: $muted;
+    }
+  }
+
+  label {
+    font-size: 14px;
+    font-weight: 700;
+    color: $ink;
+  }
+
+  /* text inputs (NOT checkboxes/radios) */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid rgba(7, 68, 98, 0.16);
+    border-radius: 14px;
+    background: $paper;
+    color: $ink;
+    font-family: $font;
+    font-size: 15px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+
+    &::placeholder {
+      color: #9fb1bd;
+    }
+
+    &:focus {
+      border-color: $ink;
+      background: #ffffff;
+      box-shadow: 0 0 0 4px rgba(7, 68, 98, 0.08);
+    }
+  }
+
+  /* password field with eye toggle */
+  [class$="__input-wrap"] {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    input {
+      padding-right: 46px;
+    }
+  }
+
+  [class$="__eye"] {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: $muted;
+    cursor: pointer;
+
+    &:hover {
+      color: $ink;
+    }
+  }
+
+  /* ---- submit button ---- */
+  [class$="__button"],
+  [class$="__submit"] {
+    width: 100%;
+    min-height: 54px;
+    padding: 0 24px;
+    border: none;
+    border-radius: 14px;
+    background: $ink;
+    color: #ffffff;
+    font-family: $font;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      background: #0b5f88;
+      box-shadow: 0 16px 34px rgba(7, 68, 98, 0.28);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  }
+
+  /* ---- links / bottom ---- */
+  a {
+    color: #0b5f88;
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  [class$="__bottom"] {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 14px;
+    color: $muted;
+
+    span {
+      margin-right: 6px;
+    }
+  }
+
+  /* ---- alerts / notices ---- */
+  [class$="__alert"],
+  [class$="__error"],
+  [class$="--error"],
+  [class$="__notice"] {
+    padding: 13px 16px;
+    border-radius: 14px;
+    background: rgba(232, 104, 74, 0.12);
+    border: 1px solid rgba(232, 104, 74, 0.3);
+    color: #c0472c;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+
+  /* field-level error is a small inline span, not a full banner */
+  [class$="__field"] [class$="__error"] {
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 12.5px;
+  }
+
+  [class$="__success"] {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: rgba(46, 158, 91, 0.12);
+    border: 1px solid rgba(46, 158, 91, 0.3);
+    color: #1f7a45;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  /* ---- consent checkbox (register) ---- */
+  [class$="__consent"] {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  [class$="__consent-label"] {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: $muted;
+    cursor: pointer;
+
+    input[type="checkbox"] {
+      flex: 0 0 auto;
+      width: 22px;
+      height: 22px;
+      margin-top: 1px;
+      accent-color: $ink;
+      cursor: pointer;
+    }
+
+    a {
+      color: $ink;
+      font-weight: 800;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      text-decoration-thickness: 2px;
+      text-decoration-color: $yellow;
+    }
+  }
+}

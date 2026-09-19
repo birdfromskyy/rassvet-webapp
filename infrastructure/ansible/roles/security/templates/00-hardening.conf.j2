@@ -1,0 +1,14 @@
+Port {{ ssh_port }}
+PermitRootLogin {{ ssh_permit_root_login }}
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+MaxAuthTries 3
+LoginGraceTime 20
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+GatewayPorts no
+PermitTunnel no
+PermitUserEnvironment no
+AllowUsers {{ ssh_allowed_users | join(' ') }}

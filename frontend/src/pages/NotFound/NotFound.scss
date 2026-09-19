@@ -1,0 +1,92 @@
+/* 404 page — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.notfound-page {
+  @include design2-base;
+
+  /* header: pinned + opaque, consistent with the rest of the site */
+  .header {
+    background: #f3efe3;
+  }
+  @media (min-width: 993px) {
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+    }
+  }
+
+  /* Dark hero that fills the screen so the 404 doesn't float in a void */
+  .nf-hero {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+  }
+
+  .nf-content {
+    max-width: 720px;
+    margin: 0 auto;
+    text-align: center;
+    align-items: center;
+  }
+
+  /* Big decorative 404 */
+  .nf-code {
+    font-family: $font;
+    font-weight: 800;
+    font-size: clamp(96px, 20vw, 220px);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    color: rgba(255, 255, 255, 0.14);
+    margin-bottom: 8px;
+    user-select: none;
+  }
+
+  .nf-code__zero {
+    color: $yellow;
+    -webkit-text-fill-color: $yellow;
+  }
+
+  .nf-content .d2-tag {
+    margin: 0 auto;
+  }
+
+  .nf-content .d2-hero__title {
+    margin-top: 18px;
+  }
+
+  .nf-content .d2-hero__text {
+    margin: 0 auto;
+  }
+
+  .nf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 30px;
+  }
+
+  .nf-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 26px;
+    margin-top: 30px;
+
+    a {
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 700;
+      font-size: 15px;
+      text-decoration: none;
+      transition: color 0.2s ease;
+
+      &:hover {
+        color: $yellow;
+      }
+    }
+  }
+}

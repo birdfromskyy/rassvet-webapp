@@ -1,0 +1,91 @@
+# Production overrides for docker-compose.yml
+# No external ports exposed — nginx on host reaches containers via Docker bridge IPs directly.
+# Backend:  172.28.0.10:8080
+# Frontend: 172.28.0.11:80
+
+services:
+  postgres:
+    ports: []
+    environment:
+      TZ: Asia/Yekaterinburg
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      data-network:
+        ipv4_address: 172.29.0.5
+    restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}" --protected-mode yes --maxmemory 128mb --maxmemory-policy noeviction
+    environment:
+      TZ: Asia/Yekaterinburg
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports: []
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      data-network:
+        ipv4_address: 172.29.0.6
+    restart: unless-stopped
+    mem_limit: 192m
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    environment:
+      TZ: Asia/Yekaterinburg
+    ports: []
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.10
+      data-network:
+    restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      args:
+        VITE_API_URL: https://rassvethm.ru/api
+    environment:
+      TZ: Asia/Yekaterinburg
+    ports: []
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    networks:
+      app-network:
+        ipv4_address: 172.28.0.11
+    restart: unless-stopped
+    mem_limit: 128m
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
+  data-network:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+          gateway: 172.29.0.1

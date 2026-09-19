@@ -1,0 +1,134 @@
+/* /services-description — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.servicesdesc-page {
+  @include design2-base;
+
+  .sd-link {
+    color: $yellow;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+
+    &:hover {
+      color: #ffffff;
+    }
+  }
+
+  .sd-section {
+    background: $paper;
+  }
+
+  /* our-services list band */
+  .sd-our {
+    margin-bottom: clamp(32px, 5vh, 56px);
+  }
+
+  .sd-our__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px 24px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      position: relative;
+      padding: 16px 18px 16px 40px;
+      border-radius: 16px;
+      background: #ffffff;
+      border: 1px solid $border;
+      font-size: 15px;
+      line-height: 1.45;
+      color: $content;
+
+      &::before {
+        content: "✓";
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        color: #1f7a45;
+        font-weight: 800;
+      }
+    }
+  }
+
+  /* One block per row (full width). Guaranteed to stay tidy no matter
+     how many services are added or removed — never leaves gaps. */
+  .sd-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .sd-card {
+    padding: clamp(24px, 2.4vw, 34px);
+    border-radius: 24px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+  }
+
+  /* Items flow in two even columns within the full-width card. */
+  .sd-card__list {
+    columns: 2;
+    column-gap: 40px;
+
+    li {
+      break-inside: avoid;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .sd-card__list {
+      columns: 1;
+    }
+  }
+
+  .sd-card__title {
+    margin: 0 0 12px;
+    font-size: clamp(19px, 1.8vw, 24px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: $ink;
+  }
+
+  .sd-card__text {
+    margin: 0 0 14px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: $muted;
+  }
+
+  .sd-card__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    li {
+      position: relative;
+      padding-left: 18px;
+      margin-bottom: 8px;
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: $content;
+
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 8px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: $yellow;
+      }
+    }
+  }
+}

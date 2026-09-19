@@ -1,0 +1,112 @@
+/* /contacts — "Rassvet 2.0" design (Skills/Design2.md).
+   Restyles the reused <ContactsInfo/> within this page scope. */
+
+@use "../../styles/design2" as *;
+
+.contacts-page {
+  @include design2-base;
+
+  .ct-section {
+    background: $paper;
+  }
+
+  /* ContactsInfo restyle (scoped) */
+  .contacts {
+    padding: 0;
+    background: transparent;
+  }
+
+  /* All five contact cards in one row on desktop. */
+  .contacts__grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 1200px) {
+    .contacts__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 760px) {
+    .contacts__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 480px) {
+    .contacts__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .contactCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+    padding: 26px 20px;
+    border-radius: 22px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 12px 30px rgba(7, 68, 98, 0.05);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 42px rgba(7, 68, 98, 0.1);
+    }
+
+    img {
+      width: 44px;
+      height: 44px;
+      object-fit: contain;
+      margin-bottom: 8px;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: $ink;
+    }
+
+    p {
+      margin: 0;
+      font-size: 14.5px;
+      line-height: 1.5;
+      color: $content;
+    }
+
+    a {
+      font-size: 14.5px;
+      line-height: 1.5;
+      color: #0b5f88;
+      text-decoration: none;
+      word-break: break-word;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  .ct-map {
+    height: clamp(320px, 46vh, 480px);
+    border-radius: 26px;
+    overflow: hidden;
+    border: 1px solid $border;
+    box-shadow: 0 20px 46px rgba(7, 68, 98, 0.12);
+
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  }
+}

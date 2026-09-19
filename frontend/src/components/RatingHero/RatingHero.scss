@@ -1,0 +1,56 @@
+.ratingHero {
+  background: #f7f4ec;
+  padding: 80px 0 50px;
+  color: #074462;
+}
+
+.ratingHero__inner {
+  display: block;
+  text-align: center;
+  gap: 60px;
+  align-items: center;
+}
+
+.ratingHero__badge {
+  display: inline-flex;
+  background: #f4df00;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 18px;
+}
+
+.ratingHero h1 {
+    margin: 20px auto 18px;
+    max-width: 820px;
+    font-family: "Merriweather", serif;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 1;
+}
+
+.ratingHero p {
+    max-width: 820px;
+    margin: 0 auto;
+    color: #35586b;
+    font-size: 20px;
+    line-height: 1.6;
+}
+
+.ratingHero__image {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+}
+
+@media (max-width: 850px) {
+  .ratingHero__inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .ratingHero__image {
+    max-width: 350px;
+    margin: 0 auto;
+  }
+}

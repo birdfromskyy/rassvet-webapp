@@ -1,0 +1,57 @@
+/* Child schedule additions — "Rassvet 2.0" design (Skills/Design2.md).
+   Reuses the shared schedule styles from TeacherSchedule.scss. */
+
+@use "../styles/design2" as *;
+
+.schedule__child-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.schedule__child-btn {
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid rgba(7, 68, 98, 0.2);
+  border-radius: 14px;
+  background: #ffffff;
+  color: $ink;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    background: $ink;
+    color: #ffffff;
+  }
+}
+
+.schedule__child-name {
+  min-width: 200px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: $ink;
+}
+
+.schedule__child-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule__child-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(7, 68, 98, 0.25);
+  transition: all 0.18s ease;
+
+  &--active {
+    background: $yellow;
+    transform: scale(1.4);
+  }
+}

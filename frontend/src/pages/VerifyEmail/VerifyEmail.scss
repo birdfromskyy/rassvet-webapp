@@ -1,0 +1,31 @@
+/* /verify-email — "Rassvet 2.0" auth design (Skills/Design2.md). */
+@use "../../styles/auth" as *;
+
+.verify-page {
+  @include auth-base;
+
+  .verify__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 14px;
+    color: $muted;
+  }
+
+  .verify__back,
+  .verify__repeat {
+    background: transparent;
+    border: none;
+    color: #0b5f88;
+    font-weight: 700;
+    font-family: $font;
+    font-size: 14px;
+    cursor: pointer;
+
+    &:hover { text-decoration: underline; }
+
+    &:disabled { opacity: 0.5; cursor: not-allowed; text-decoration: none; }
+  }
+}

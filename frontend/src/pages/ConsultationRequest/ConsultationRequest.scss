@@ -1,0 +1,234 @@
+/* /consultation-request — "Rassvet 2.0" design (Skills/Design2.md).
+   Form markup & logic unchanged — only restyled. */
+
+@use "../../styles/design2" as *;
+
+.consultation-page {
+  @include design2-base;
+  background: $paper;
+
+  /* ---- dark hero band --------------------------------------- */
+  .cr-hero {
+    position: relative;
+    background: $night;
+    color: #ffffff;
+    padding: 140px 0 52px;
+    overflow: hidden;
+  }
+
+  .cr-hero__glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(50% 60% at 90% -10%, rgba(11, 95, 136, 0.4), transparent 70%),
+      radial-gradient(50% 55% at 6% 120%, rgba(244, 223, 0, 0.12), transparent 70%);
+  }
+
+  .cr-hero__title {
+    margin: 18px 0 12px;
+    font-size: clamp(30px, 3.4vw, 48px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+
+  .cr-hero__text {
+    margin: 0;
+    max-width: 620px;
+    font-size: clamp(16px, 1.3vw, 19px);
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  /* ---- body: form + aside ----------------------------------- */
+  .cr-body {
+    padding: clamp(32px, 5vh, 56px) 0 72px;
+  }
+
+  .consultation__content {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* form card */
+  .consultation-form {
+    padding: clamp(24px, 2.6vw, 36px);
+    border-radius: 26px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 14px 34px rgba(7, 68, 98, 0.06);
+  }
+
+  .consultation-form__error {
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: rgba(232, 104, 74, 0.12);
+    border: 1px solid rgba(232, 104, 74, 0.3);
+    color: #c0472c;
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+
+  .consultation-form__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: $ink;
+  }
+
+  // Header is rendered inside .consultation-page too. Scope field styles to
+  // the form so they do not add a second border to the global header search.
+  .consultation-form input,
+  .consultation-form select,
+  .consultation-form textarea {
+    width: 100%;
+    padding: 13px 16px;
+    border: 1.5px solid rgba(7, 68, 98, 0.16);
+    border-radius: 14px;
+    background: $paper;
+    color: $ink;
+    font-family: $font;
+    font-size: 15px;
+    font-weight: 500;
+    outline: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+
+    &::placeholder {
+      color: #9fb1bd;
+    }
+
+    &:focus {
+      border-color: $ink;
+      background: #ffffff;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  .consultation-form__textarea {
+    margin-top: 18px;
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+  }
+
+  .consultation-form > button[type="submit"] {
+    margin-top: 22px;
+    min-height: 54px;
+    padding: 0 32px;
+    border: none;
+    border-radius: 16px;
+    background: $yellow;
+    color: $ink;
+    font-family: $font;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 34px rgba(244, 223, 0, 0.3);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  /* aside */
+  .consultation-info {
+    padding: clamp(24px, 2.6vw, 32px);
+    border-radius: 26px;
+    background: $night;
+    color: #ffffff;
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: clamp(19px, 1.8vw, 24px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    ol {
+      margin: 0 0 20px;
+      padding-left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+
+      li {
+        font-size: 15px;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.85);
+
+        &::marker {
+          color: $yellow;
+          font-weight: 800;
+        }
+      }
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(255, 255, 255, 0.65);
+    }
+  }
+
+  /* success state */
+  .consultation-success {
+    grid-column: 1 / -1;
+    padding: clamp(30px, 4vw, 48px);
+    border-radius: 26px;
+    background: #ffffff;
+    border: 1px solid $border;
+    box-shadow: 0 14px 34px rgba(7, 68, 98, 0.06);
+    text-align: center;
+
+    h2 {
+      margin: 16px 0 12px;
+      font-size: clamp(24px, 2.4vw, 32px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: $ink;
+    }
+
+    p {
+      margin: 0 auto;
+      max-width: 560px;
+      font-size: 16px;
+      line-height: 1.6;
+      color: $content;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .consultation__content {
+      grid-template-columns: 1fr;
+    }
+
+    .consultation-form__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+}

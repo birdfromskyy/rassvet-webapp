@@ -2,26 +2,38 @@ package middleware
 
 import (
 	"backend/internal/utils"
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
-func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
+func AuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		// Cookie takes priority (browser); Authorization header as fallback (API/mobile clients)
+		tokenString, _ := c.Cookie("token")
+		if tokenString == "" {
+			tokenString = strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		}
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
 			c.Abort()
 			return
 		}
 
-		tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
-
 		claims, err := utils.ValidateToken(tokenString, jwtSecret)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Недействительный токен"})
+			c.Abort()
+			return
+		}
+
+		// Check token blacklist (set on logout / account deletion)
+		val, _ := rdb.Get(context.Background(), "blacklist:"+tokenString).Result()
+		if val == "1" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Сессия завершена. Выполните вход снова"})
 			c.Abort()
 			return
 		}
@@ -32,14 +44,67 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuthMiddleware parses the JWT from cookie/header if present and sets
+// userID/role in context when valid, but never blocks the request. Used on public
+// endpoints (e.g. guest consultation form) that should still attach the caller
+// when they happen to be logged in, regardless of which endpoint the frontend hit.
+func OptionalAuthMiddleware(jwtSecret string, rdb *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString, _ := c.Cookie("token")
+		if tokenString == "" {
+			tokenString = strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		}
+		if tokenString == "" {
+			c.Next()
+			return
+		}
+
+		claims, err := utils.ValidateToken(tokenString, jwtSecret)
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		val, _ := rdb.Get(context.Background(), "blacklist:"+tokenString).Result()
+		if val == "1" {
+			c.Next()
+			return
+		}
+
+		c.Set("userID", claims.UserID)
+		c.Set("role", claims.Role)
+		c.Next()
+	}
+}
+
+// AdminMiddleware allows both "admin" and "superadmin".
 func AdminMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, exists := c.Get("role")
-		if !exists || role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
+		role, _ := c.Get("role")
+		if role != "admin" && role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ запрещён"})
 			c.Abort()
 			return
 		}
 		c.Next()
 	}
+}
+
+// SuperAdminMiddleware allows only "superadmin".
+func SuperAdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		if role != "superadmin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Доступ только для суперадминистратора"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+// IsSuperAdmin returns true if the current request is made by a superadmin.
+func IsSuperAdmin(c *gin.Context) bool {
+	role, _ := c.Get("role")
+	return role == "superadmin"
 }

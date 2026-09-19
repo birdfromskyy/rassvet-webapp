@@ -1,0 +1,62 @@
+---
+server_timezone: Asia/Yekaterinburg
+manage_timezone: true
+
+ssh_port: 22
+ssh_permit_root_login: "no"
+
+manage_admin_user: true
+admin_user_name: birdfromsky
+admin_user_shell: /bin/bash
+admin_authorized_key_file: "~/.ssh/rassvet_key.pub"
+admin_password_hash: "{{ vault_admin_password_hash | default('') }}"
+
+manage_deploy_user: true
+deploy_user_name: deploy
+deploy_user_shell: /bin/bash
+deploy_authorized_key_file: "~/.ssh/rassvet_deploy_key.pub"
+deploy_forced_command_path: /usr/local/libexec/rassvet-deploy-ssh
+
+ssh_allowed_users:
+  - "{{ admin_user_name }}"
+  - "{{ deploy_user_name }}"
+
+fail2ban_bantime: 3600
+fail2ban_bantime_increment: true
+fail2ban_bantime_factor: 2
+fail2ban_bantime_maxtime: 86400
+fail2ban_findtime: 600
+fail2ban_maxretry: 8
+
+rassvet_domain: rassvethm.ru
+rassvet_www_domain: www.rassvethm.ru
+rassvet_backend_ip: 172.28.0.10
+rassvet_frontend_ip: 172.28.0.11
+rassvet_app_dir: /opt/rassvet
+rassvet_service_start: false
+
+restic_version: 0.19.1
+restic_linux_amd64_sha256: f415415624dcc452f2a02b8c33641791a8c6d6d3b65bbb3543fcf9a25151585c
+restic_repository: /var/backups/rassvet-restic
+restic_password_file: /etc/rassvet-backup/restic-password
+restic_cache_dir: /var/cache/restic
+restic_backup_calendar: "*-*-* 02:00:00 Asia/Yekaterinburg"
+restic_maintenance_calendar: "Sun *-*-* 04:00:00 Asia/Yekaterinburg"
+
+journald_system_max_use: 512M
+journald_system_keep_free: 1G
+journald_runtime_max_use: 64M
+journald_max_retention_sec: 30day
+
+monitor_calendar: "*:0/5"
+monitor_disk_warning_percent: 85
+monitor_inode_warning_percent: 85
+monitor_memory_available_min_percent: 10
+monitor_certificate_warning_days: 21
+monitor_backup_max_age_hours: 30
+monitor_heartbeat_url: "{{ vault_monitor_heartbeat_url | default('') }}"
+monitor_expected_containers:
+  - postgres
+  - redis
+  - backend
+  - frontend

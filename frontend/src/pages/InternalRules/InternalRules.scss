@@ -1,0 +1,11 @@
+/* /internal-rules — "Rassvet 2.0" design (Skills/Design2.md). */
+
+@use "../../styles/design2" as *;
+
+.rules-page {
+  @include design2-base;
+
+  .rules-section {
+    background: $paper;
+  }
+}

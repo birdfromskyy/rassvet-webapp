@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"backend/internal/models"
 	"fmt"
+	"log"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,9 +23,113 @@ func Initialize(cfg *config.Config) (*gorm.DB, error) {
 }
 
 func Migrate(db *gorm.DB) {
-	db.AutoMigrate(
+	// Make previously NOT NULL columns nullable before AutoMigrate
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN assignment_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN student_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN subject_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_slots ALTER COLUMN room_id DROP NOT NULL")
+	db.Exec("ALTER TABLE group_lessons ALTER COLUMN subject_id DROP NOT NULL")
+	db.Exec("ALTER TABLE students ALTER COLUMN funding_type DROP NOT NULL")
+	db.Exec("ALTER TABLE students ALTER COLUMN funding_type SET DEFAULT 'budget'")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN assignment_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN student_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN teacher_id DROP NOT NULL")
+	db.Exec("ALTER TABLE schedule_generation_issues ALTER COLUMN subject_id DROP NOT NULL")
+
+	err := db.AutoMigrate(
+		// Auth models
 		&models.User{},
 		&models.Review{},
-		&models.VerificationCode{},
+
+		// Schedule module models
+		&models.Subject{},
+		&models.Teacher{},
+		&models.TeacherUserLink{},
+		&models.TeacherSubject{},
+		&models.TeacherRoom{},
+		&models.Room{},
+		&models.RoomSubject{},
+		&models.Student{},
+		&models.StudentServiceValidity{},
+		&models.SocialService{},
+		&models.StudentSocialService{},
+		&models.StudentAvailability{},
+		&models.TeacherAvailability{},
+		&models.Assignment{},
+		&models.GroupLesson{},
+		&models.GroupLessonTeacher{},
+		&models.GroupLessonEnrollment{},
+		&models.Schedule{},
+		&models.ScheduleSlot{},
+		&models.ScheduleSlotTeacher{},
+		&models.ScheduleGenerationIssue{},
+		&models.ScheduleSlotBackup{},
+		&models.GroupLessonAttendance{},
+		&models.UserStudent{},
+
+		// Document submissions (parent profiles + child docs)
+		&models.ParentProfile{},
+		&models.ChildDocSubmission{},
+
+		// CMS models (Employee removed — teachers table is used instead)
+		&models.CmsFileGroup{},
+		&models.CmsFile{},
+		&models.HistoryEvent{},
+		&models.Article{},
+		&models.ArticleBlock{},
+		&models.ServiceItem{},
+		&models.CommercialTariff{},
+		&models.ReportTariffRule{},
+		&models.FinZone{},
+		&models.SiteSetting{},
+
+		// In-app notifications
+		&models.Notification{},
+		&models.VKNotificationRecipient{},
+		&models.StaffDates{},
+		&models.StaffReminderPreference{},
+		&models.StaffReminderDelivery{},
+		&models.VKScheduleDayDelivery{},
+		&models.VKScheduleChangeEvent{},
+
+		// Consultation requests (from public form)
+		&models.ConsultationRequest{},
+
+		// CMS: achievements and awards
+		&models.Achievement{},
+		&models.AchievementBlock{},
+		&models.Award{},
+
+		// Questionnaire (parent uploads filled anketa)
+		&models.Questionnaire{},
+
+		// CMS: video shorts for the main page stories section
+		&models.VideoShort{},
+
+		// CMS: vacancies
+		&models.Vacancy{},
+
+		// Tech support
+		&models.SupportTicket{},
+		&models.SupportMessage{},
+		&models.SupportAttachment{},
 	)
+
+	if err != nil {
+		log.Fatal("Failed to migrate database:", err)
+	}
+
+	// Create unique indexes manually to avoid GORM's DROP CONSTRAINT without IF EXISTS bug
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_key ON site_settings(key)")
+	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_cms_file_groups_section_title ON cms_file_groups(section, title)")
+	if err := CorrectInitialSocialServiceCategories(db); err != nil {
+		log.Println("Social service category correction error:", err)
+	}
+	if err := CorrectSocialServicePeriodicities(db); err != nil {
+		log.Println("Social service periodicity correction error:", err)
+	}
+	if err := MigrateReporting(db); err != nil {
+		log.Fatal("Failed to migrate monthly reporting:", err)
+	}
 }
