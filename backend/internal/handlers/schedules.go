@@ -21,15 +21,29 @@ import (
 type ScheduleHandler struct {
 	db                *gorm.DB
 	generator         *services.ScheduleGenerator
+	scheduleNotifier  *services.VKTeacherScheduleService
 	jobs              *ScheduleGenerationJobManager
 	asyncGenerationMu sync.Mutex
 }
 
-func NewScheduleHandler(db *gorm.DB, generator *services.ScheduleGenerator) *ScheduleHandler {
-	return &ScheduleHandler{
+func NewScheduleHandler(db *gorm.DB, generator *services.ScheduleGenerator, notifier ...*services.VKTeacherScheduleService) *ScheduleHandler {
+	handler := &ScheduleHandler{
 		db:        db,
 		generator: generator,
 		jobs:      NewScheduleGenerationJobManager(),
+	}
+	if len(notifier) > 0 {
+		handler.scheduleNotifier = notifier[0]
+	}
+	return handler
+}
+
+func (h *ScheduleHandler) recordVKScheduleChange(action string, before, after *models.ScheduleSlot) {
+	if h.scheduleNotifier == nil {
+		return
+	}
+	if err := h.scheduleNotifier.RecordSlotChange(action, before, after); err != nil {
+		logging.Event("vk_schedule.change_queue_failed", map[string]any{"action": action, "error": err.Error()})
 	}
 }
 
@@ -535,6 +549,9 @@ func (h *ScheduleHandler) ApproveSchedule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось утвердить расписание"})
 		return
 	}
+	if h.scheduleNotifier != nil {
+		h.scheduleNotifier.ScheduleApproved()
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":  "Schedule approved successfully",
@@ -824,6 +841,7 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 	}
 
 	logging.AdminMutation(c, "schedule.slot.create", nil, scheduleSlotAuditSnapshot(slot))
+	h.recordVKScheduleChange("created", nil, &slot)
 	if req.AcknowledgeMissingReportTariff {
 		logAcknowledgedMissingReportTariff(c, slot, tariffMatch)
 	}
@@ -854,6 +872,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 
 	var slot models.ScheduleSlot
 	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).
+		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").Preload("Teachers").
 		First(&slot).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Слот расписания не найден"})
@@ -862,7 +881,8 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
 		return
 	}
-	before := scheduleSlotAuditSnapshot(slot)
+	beforeSlot := slot
+	before := scheduleSlotAuditSnapshot(beforeSlot)
 
 	if req.RoomID != nil {
 		if *req.RoomID == 0 {
@@ -1015,6 +1035,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	}
 
 	logging.AdminMutation(c, "schedule.slot.update", before, scheduleSlotAuditSnapshot(slot))
+	h.recordVKScheduleChange("updated", &beforeSlot, &slot)
 	if durationChanged && req.AcknowledgeMissingReportTariff {
 		logAcknowledgedMissingReportTariff(c, slot, tariffMatch)
 	}
@@ -1101,6 +1122,7 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 
 	var slot models.ScheduleSlot
 	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).
+		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").Preload("Teachers").
 		First(&slot).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Слот расписания не найден"})
@@ -1127,6 +1149,7 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 	}
 
 	logging.AdminMutation(c, "schedule.slot.delete", before, nil)
+	h.recordVKScheduleChange("deleted", &slot, nil)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Schedule slot deleted successfully",
 	})

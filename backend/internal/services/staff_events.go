@@ -28,6 +28,23 @@ type StaffMember struct {
 	NextBirthday *models.Date      `json:"next_birthday" gorm:"-"`
 }
 
+type teacherAccountLink struct {
+	TeacherID uint
+	UserID    uint
+}
+
+// teacherAccountLinks includes the old teachers.user_id relation as well as
+// the current teacher_user_links table. Staff dates were introduced while
+// both identities could appear in the UI, so an old date may still belong to
+// the account rather than the teacher record.
+func teacherAccountLinks(db *gorm.DB) ([]teacherAccountLink, error) {
+	links := []teacherAccountLink{}
+	err := db.Raw(`SELECT teacher_id, user_id FROM teacher_user_links
+		UNION
+		SELECT id AS teacher_id, user_id FROM teachers WHERE user_id IS NOT NULL`).Scan(&links).Error
+	return links, err
+}
+
 func StaffLocation() *time.Location { loc, _ := time.LoadLocation("Asia/Yekaterinburg"); return loc }
 func staffDay(now time.Time) time.Time {
 	local := now.In(StaffLocation())
@@ -59,8 +76,23 @@ func NextStaffBirthday(d models.Date, now time.Time) (time.Time, error) {
 // Unlinked employee accounts remain visible; no names or dates are guessed.
 func ListStaff(db *gorm.DB, now time.Time) ([]StaffMember, error) {
 	rows := []StaffMember{}
-	err := db.Raw(`SELECT 'teacher' AS kind, t.id AS owner_id, t.full_name AS name, 'teacher' AS role,
+	err := db.Raw(`WITH account_links AS (
+			SELECT teacher_id, user_id FROM teacher_user_links
+			UNION
+			SELECT id AS teacher_id, user_id FROM teachers WHERE user_id IS NOT NULL
+		), account_roles AS (
+			SELECT l.teacher_id, CASE
+				WHEN bool_or(u.role = 'superadmin') THEN 'superadmin'
+				WHEN bool_or(u.role = 'admin') THEN 'admin'
+				ELSE 'teacher'
+			END AS role
+			FROM account_links l JOIN users u ON u.id = l.user_id AND u.deleted_at IS NULL
+			GROUP BY l.teacher_id
+		)
+		SELECT 'teacher' AS kind, t.id AS owner_id, t.full_name AS name,
+		coalesce(ar.role, 'teacher') AS role,
 		(t.is_active AND t.archived_at IS NULL) AS active FROM teachers t
+		LEFT JOIN account_roles ar ON ar.teacher_id = t.id
 		UNION ALL SELECT 'user', u.id, concat_ws(' ',u.last_name,u.first_name,nullif(u.middle_name,'')), u.role, true
 		FROM users u WHERE u.deleted_at IS NULL AND u.role IN ('teacher','admin','superadmin')
 		AND NOT EXISTS (SELECT 1 FROM teacher_user_links l WHERE l.user_id=u.id)
@@ -74,6 +106,7 @@ func ListStaff(db *gorm.DB, now time.Time) ([]StaffMember, error) {
 		return nil, err
 	}
 	byOwner := map[string]models.StaffDates{}
+	legacyDatesByTeacher := map[uint]models.StaffDates{}
 	for _, d := range dates {
 		key := ""
 		if d.TeacherID != nil {
@@ -83,10 +116,39 @@ func ListStaff(db *gorm.DB, now time.Time) ([]StaffMember, error) {
 		}
 		byOwner[key] = d
 	}
+	links, err := teacherAccountLinks(db)
+	if err != nil {
+		return nil, err
+	}
+	teacherByUser := map[uint]uint{}
+	for _, link := range links {
+		teacherByUser[link.UserID] = link.TeacherID
+	}
+	for _, d := range dates {
+		if d.UserID == nil {
+			continue
+		}
+		teacherID, linked := teacherByUser[*d.UserID]
+		if !linked {
+			continue
+		}
+		// A date saved directly for the teacher is authoritative. If an old
+		// account-owned row is the only one, expose it so the form keeps the
+		// data instead of pretending it was never entered.
+		if _, canonical := byOwner[fmt.Sprintf("teacher/%d", teacherID)]; canonical {
+			continue
+		}
+		if previous, exists := legacyDatesByTeacher[teacherID]; !exists || d.UpdatedAt.After(previous.UpdatedAt) {
+			legacyDatesByTeacher[teacherID] = d
+		}
+	}
 	today := staffDay(now)
 	for i := range rows {
 		r := &rows[i]
 		r.Dates = byOwner[fmt.Sprintf("%s/%d", r.Kind, r.OwnerID)]
+		if r.Kind == "teacher" && r.Dates.ID == 0 {
+			r.Dates = legacyDatesByTeacher[r.OwnerID]
+		}
 		if d := r.Dates.MedicalUntil; d != nil {
 			end, e := time.ParseInLocation("2006-01-02", string(*d), today.Location())
 			if e != nil {

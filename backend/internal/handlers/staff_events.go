@@ -21,6 +21,30 @@ func RegisterStaffDatesRoutes(admin *gin.RouterGroup, db *gorm.DB) {
 
 type staffDatesHandler struct{ db *gorm.DB }
 
+// accountOwnedDatesForTeacher finds a date record created before the account
+// was linked to a teacher. It is deliberately narrow: unrelated employee
+// accounts can never become a teacher's private HR record.
+func accountOwnedDatesForTeacher(tx *gorm.DB, teacherID uint) (*models.StaffDates, error) {
+	var dates []models.StaffDates
+	err := tx.Raw(`SELECT d.* FROM staff_dates d
+		WHERE d.user_id IN (
+			SELECT user_id FROM teacher_user_links WHERE teacher_id = ?
+			UNION
+			SELECT user_id FROM teachers WHERE id = ? AND user_id IS NOT NULL
+		)
+		ORDER BY d.updated_at DESC, d.id DESC`, teacherID, teacherID).Scan(&dates).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(dates) > 1 {
+		return nil, &reporting.Error{Status: 409, Message: "У преподавателя найдено несколько старых записей дат. Обратитесь к администратору для сверки"}
+	}
+	if len(dates) == 0 {
+		return nil, nil
+	}
+	return &dates[0], nil
+}
+
 func (h staffDatesHandler) list(c *gin.Context) {
 	rows, err := services.ListStaff(h.db, time.Now())
 	if err != nil {
@@ -83,6 +107,16 @@ func (h staffDatesHandler) save(c *gin.Context) {
 			column = "user_id"
 		}
 		err = tx.Where(column+" = ?", id).First(&saved).Error
+		if err == gorm.ErrRecordNotFound && kind == "teacher" {
+			legacy, findErr := accountOwnedDatesForTeacher(tx, id)
+			if findErr != nil {
+				return findErr
+			}
+			if legacy != nil {
+				saved = *legacy
+				err = nil
+			}
+		}
 		if err == gorm.ErrRecordNotFound {
 			if in.Revision != 0 {
 				return &reporting.Error{Status: 409, Message: "Обновите данные сотрудника"}
@@ -103,6 +137,12 @@ func (h staffDatesHandler) save(c *gin.Context) {
 				return err
 			}
 			saved.Revision++
+			if kind == "teacher" && saved.TeacherID == nil {
+				// The date is now owned by the canonical teacher identity. The
+				// same row is updated, preserving its history and reminder ledger.
+				saved.TeacherID = &id
+				saved.UserID = nil
+			}
 		}
 		saved.BirthDate = in.BirthDate
 		saved.MedicalUntil = in.MedicalUntil

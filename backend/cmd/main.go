@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -78,7 +77,6 @@ func main() {
 	reportHandler := handlers.NewReportHandler(db)
 
 	scheduleGenerator := services.NewScheduleGenerator(db)
-	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator)
 	userStudentHandler := handlers.NewUserStudentHandler(db, rdb)
 
 	// Document submissions handler
@@ -87,8 +85,13 @@ func main() {
 	// Notification handler
 	notificationHandler := handlers.NewNotificationHandler(db)
 	vkNotificationService := services.NewVKNotificationService(db, cfg.VKCommunityToken, cfg.VKAPIVersion, cfg.FrontendURL)
+	vkTeacherScheduleService, err := services.NewVKTeacherScheduleService(db, vkNotificationService)
+	if err != nil {
+		log.Fatal("Failed to initialize VK teacher schedule service:", err)
+	}
+	scheduleHandler := handlers.NewScheduleHandler(db, scheduleGenerator, vkTeacherScheduleService)
 	handlers.ConfigureAdminNotificationSender(vkNotificationService)
-	vkNotificationRecipientHandler := handlers.NewVKNotificationRecipientHandler(db, vkNotificationService)
+	vkNotificationRecipientHandler := handlers.NewVKNotificationRecipientHandler(db, vkNotificationService, vkTeacherScheduleService)
 
 	// New feature handlers
 	consultationHandler := handlers.NewConsultationHandler(db)
@@ -208,6 +211,7 @@ func main() {
 			admin.PUT("/vk-notification-recipients/:id", vkNotificationRecipientHandler.Update)
 			admin.DELETE("/vk-notification-recipients/:id", vkNotificationRecipientHandler.Delete)
 			admin.POST("/vk-notification-recipients/:id/test", vkNotificationRecipientHandler.SendTest)
+			admin.POST("/vk-notification-recipients/:id/test-schedule", vkNotificationRecipientHandler.SendScheduleTest)
 
 			// CMS — Employees managed via /admin/teachers (CMS fields added to Teacher model)
 
@@ -494,6 +498,7 @@ func main() {
 	// Background context — cancelled on graceful shutdown to stop background workers.
 	bgCtx, bgCancel := context.WithCancel(context.Background())
 	go services.NewStaffEventService(db, vkNotificationService).Run(bgCtx)
+	go vkTeacherScheduleService.Run(bgCtx)
 
 	// Background goroutine: checks expiring and expired validity dates once a day.
 	// The data is informational only: it is never read by schedule generation or
@@ -504,8 +509,6 @@ func main() {
 			ChildName       string
 			IppsuExpiryDate *time.Time
 			UserID          uint
-			UserFirstName   string
-			UserLastName    string
 		}
 		childReminderColumn := func(daysBefore int) string {
 			switch daysBefore {
@@ -533,25 +536,23 @@ func main() {
 		}
 
 		notifyChildDocument := func(r row, daysBefore int) error {
-			expiryStr := ""
-			if r.IppsuExpiryDate != nil {
-				expiryStr = r.IppsuExpiryDate.Format("02.01.2006")
+			if r.IppsuExpiryDate == nil {
+				return nil
 			}
-			fullName := strings.TrimSpace(r.UserLastName + " " + r.UserFirstName)
+			title, body := services.ExpiryNotificationContent("ИППСУ", r.ChildName, *r.IppsuExpiryDate, daysBefore)
 
 			return db.Transaction(func(tx *gorm.DB) error {
 				if daysBefore > 0 {
 					if err := handlers.CreateNotification(tx, r.UserID, "",
-						"Срок действия ИППСУ скоро истечёт",
-						"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истекает "+expiryStr+
-							". Пожалуйста, заранее загрузите обновлённый документ в личном кабинете.",
+						title,
+						body,
 						"/profile",
 					); err != nil {
 						return err
 					}
 					if err := handlers.CreateNotification(tx, 0, "admin",
-						"Скоро истечёт срок ИППСУ",
-						"У клиента "+fullName+" скоро истекает срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
+						title,
+						body,
 						"/admin/documents",
 					); err != nil {
 						return err
@@ -561,16 +562,15 @@ func main() {
 				}
 
 				if err := handlers.CreateNotification(tx, r.UserID, "",
-					"Срок действия ИППСУ истёк",
-					"Срок действия документа ИППСУ для ребёнка «"+r.ChildName+"» истёк "+expiryStr+
-						". Пожалуйста, загрузите обновлённый документ в личном кабинете.",
+					title,
+					body,
 					"/profile",
 				); err != nil {
 					return err
 				}
 				if err := handlers.CreateNotification(tx, 0, "admin",
-					"Истёк срок ИППСУ",
-					"У клиента "+fullName+" истёк срок действия ИППСУ для ребёнка «"+r.ChildName+"» ("+expiryStr+").",
+					title,
+					body,
 					"/admin/documents",
 				); err != nil {
 					return err
@@ -599,7 +599,7 @@ func main() {
 		}
 		notifyServiceValidity := func(row serviceValidityRow, daysBefore int, now time.Time) error {
 			name := serviceName(row.ServiceType)
-			date := row.ValidUntil.Format("02.01.2006")
+			title, body := services.ExpiryNotificationContent(name, row.StudentName, row.ValidUntil, daysBefore)
 
 			return db.Transaction(func(tx *gorm.DB) error {
 				var parentIDs []uint
@@ -609,44 +609,12 @@ func main() {
 				}
 
 				for _, parentID := range parentIDs {
-					title := "Истёк срок: " + name
-					body := "Срок действия услуги «" + name + "» для ребёнка «" + row.StudentName +
-						"» истёк " + date + ". Пожалуйста, обратитесь к администрации центра."
-					if daysBefore > 0 {
-						title = "Срок действия услуги скоро истечёт: " + name
-						body = "Срок действия услуги «" + name + "» для ребёнка «" + row.StudentName +
-							"» истекает " + date + ". Пожалуйста, заранее обратитесь к администрации центра."
-					}
-					if row.ServiceType == models.StudentServiceIppsu {
-						if daysBefore > 0 {
-							title = "Срок действия ИППСУ скоро истечёт"
-							body = "Срок действия ИППСУ для ребёнка «" + row.StudentName + "» истекает " + date + ". Пожалуйста, заранее обратитесь к администрации центра."
-						} else {
-							title = "Истёк срок ИППСУ"
-							body = "Срок действия ИППСУ для ребёнка «" + row.StudentName + "» истёк " + date + ". Пожалуйста, обратитесь к администрации центра."
-						}
-					}
 					if err := handlers.CreateNotification(tx, parentID, "", title, body, "/dashboard"); err != nil {
 						return err
 					}
 				}
 
-				adminTitle := "Истёк срок: " + name
-				adminBody := "У ученика «" + row.StudentName + "» истёк срок действия услуги «" + name + "» (" + date + ")."
-				if daysBefore > 0 {
-					adminTitle = "Скоро истечёт срок: " + name
-					adminBody = "У ученика «" + row.StudentName + "» скоро истекает срок действия услуги «" + name + "» (" + date + ")."
-				}
-				if row.ServiceType == models.StudentServiceIppsu {
-					if daysBefore > 0 {
-						adminTitle = "Скоро истечёт срок ИППСУ"
-						adminBody = "У ученика «" + row.StudentName + "» скоро истекает срок действия ИППСУ (" + date + ")."
-					} else {
-						adminTitle = "Истёк срок ИППСУ"
-						adminBody = "У ученика «" + row.StudentName + "» истёк срок действия ИППСУ (" + date + ")."
-					}
-				}
-				if err := handlers.CreateNotification(tx, 0, "admin", adminTitle, adminBody, "/admin/schedule/students"); err != nil {
+				if err := handlers.CreateNotification(tx, 0, "admin", title, body, "/admin/schedule/service-validities"); err != nil {
 					return err
 				}
 
@@ -666,10 +634,8 @@ func main() {
 
 			var expiredRows []row
 			if err := db.Raw(`
-				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
-				       u.first_name AS user_first_name, u.last_name AS user_last_name
+				SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id
 				FROM child_doc_submissions c
-				JOIN users u ON u.id = c.user_id
 				WHERE c.deleted_at IS NULL
 				  AND c.status = 'approved'
 				  AND c.ippsu_expiry_date IS NOT NULL
@@ -692,10 +658,8 @@ func main() {
 				var expiringRows []row
 				reminderDate := reminderDates[index].Format("2006-01-02")
 				if err := db.Raw(`
-					SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id,
-					       u.first_name AS user_first_name, u.last_name AS user_last_name
+					SELECT c.id, c.child_name, c.ippsu_expiry_date, c.user_id
 					FROM child_doc_submissions c
-					JOIN users u ON u.id = c.user_id
 					WHERE c.deleted_at IS NULL
 					  AND c.status = 'approved'
 					  AND c.ippsu_expiry_date IS NOT NULL

@@ -6,6 +6,7 @@ const vkNotificationService = {
   update: (id, data) => api.put(`/admin/vk-notification-recipients/${id}`, data).then((response) => response.data),
   delete: (id) => api.delete(`/admin/vk-notification-recipients/${id}`).then((response) => response.data),
   sendTest: (id) => api.post(`/admin/vk-notification-recipients/${id}/test`).then((response) => response.data),
+  sendScheduleTest: (id) => api.post(`/admin/vk-notification-recipients/${id}/test-schedule`).then((response) => response.data),
 };
 
 export default vkNotificationService;

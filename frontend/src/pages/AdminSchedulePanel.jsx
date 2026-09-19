@@ -20,12 +20,6 @@ import './AdminCMSPanel/AdminCMSPanel.scss'
 
 const MODULES = [
 	{
-		title: 'Даты сотрудников',
-		description: 'Медосмотры, дни рождения и напоминания VK.',
-		icon: ValidityIcon,
-		path: '/admin/schedule/staff-dates',
-	},
-	{
 		title: 'Предметы',
 		description: 'Управление предметами и дисциплинами центра.',
 		icon: SubjectIcon,

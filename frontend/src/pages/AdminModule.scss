@@ -922,6 +922,12 @@
   }
 
   &__switch { margin: 0 !important; }
+  &__tests {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
   &__actions { display: flex; align-items: center; }
 }
 
@@ -943,7 +949,7 @@
   .admin-vk-recipient {
     grid-template-columns: minmax(260px, 1fr) auto auto;
 
-    > .MuiButton-root { justify-self: start; }
+    &__tests { justify-self: start; }
     &__actions { justify-self: end; }
   }
 }
@@ -957,7 +963,12 @@
     &__identity { grid-column: 1 / -1; }
     > .MuiChip-root { justify-self: start; }
     &__switch { justify-self: end; }
-    > .MuiButton-root { grid-column: 1 / -1; width: 100%; }
+    &__tests {
+      grid-column: 1 / -1;
+      width: 100%;
+
+      .MuiButton-root { flex: 1 1 210px; }
+    }
     &__actions { grid-column: 1 / -1; justify-self: end; }
   }
 }

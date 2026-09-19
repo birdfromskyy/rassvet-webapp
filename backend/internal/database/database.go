@@ -89,6 +89,8 @@ func Migrate(db *gorm.DB) {
 		&models.StaffDates{},
 		&models.StaffReminderPreference{},
 		&models.StaffReminderDelivery{},
+		&models.VKScheduleDayDelivery{},
+		&models.VKScheduleChangeEvent{},
 
 		// Consultation requests (from public form)
 		&models.ConsultationRequest{},

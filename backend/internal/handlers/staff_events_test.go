@@ -47,6 +47,64 @@ func TestStaffDatesAPIPrivacyAndConflicts(t *testing.T) {
 	}
 }
 
+func TestStaffDatesShowAndCanonicalizeLinkedAccountDate(t *testing.T) {
+	e := newTestEnv(t)
+	teacher := models.Teacher{FullName: "Преподаватель со старой датой", IsActive: true}
+	require.NoError(t, e.db.Create(&teacher).Error)
+	account := e.seedUser(t, "staff-old-date@test.invalid", "password123", "teacher", true)
+	require.NoError(t, e.db.Create(&models.TeacherUserLink{TeacherID: teacher.ID, UserID: account.ID}).Error)
+	birth, medical := models.Date("1984-05-06"), models.Date("2026-12-31")
+	legacy := models.StaffDates{UserID: &account.ID, BirthDate: &birth, MedicalUntil: &medical, Revision: 2}
+	require.NoError(t, e.db.Create(&legacy).Error)
+
+	admin := e.seedUser(t, "staff-old-date-admin@test.invalid", "password123", "admin", true)
+	cookies := e.login(t, admin.Email, "password123")
+	w := e.do("GET", "/api/admin/staff-dates", "", cookies)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	require.Contains(t, w.Body.String(), fmt.Sprintf(`"owner_id":%d`, teacher.ID))
+	require.Contains(t, w.Body.String(), `"birth_date":"1984-05-06"`)
+	require.Contains(t, w.Body.String(), `"medical_until":"2026-12-31"`)
+
+	path := fmt.Sprintf("/api/admin/staff-dates/teacher/%d", teacher.ID)
+	w = e.do("PUT", path, `{"revision":2,"birth_date":"1984-05-06","medical_until":"2027-01-15"}`, cookies)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	var saved models.StaffDates
+	require.NoError(t, e.db.First(&saved, legacy.ID).Error)
+	require.Equal(t, &teacher.ID, saved.TeacherID)
+	require.Nil(t, saved.UserID)
+	require.Equal(t, models.Date("2027-01-15"), *saved.MedicalUntil)
+	require.Equal(t, int64(3), saved.Revision)
+}
+
+func TestStaffDatesUseHighestLinkedAccountRole(t *testing.T) {
+	e := newTestEnv(t)
+	teacher := models.Teacher{FullName: "Сотрудник с несколькими ролями", IsActive: true}
+	require.NoError(t, e.db.Create(&teacher).Error)
+	admin := e.seedUser(t, "linked-admin@test.invalid", "password123", "admin", true)
+	superadmin := e.seedUser(t, "linked-superadmin@test.invalid", "password123", "superadmin", true)
+	require.NoError(t, e.db.Create(&models.TeacherUserLink{TeacherID: teacher.ID, UserID: admin.ID}).Error)
+
+	staff, err := services.ListStaff(e.db, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, "admin", staffRole(t, staff, teacher.ID))
+
+	require.NoError(t, e.db.Create(&models.TeacherUserLink{TeacherID: teacher.ID, UserID: superadmin.ID}).Error)
+	staff, err = services.ListStaff(e.db, time.Now())
+	require.NoError(t, err)
+	require.Equal(t, "superadmin", staffRole(t, staff, teacher.ID))
+}
+
+func staffRole(t *testing.T, staff []services.StaffMember, teacherID uint) string {
+	t.Helper()
+	for _, row := range staff {
+		if row.Kind == "teacher" && row.OwnerID == teacherID {
+			return row.Role
+		}
+	}
+	t.Fatalf("teacher %d is missing from staff list", teacherID)
+	return ""
+}
+
 type staffFakeSender struct {
 	calls    []int64
 	messages []string

@@ -11,6 +11,7 @@ import {
   DialogTitle,
   FormControlLabel,
   IconButton,
+  MenuItem,
   Switch,
   TextField,
   Tooltip,
@@ -25,27 +26,40 @@ import {
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import vkNotificationService from "../services/vkNotificationService";
+import scheduleService from "../services/scheduleService";
 import "./AdminModule.scss";
 
-const emptyForm = { profile_url: "", is_enabled: true };
+const emptyForm = {
+  profile_url: "",
+  is_enabled: true,
+  receive_admin_notifications: true,
+  receive_schedule_notifications: false,
+  teacher_id: "",
+};
 
 function AdminVKNotifications() {
   const navigate = useNavigate();
   const [recipients, setRecipients] = useState([]);
   const [configured, setConfigured] = useState(false);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [testingID, setTestingID] = useState(null);
+  const [deleting, setDeleting] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await vkNotificationService.getAll();
+      const [data, teacherList] = await Promise.all([
+        vkNotificationService.getAll(),
+        scheduleService.getTeachers(),
+      ]);
       setRecipients(data.recipients || []);
       setConfigured(Boolean(data.configured));
+      setTeachers(teacherList || []);
     } catch {
       toast.error("Не удалось загрузить получателей VK");
     } finally {
@@ -63,7 +77,13 @@ function AdminVKNotifications() {
 
   const openEdit = (recipient) => {
     setEditing(recipient);
-    setForm({ profile_url: recipient.profile_url, is_enabled: recipient.is_enabled });
+    setForm({
+      profile_url: recipient.profile_url,
+      is_enabled: recipient.is_enabled,
+      receive_admin_notifications: recipient.receive_admin_notifications,
+      receive_schedule_notifications: recipient.receive_schedule_notifications,
+      teacher_id: recipient.teacher_id || "",
+    });
     setOpen(true);
   };
 
@@ -74,8 +94,9 @@ function AdminVKNotifications() {
     }
     setSaving(true);
     try {
-      if (editing) await vkNotificationService.update(editing.id, form);
-      else await vkNotificationService.create(form);
+      const payload = { ...form, teacher_id: Number(form.teacher_id) || 0 };
+      if (editing) await vkNotificationService.update(editing.id, payload);
+      else await vkNotificationService.create(payload);
       toast.success(editing ? "Получатель обновлён" : "Получатель добавлен");
       setOpen(false);
       await load();
@@ -91,6 +112,9 @@ function AdminVKNotifications() {
       await vkNotificationService.update(recipient.id, {
         profile_url: recipient.profile_url,
         is_enabled: !recipient.is_enabled,
+        receive_admin_notifications: recipient.receive_admin_notifications,
+        receive_schedule_notifications: recipient.receive_schedule_notifications,
+        teacher_id: recipient.teacher_id || 0,
       });
       await load();
     } catch (error) {
@@ -99,13 +123,16 @@ function AdminVKNotifications() {
   };
 
   const remove = async (recipient) => {
-    if (!window.confirm(`Удалить получателя VK ${recipient.profile_url}?`)) return;
+    setSaving(true);
     try {
       await vkNotificationService.delete(recipient.id);
       toast.success("Получатель удалён");
+      setDeleting(null);
       await load();
     } catch {
       toast.error("Не удалось удалить получателя");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -116,6 +143,18 @@ function AdminVKNotifications() {
       toast.success("Тестовое уведомление отправлено");
     } catch (error) {
       toast.error(error.response?.data?.error || "VK не принял тестовое уведомление");
+    } finally {
+      setTestingID(null);
+    }
+  };
+
+  const sendScheduleTest = async (recipient) => {
+    setTestingID(recipient.id);
+    try {
+      await vkNotificationService.sendScheduleTest(recipient.id);
+      toast.success("Расписание на завтра отправлено");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Не удалось отправить расписание");
     } finally {
       setTestingID(null);
     }
@@ -165,6 +204,7 @@ function AdminVKNotifications() {
                         {recipient.profile_url} <OpenIcon fontSize="inherit" />
                       </a>
                       <span>VK ID: {recipient.vk_user_id}</span>
+                      {recipient.teacher && <span>Расписание: {recipient.teacher.full_name}</span>}
                     </div>
                   </div>
                   <Chip label={recipient.is_enabled ? "Доставка включена" : "Доставка отключена"} color={recipient.is_enabled ? "success" : "default"} />
@@ -173,17 +213,29 @@ function AdminVKNotifications() {
                     control={<Switch checked={recipient.is_enabled} onChange={() => toggle(recipient)} />}
                     label="Получать"
                   />
-                  <Button
-                    variant="outlined"
-                    startIcon={testingID === recipient.id ? <CircularProgress size={17} /> : <SendIcon />}
-                    disabled={!configured || !recipient.is_enabled || testingID !== null}
-                    onClick={() => sendTest(recipient)}
-                  >
-                    Тестовое уведомление
-                  </Button>
+                  <div className="admin-vk-recipient__tests">
+                    <Button
+                      variant="outlined"
+                      startIcon={testingID === recipient.id ? <CircularProgress size={17} /> : <SendIcon />}
+                      disabled={!configured || !recipient.is_enabled || testingID !== null}
+                      onClick={() => sendTest(recipient)}
+                    >
+                      Тестовое уведомление
+                    </Button>
+                    {recipient.receive_schedule_notifications && (
+                      <Button
+                        variant="outlined"
+                        startIcon={testingID === recipient.id ? <CircularProgress size={17} /> : <SendIcon />}
+                        disabled={!configured || !recipient.is_enabled || testingID !== null}
+                        onClick={() => sendScheduleTest(recipient)}
+                      >
+                        Расписание на завтра
+                      </Button>
+                    )}
+                  </div>
                   <div className="admin-vk-recipient__actions">
                     <Tooltip title="Редактировать"><IconButton onClick={() => openEdit(recipient)}><EditIcon /></IconButton></Tooltip>
-                    <Tooltip title="Удалить"><IconButton color="error" onClick={() => remove(recipient)}><DeleteIcon /></IconButton></Tooltip>
+                    <Tooltip title="Удалить"><IconButton color="error" onClick={() => setDeleting(recipient)}><DeleteIcon /></IconButton></Tooltip>
                   </div>
                 </article>
               ))}
@@ -208,10 +260,48 @@ function AdminVKNotifications() {
               control={<Switch checked={form.is_enabled} onChange={(event) => setForm((current) => ({ ...current, is_enabled: event.target.checked }))} />}
               label="Включить доставку уведомлений"
             />
+            <FormControlLabel
+              control={<Switch checked={form.receive_admin_notifications} onChange={(event) => setForm((current) => ({ ...current, receive_admin_notifications: event.target.checked }))} />}
+              label="Общие уведомления администрации"
+            />
+            <TextField
+              select
+              label="Преподаватель"
+              value={form.teacher_id}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                teacher_id: event.target.value,
+                receive_schedule_notifications: event.target.value ? current.receive_schedule_notifications : false,
+              }))}
+              fullWidth
+            >
+              <MenuItem value="">Не привязывать</MenuItem>
+              {teachers.map((teacher) => (
+                <MenuItem key={teacher.id} value={teacher.id}>{teacher.full_name}</MenuItem>
+              ))}
+            </TextField>
+            <FormControlLabel
+              control={(
+                <Switch
+                  checked={form.receive_schedule_notifications}
+                  disabled={!form.teacher_id}
+                  onChange={(event) => setForm((current) => ({ ...current, receive_schedule_notifications: event.target.checked }))}
+                />
+              )}
+              label="Расписание преподавателя"
+            />
           </DialogContent>
           <DialogActions className="admin-module-dialog__actions">
             <Button onClick={() => setOpen(false)} disabled={saving}>Отмена</Button>
             <Button variant="contained" onClick={save} disabled={saving || !form.profile_url.trim()}>{saving ? "Сохранение..." : "Сохранить"}</Button>
+          </DialogActions>
+        </Dialog>
+        <Dialog open={Boolean(deleting)} onClose={() => !saving && setDeleting(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>Удалить получателя VK?</DialogTitle>
+          <DialogContent><p>{deleting?.profile_url}</p></DialogContent>
+          <DialogActions>
+            <Button disabled={saving} onClick={() => setDeleting(null)}>Отмена</Button>
+            <Button disabled={saving} color="error" variant="contained" onClick={() => remove(deleting)}>Удалить</Button>
           </DialogActions>
         </Dialog>
       </div>

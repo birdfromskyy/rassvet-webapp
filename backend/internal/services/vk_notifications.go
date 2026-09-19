@@ -180,7 +180,7 @@ func (s *VKNotificationService) sendToEnabledRecipients(notificationID uint, tit
 		return 0, 0
 	}
 	var recipients []models.VKNotificationRecipient
-	if err := s.db.Where("is_enabled = true").Order("id ASC").Find(&recipients).Error; err != nil {
+	if err := s.db.Where("is_enabled = true AND receive_admin_notifications = true").Order("id ASC").Find(&recipients).Error; err != nil {
 		log.Printf("[VK-NOTIFICATION] event=load_recipients_failed error=%q", err.Error())
 		return 0, 1
 	}
