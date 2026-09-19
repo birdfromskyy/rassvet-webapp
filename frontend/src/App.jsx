@@ -1,90 +1,98 @@
-import React, { useState, useEffect } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 import authService from "./services/authService";
 import { AuthContext } from "./contexts/AuthContext";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import Home from "./pages/Home";
-import NotFound from "./pages/NotFound/NotFound";
+import "./App.css";
 import ScrollToTop from "./components/ScrollToTop/ScrollToTop";
 import StaleBanner from "./components/StaleBanner/StaleBanner";
 import usePageFreshness from "./hooks/usePageFreshness";
-import ServicesListPage from "./pages/ServicesListPage/ServicesListPage";
-import Mission from "./pages/Mission/Mission";
-import History from "./pages/History/History";
-import Docs from "./pages/Docs/Docs";
-import Employees from "./pages/Employees/Employees";
-import AvailablePlaces from "./pages/AvailablePlaces/AvailablePlaces";
-import InternalRules from "./pages/InternalRules/InternalRules";
-import Structure from "./pages/Structure/Structure";
-import Rating from "./pages/Rating/Rating";
-import ServicesDescription from "./pages/ServicesDescription/ServicesDescription";
-import Contacts from "./pages/Contacts/Contacts";
-import Donation from "./pages/Donation/Donation";
-import SocialServiceForm from "./pages/SocialServiceForm/SocialServiceForm";
-import Awards from "./pages/Awards/Awards";
-import Login from "./pages/Login/Login";
-import Register from "./pages/Register/Register";
-import VerifyEmail from "./pages/VerifyEmail/VerifyEmail";
-import Dashboard from "./pages/Dashboard/Dashboard";
-import Reviews from "./pages/Reviews/Reviews";
-import CreateReview from "./pages/CreateReview/CreateReview";
-import AdminReviews from "./pages/AdminReviews";
-import PendingReviews from "./pages/PendingReviews";
-import News from "./pages/News/News";
-import NewsDetail from "./pages/NewsDetail/NewsDetail";
-import AdminNews from "./pages/AdminNews";
-import AdminNewsPreview from "./pages/AdminNewsPreview";
-import AdminSchedulePanel from "./pages/AdminSchedulePanel";
-import AdminSubjects from "./pages/AdminSubjects";
-import AdminTeachers from "./pages/AdminTeachers";
-import AdminStudents from "./pages/AdminStudents";
-import AdminStudentServiceValidities from "./pages/AdminStudentServiceValidities";
-import AdminRooms from "./pages/AdminRooms";
-import AdminAssignments from "./pages/AdminAssignments";
-import AdminSchedule from "./pages/AdminSchedule";
-import AdminGroupLessons from "./pages/AdminGroupLessons";
-import AdminUsers from "./pages/AdminUsers";
-import AdminReports from "./pages/AdminReports";
-import AdminMonthlySocialServices from "./pages/AdminMonthlySocialServices";
-import AdminStaffDates from "./pages/AdminStaffDates";
-import AdminCmsFiles from "./pages/AdminCmsFiles";
-import AdminHistory from "./pages/AdminHistory";
-import AdminFinZones from "./pages/AdminFinZones";
-import AdminServices from "./pages/AdminServices";
-import AdminSiteSettings from "./pages/AdminSiteSettings";
-import AdminCMSPanel from "./pages/AdminCMSPanel/AdminCMSPanel";
-import AdminDocuments from "./pages/AdminDocuments";
-import AdminConsultations from "./pages/AdminConsultations";
-import AdminAchievements from "./pages/AdminAchievements";
-import AdminAchievementPreview from "./pages/AdminAchievementPreview";
-import AdminAwards from "./pages/AdminAwards";
-import AdminShorts from "./pages/AdminShorts";
-import AdminVacancies from "./pages/AdminVacancies";
-import AdminQuestionnaires from "./pages/AdminQuestionnaires";
-import ChildSchedule from "./pages/ChildSchedule";
-import TeacherSchedule from "./pages/TeacherSchedule";
-import SupportList from "./pages/Support/SupportList";
-import SupportNew from "./pages/Support/SupportNew";
-import SupportTicket from "./pages/Support/SupportTicket";
-import AdminSupport from "./pages/AdminSupport";
-import AdminSupportTicket from "./pages/AdminSupportTicket";
 import PrivateRoute from "./components/PrivateRoute";
 import AdminRoute from "./components/AdminRoute";
-import ForgotPassword from "./pages/ForgotPassword/ForgotPassword";
-import Profile from "./pages/Profile/Profile";
-import FinActivities from "./pages/FinActivities/FinActivities";
-import ServiceAlgorithm from "./pages/ServiceAlgorithm/ServiceAlgorithm";
-import Achievements from "./pages/Achievements/Achievements";
-import AchievementDetail from "./pages/Achievements/AchievementDetail";
-import ConsultationRequest from "./pages/ConsultationRequest/ConsultationRequest";
 import AccessibilityPanel from "./components/AccessibilityPanel/AccessibilityPanel";
-import PrivacyPolicy from "./pages/PrivacyPolicy/PrivacyPolicy";
-import AdminPrivacyPolicy from "./pages/AdminPrivacyPolicy/AdminPrivacyPolicy";
-import Vacancies from "./pages/Vacancies/Vacancies";
-import CommercialTariffs from "./pages/CommercialTariffs/CommercialTariffs";
-import AdminCommercialTariffs from "./pages/AdminCommercialTariffs";
-import AdminVKNotifications from "./pages/AdminVKNotifications";
+
+const Home = lazy(() => import("./pages/Home"));
+const NotFound = lazy(() => import("./pages/NotFound/NotFound"));
+const ServicesListPage = lazy(() => import("./pages/ServicesListPage/ServicesListPage"));
+const Mission = lazy(() => import("./pages/Mission/Mission"));
+const History = lazy(() => import("./pages/History/History"));
+const Docs = lazy(() => import("./pages/Docs/Docs"));
+const Employees = lazy(() => import("./pages/Employees/Employees"));
+const AvailablePlaces = lazy(() => import("./pages/AvailablePlaces/AvailablePlaces"));
+const InternalRules = lazy(() => import("./pages/InternalRules/InternalRules"));
+const Structure = lazy(() => import("./pages/Structure/Structure"));
+const Rating = lazy(() => import("./pages/Rating/Rating"));
+const ServicesDescription = lazy(() => import("./pages/ServicesDescription/ServicesDescription"));
+const Contacts = lazy(() => import("./pages/Contacts/Contacts"));
+const Donation = lazy(() => import("./pages/Donation/Donation"));
+const SocialServiceForm = lazy(() => import("./pages/SocialServiceForm/SocialServiceForm"));
+const Awards = lazy(() => import("./pages/Awards/Awards"));
+const Login = lazy(() => import("./pages/Login/Login"));
+const Register = lazy(() => import("./pages/Register/Register"));
+const VerifyEmail = lazy(() => import("./pages/VerifyEmail/VerifyEmail"));
+const Dashboard = lazy(() => import("./pages/Dashboard/Dashboard"));
+const Reviews = lazy(() => import("./pages/Reviews/Reviews"));
+const CreateReview = lazy(() => import("./pages/CreateReview/CreateReview"));
+const AdminReviews = lazy(() => import("./pages/AdminReviews"));
+const PendingReviews = lazy(() => import("./pages/PendingReviews"));
+const News = lazy(() => import("./pages/News/News"));
+const NewsDetail = lazy(() => import("./pages/NewsDetail/NewsDetail"));
+const AdminNews = lazy(() => import("./pages/AdminNews"));
+const AdminNewsPreview = lazy(() => import("./pages/AdminNewsPreview"));
+const AdminSchedulePanel = lazy(() => import("./pages/AdminSchedulePanel"));
+const AdminSubjects = lazy(() => import("./pages/AdminSubjects"));
+const AdminTeachers = lazy(() => import("./pages/AdminTeachers"));
+const AdminStudents = lazy(() => import("./pages/AdminStudents"));
+const AdminStudentServiceValidities = lazy(() => import("./pages/AdminStudentServiceValidities"));
+const AdminRooms = lazy(() => import("./pages/AdminRooms"));
+const AdminAssignments = lazy(() => import("./pages/AdminAssignments"));
+const AdminSchedule = lazy(() => import("./pages/AdminSchedule"));
+const AdminGroupLessons = lazy(() => import("./pages/AdminGroupLessons"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminReports = lazy(() => import("./pages/AdminReports"));
+const AdminMonthlySocialServices = lazy(() => import("./pages/AdminMonthlySocialServices"));
+const AdminStaffDates = lazy(() => import("./pages/AdminStaffDates"));
+const AdminCmsFiles = lazy(() => import("./pages/AdminCmsFiles"));
+const AdminHistory = lazy(() => import("./pages/AdminHistory"));
+const AdminFinZones = lazy(() => import("./pages/AdminFinZones"));
+const AdminServices = lazy(() => import("./pages/AdminServices"));
+const AdminSiteSettings = lazy(() => import("./pages/AdminSiteSettings"));
+const AdminCMSPanel = lazy(() => import("./pages/AdminCMSPanel/AdminCMSPanel"));
+const AdminDocuments = lazy(() => import("./pages/AdminDocuments"));
+const AdminConsultations = lazy(() => import("./pages/AdminConsultations"));
+const AdminAchievements = lazy(() => import("./pages/AdminAchievements"));
+const AdminAchievementPreview = lazy(() => import("./pages/AdminAchievementPreview"));
+const AdminAwards = lazy(() => import("./pages/AdminAwards"));
+const AdminShorts = lazy(() => import("./pages/AdminShorts"));
+const AdminVacancies = lazy(() => import("./pages/AdminVacancies"));
+const AdminQuestionnaires = lazy(() => import("./pages/AdminQuestionnaires"));
+const ChildSchedule = lazy(() => import("./pages/ChildSchedule"));
+const TeacherSchedule = lazy(() => import("./pages/TeacherSchedule"));
+const SupportList = lazy(() => import("./pages/Support/SupportList"));
+const SupportNew = lazy(() => import("./pages/Support/SupportNew"));
+const SupportTicket = lazy(() => import("./pages/Support/SupportTicket"));
+const AdminSupport = lazy(() => import("./pages/AdminSupport"));
+const AdminSupportTicket = lazy(() => import("./pages/AdminSupportTicket"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword/ForgotPassword"));
+const Profile = lazy(() => import("./pages/Profile/Profile"));
+const FinActivities = lazy(() => import("./pages/FinActivities/FinActivities"));
+const ServiceAlgorithm = lazy(() => import("./pages/ServiceAlgorithm/ServiceAlgorithm"));
+const Achievements = lazy(() => import("./pages/Achievements/Achievements"));
+const AchievementDetail = lazy(() => import("./pages/Achievements/AchievementDetail"));
+const ConsultationRequest = lazy(() => import("./pages/ConsultationRequest/ConsultationRequest"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy/PrivacyPolicy"));
+const AdminPrivacyPolicy = lazy(() => import("./pages/AdminPrivacyPolicy/AdminPrivacyPolicy"));
+const Vacancies = lazy(() => import("./pages/Vacancies/Vacancies"));
+const CommercialTariffs = lazy(() => import("./pages/CommercialTariffs/CommercialTariffs"));
+const AdminCommercialTariffs = lazy(() => import("./pages/AdminCommercialTariffs"));
+const AdminVKNotifications = lazy(() => import("./pages/AdminVKNotifications"));
+
+const PageLoader = () => (
+  <div className="app-page-loader" role="status" aria-live="polite">
+    Загрузка страницы…
+  </div>
+);
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -126,7 +134,7 @@ function App() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <PageLoader />;
   }
 
   return (
@@ -134,7 +142,8 @@ function App() {
       <AccessibilityPanel />
       <StaleBanner show={stalePage} />
       <ScrollToTop />
-      <Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route
           path="/profile"
@@ -338,7 +347,8 @@ function App() {
 
         {/* Catch-all: any unknown path → branded 404 page */}
         <Route path="*" element={<NotFound />} />
-      </Routes>
+        </Routes>
+      </Suspense>
       <ToastContainer
         position="bottom-right"
         autoClose={3500}

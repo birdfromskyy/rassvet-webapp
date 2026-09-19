@@ -52,8 +52,8 @@ Production: [rassvethm.ru](https://rassvethm.ru)
 
 | Слой | Технологии |
 | --- | --- |
-| Frontend | React 19, React Router, MUI, Sass |
-| Backend | Go 1.24, Gin, GORM |
+| Frontend | React 19, Vite, React Router, MUI, Sass |
+| Backend | Go 1.27, Gin, GORM |
 | Database | PostgreSQL 15 |
 | Cache / sessions | Redis 7, AOF |
 | Infrastructure | Docker Compose, Nginx |
@@ -126,7 +126,7 @@ cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 
 # В backend/.env задайте уникальный JWT_SECRET длиной не менее 32 символов.
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+make up
 ```
 
 | Сервис | Адрес |
@@ -140,8 +140,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 Остановка локального стека без удаления volumes:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+make down
 ```
+
+Полный список команд: `make help`. Например, `make up-d` запускает сервисы в фоне, а `make logs-backend` показывает логи API.
 
 ## Конфигурация
 
@@ -154,9 +156,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 | Redis | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` |
 | Email | `EMAIL_FROM`, `EMAIL_PASSWORD`, `SMTP_HOST`, `SMTP_PORT` |
 | VK | `VK_COMMUNITY_TOKEN`, `VK_API_VERSION` |
-| API для frontend | `REACT_APP_API_URL` |
+| API для frontend | `VITE_API_URL` |
 
-Переменные с префиксом `REACT_APP_` встраиваются в браузерную сборку; секреты должны находиться только в `backend/.env`.
+Переменные с префиксом `VITE_` встраиваются в браузерную сборку; секреты должны находиться только в `backend/.env`.
 
 ## Эксплуатация и надёжность
 

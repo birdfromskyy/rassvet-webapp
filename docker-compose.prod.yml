@@ -6,35 +6,74 @@
 services:
   postgres:
     ports: []
+    environment:
+      TZ: Asia/Yekaterinburg
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
-      app-network:
-        ipv4_address: 172.28.0.5
+      data-network:
+        ipv4_address: 172.29.0.5
     restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
 
   redis:
-    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}" --protected-mode yes
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD}" --protected-mode yes --maxmemory 128mb --maxmemory-policy noeviction
+    environment:
+      TZ: Asia/Yekaterinburg
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports: []
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
-      app-network:
-        ipv4_address: 172.28.0.6
+      data-network:
+        ipv4_address: 172.29.0.6
     restart: unless-stopped
+    mem_limit: 192m
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
 
   backend:
+    environment:
+      TZ: Asia/Yekaterinburg
     ports: []
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
     networks:
       app-network:
         ipv4_address: 172.28.0.10
+      data-network:
     restart: unless-stopped
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
 
   frontend:
     build:
       args:
-        REACT_APP_API_URL: https://rassvethm.ru/api
+        VITE_API_URL: https://rassvethm.ru/api
+    environment:
+      TZ: Asia/Yekaterinburg
     ports: []
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     networks:
       app-network:
         ipv4_address: 172.28.0.11
     restart: unless-stopped
+    mem_limit: 128m
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   app-network:
@@ -43,3 +82,10 @@ networks:
       config:
         - subnet: 172.28.0.0/24
           gateway: 172.28.0.1
+  data-network:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+          gateway: 172.29.0.1

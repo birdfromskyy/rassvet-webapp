@@ -1,7 +1,7 @@
 import api from './api'
 import { cachedGet, invalidate } from './cmsCache'
 
-const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8080/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
 
 // Returns the full URL for an uploaded file path like "/uploads/abc.jpg"
 export const getUploadUrl = (path) => {

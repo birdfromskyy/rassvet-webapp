@@ -28,7 +28,7 @@ function ServicesListPage() {
   useBrandFont();
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/services?type=services_list`)
+    fetch(`${import.meta.env.VITE_API_URL}/services?type=services_list`)
       .then((r) => r.json())
       .then((data) => {
         const all = (data || [])

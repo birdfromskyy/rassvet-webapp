@@ -90,7 +90,7 @@ const StatusChip = ({ status }) => {
 };
 
 const openPrivateFile = (filename) => {
-  const base = process.env.REACT_APP_API_URL || "http://localhost:8080/api";
+  const base = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
   window.open(`${base}/documents/file/${filename}`, "_blank");
 };
 

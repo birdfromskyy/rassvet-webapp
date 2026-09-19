@@ -11,14 +11,14 @@ const questionnaireService = {
     }).then(r => r.data)
   },
   getFileUrl: () => {
-    const base = process.env.REACT_APP_API_URL || 'http://localhost:8080/api'
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
     return `${base}/questionnaire/file`
   },
 
   // Admin
   adminList: () => api.get('/admin/questionnaires').then(r => r.data),
   adminFileUrl: (id) => {
-    const base = process.env.REACT_APP_API_URL || 'http://localhost:8080/api'
+    const base = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
     return `${base}/admin/questionnaires/${id}/file`
   },
   adminUpdateStatus: (id, status, adminNote = '') =>

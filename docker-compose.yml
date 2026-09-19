@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15.19
     container_name: postgres
     env_file:
       - ./backend/.env
@@ -10,14 +10,15 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - app-network
+      - data-network
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   backend:
     build: ./backend
@@ -26,41 +27,65 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     env_file:
       - ./backend/.env
     environment:
       - GIN_MODE=release
     networks:
       - app-network
+      - data-network
     volumes:
       - uploads_data:/app/uploads
       - private_uploads_data:/app/private_uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/api/health | grep -q '\"status\":\"ok\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
       context: ./frontend
       args:
-        # REACT_APP_API_URL is baked into the JS bundle at build time.
+        # VITE_API_URL is baked into the JS bundle at build time.
         # For production: change to http://YOUR_SERVER_IP:8080/api or https://YOUR_DOMAIN/api
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:8080/api}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
     container_name: frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.11-alpine
     container_name: redis
     command: redis-server --appendonly yes
     networks:
-      - app-network
+      - data-network
     volumes:
       - redis_data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - if [ -n "$$REDIS_PASSWORD" ]; then redis-cli -a "$$REDIS_PASSWORD" ping; else redis-cli ping; fi | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 networks:
   app-network:
+    driver: bridge
+  data-network:
     driver: bridge
 
 volumes:

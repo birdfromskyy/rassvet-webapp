@@ -7,7 +7,7 @@ function ServicesList() {
   const [sections, setSections] = useState([]);
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_API_URL}/services?type=services_list`)
+    fetch(`${import.meta.env.VITE_API_URL}/services?type=services_list`)
       .then((r) => r.json())
       .then((data) => {
         const all = (data || []).filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order);
