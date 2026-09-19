@@ -15,7 +15,7 @@ ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # Stage 2 — serve with nginx
-FROM nginx:1.30.5-alpine
+FROM nginx:1.31.0-alpine
 
 COPY --from=builder /app/build /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
