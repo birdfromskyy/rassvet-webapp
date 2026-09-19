@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    env:
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_NAME: reviews_test
+      DB_USER: rassvet_ci
+      REQUIRE_TEST_DB: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: 1.27.1
+          cache: true
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify module files
+        working-directory: backend
+        run: go mod verify
+
+      - name: Start isolated test database
+        shell: bash
+        run: |
+          set -euo pipefail
+          ci_db_password="$(openssl rand -base64 48 | tr -d '\n')"
+          echo "::add-mask::${ci_db_password}"
+          echo "DB_PASSWORD=${ci_db_password}" >> "${GITHUB_ENV}"
+          export POSTGRES_PASSWORD="${ci_db_password}"
+          docker run --detach --rm \
+            --name rassvet-ci-postgres \
+            --publish 127.0.0.1::5432 \
+            --tmpfs /var/lib/postgresql/data \
+            --env POSTGRES_DB=postgres \
+            --env POSTGRES_USER=rassvet_ci \
+            --env POSTGRES_PASSWORD \
+            postgres:15.19@sha256:dfbbb0ad8cab91d41e99123664e37a9b25d0413426d4fb3154e4d668e5d35246
+
+          ci_db_port="$(docker port rassvet-ci-postgres 5432/tcp | sed 's/.*://')"
+          test -n "${ci_db_port}"
+          echo "TEST_DB_PORT=${ci_db_port}" >> "${GITHUB_ENV}"
+
+          for attempt in {1..30}; do
+            if docker exec rassvet-ci-postgres pg_isready -U rassvet_ci -d postgres; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker logs rassvet-ci-postgres
+          exit 1
+
+      - name: Run tests
+        working-directory: backend
+        run: go test ./...
+
+      - name: Run vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Remove test database
+        if: always()
+        run: docker rm --force rassvet-ci-postgres 2>/dev/null || true
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  docker-build:
+    name: Docker / ${{ matrix.component }}
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - backend
+          - frontend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
