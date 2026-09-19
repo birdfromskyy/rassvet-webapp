@@ -1,7 +1,7 @@
 import api from './api';
 import reporting from './monthlyReportingService';
-jest.mock('./api', () => ({ __esModule: true, default: { get: jest.fn(), post: jest.fn(), put: jest.fn() } }));
-beforeEach(() => jest.resetAllMocks());
+vi.mock('./api', () => ({ __esModule: true, default: { get: vi.fn(), post: vi.fn(), put: vi.fn() } }));
+beforeEach(() => vi.resetAllMocks());
 test('month URLs include the first day and year', async () => {
   api.get.mockResolvedValue({ data: { month: { revision: 2 } } });
   expect(await reporting.month(7, '2027-01')).toEqual({ revision: 2 });

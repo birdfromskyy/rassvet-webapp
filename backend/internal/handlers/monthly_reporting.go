@@ -23,10 +23,8 @@ func RegisterMonthlyReportingRoutes(admin *gin.RouterGroup, db *gorm.DB) {
 	admin.PUT("/students/:id/identity", h.identity)
 	admin.GET("/legal-representatives", h.representatives)
 	admin.GET("/legal-representatives/:representativeId", h.representative)
-	admin.POST("/legal-representatives", h.saveRepresentative)
 	admin.PUT("/legal-representatives/:representativeId", h.saveRepresentative)
 	admin.GET("/students/:id/legal-representatives", h.links)
-	admin.PUT("/students/:id/legal-representatives/:representativeId", h.saveLink)
 	admin.GET("/social-service-report-settings", h.settings)
 	admin.PUT("/social-service-report-settings", h.saveSettings)
 	admin.GET("/students/:id/service-months", h.months)
@@ -208,8 +206,14 @@ func (h monthlyReportingHandler) links(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if err := h.service.EnsureAccountRepresentatives(id); err != nil {
+		reportingError(c, err)
+		return
+	}
 	rows := []models.StudentLegalRepresentative{}
-	if err := h.service.DB.Where("student_id = ?", id).Order("id").Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
+	if err := h.service.DB.Joins("JOIN legal_representatives r ON r.id = student_legal_representatives.legal_representative_id").
+		Joins("JOIN user_students us ON us.student_id = student_legal_representatives.student_id AND us.user_id = r.user_id").
+		Where("student_legal_representatives.student_id = ?", id).Order("student_legal_representatives.id").Limit(limit).Offset(offset).Find(&rows).Error; err != nil {
 		reportingError(c, err)
 		return
 	}

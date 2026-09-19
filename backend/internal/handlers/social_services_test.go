@@ -62,6 +62,30 @@ func TestSelectingServiceCopiesDirectoryValuesOnlyOnce(t *testing.T) {
 	require.Equal(t, int64(35571), unchanged.TariffKopecks)
 }
 
+func TestIPPSUServicesRemainEditableWhenMonthlyHistoryExists(t *testing.T) {
+	e := newTestEnv(t)
+	student := models.Student{FullName: "Иванов Иван", FundingType: models.FundingTypeBudget, IsActive: true}
+	directory := models.SocialService{Code: "Т.02", Category: "Тест", Name: "Услуга ИППСУ", StandardDurationMinutes: 30, Periodicity: "2 раза в неделю", TariffKopecks: 10000, IsActive: true}
+	require.NoError(t, e.db.Create(&student).Error)
+	require.NoError(t, e.db.Create(&directory).Error)
+	require.NoError(t, e.db.Create(&models.StudentServiceMonth{
+		StudentID: student.ID, Month: models.Date("2026-09-01"), Status: "draft", Revision: 1,
+		Snapshot: models.ServiceMonthSnapshot{}, CreationKey: "old-month", CreationHash: "history",
+	}).Error)
+
+	callSelectStudentSocialServices(t, NewSocialServiceHandler(e.db), student.ID, fmt.Sprintf(`{"social_service_ids":[%d]}`, directory.ID))
+	var count int64
+	require.NoError(t, e.db.Model(&models.StudentSocialService{}).Where("student_id = ? AND social_service_id = ?", student.ID, directory.ID).Count(&count).Error)
+	require.EqualValues(t, 1, count)
+}
+
+func TestSplitStudentFullNameUsesSurnameFirstFormat(t *testing.T) {
+	last, first, middle := splitStudentFullName("  Иванов   Иван Иванович  ")
+	require.Equal(t, "Иванов", last)
+	require.Equal(t, "Иван", first)
+	require.Equal(t, "Иванович", middle)
+}
+
 func callSelectStudentSocialServices(t *testing.T, h *SocialServiceHandler, studentID uint, body string) {
 	t.Helper()
 	w := httptest.NewRecorder()

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -115,9 +116,12 @@ func TestServiceMonthsFinalizationAndPeople(t *testing.T) {
 	e := newTestEnv(t)
 	st, dir, s := reportingFixture(t, e.db)
 	birth := models.Date("1988-03-01")
-	rep, err := s.SaveRepresentative(0, reporting.RepresentativeInput{PersonInput: reporting.PersonInput{LastName: "Тестова", FirstName: "Анна", BirthDate: &birth}}, nil)
-	require.NoError(t, err)
-	_, err = s.SaveLink(st.ID, rep.ID, reporting.LinkInput{Relationship: "мать"}, nil)
+	parent := e.seedUser(t, "finalization-parent@test.invalid", "password123", "user", true)
+	require.NoError(t, e.db.Create(&models.UserStudent{UserID: parent.ID, StudentID: st.ID}).Error)
+	require.NoError(t, s.EnsureAccountRepresentatives(st.ID))
+	var rep models.LegalRepresentative
+	require.NoError(t, e.db.Where("user_id = ?", parent.ID).First(&rep).Error)
+	rep, err := s.SaveRepresentative(rep.ID, reporting.RepresentativeInput{PersonInput: reporting.PersonInput{Revision: rep.Revision, LastName: "Тестова", FirstName: "Анна", BirthDate: &birth}, UserID: &parent.ID}, nil)
 	require.NoError(t, err)
 	contractDate := models.Date("2020-01-01")
 	settings, err := s.UpdateSettings(reporting.SettingsInput{Revision: 1, ContractNumber: "TEST-1", ContractDate: &contractDate}, nil)
@@ -185,13 +189,15 @@ func TestServiceMonthsExplicitLegacyCutover(t *testing.T) {
 			require.NoError(t, e.db.Model(&models.StudentServiceMonth{}).Where("student_id = ?", st.ID).Count(&count).Error)
 			require.Equal(t, int64(1), count)
 			require.NoError(t, e.db.First(&old, old.ID).Error)
-			require.Error(t, e.db.Transaction(func(tx *gorm.DB) error { return tx.Model(&old).Update("actual_monthly_count", 1).Error }))
-			require.NoError(t, database.CorrectSocialServicePeriodicities(e.db)) // archived legacy rows are untouched
+			// Monthly records are retained as history, but the current IPPSU
+			// assignment remains editable after the workflow change.
+			require.NoError(t, e.db.Transaction(func(tx *gorm.DB) error { return tx.Model(&old).Update("actual_monthly_count", 1).Error }))
+			require.NoError(t, database.CorrectSocialServicePeriodicities(e.db))
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 			c.Params = gin.Params{{Key: "id", Value: fmt.Sprint(st.ID)}}
 			NewSocialServiceHandler(e.db).GetForStudent(c)
-			require.Equal(t, 409, w.Code)
+			require.Equal(t, http.StatusOK, w.Code)
 		})
 	}
 }
@@ -354,7 +360,9 @@ func TestReportingMigrationPreservesLegacyWithoutInventingHistory(t *testing.T) 
 	var st models.Student
 	require.NoError(t, db.First(&st, childID).Error)
 	require.Equal(t, "Синтетическое ФИО без разбора", st.FullName)
-	require.Empty(t, st.LastName)
+	require.Equal(t, "Синтетическое", st.LastName)
+	require.Equal(t, "ФИО", st.FirstName)
+	require.Equal(t, "без разбора", st.MiddleName)
 	require.Nil(t, st.BirthDate)
 	var count int64
 	require.NoError(t, db.Model(&models.StudentServiceMonth{}).Count(&count).Error)
@@ -396,7 +404,9 @@ func TestReportingStudentIdentityCompatibility(t *testing.T) {
 	w = e.do("PUT", path, `{"full_name":"Новая строка ФИО"}`, cookies)
 	require.Equal(t, 200, w.Code)
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
-	require.Empty(t, response.Student.LastName)
+	require.Equal(t, "Новая", response.Student.LastName)
+	require.Equal(t, "строка", response.Student.FirstName)
+	require.Equal(t, "ФИО", response.Student.MiddleName)
 	require.Equal(t, int64(2), response.Student.IdentityRevision)
 	require.Equal(t, st.BirthDate, response.Student.BirthDate)
 	w = e.do("PUT", path+"/identity", `{"revision":1,"last_name":"Тестов","first_name":"Иван"}`, cookies)
@@ -449,6 +459,7 @@ func TestReportingRepresentativeValidityAndAccountDeletion(t *testing.T) {
 	e := newTestEnv(t)
 	st, dir, s := reportingFixture(t, e.db)
 	u := e.seedUser(t, "representative@test.invalid", "password123", "user", true)
+	require.NoError(t, e.db.Create(&models.UserStudent{UserID: u.ID, StudentID: st.ID}).Error)
 	in := reporting.RepresentativeInput{PersonInput: reporting.PersonInput{LastName: "Тестова", FirstName: "Анна"}, UserID: &u.ID}
 	r, err := s.SaveRepresentative(0, in, nil)
 	require.NoError(t, err)
@@ -471,6 +482,7 @@ func TestReportingRepresentativeValidityAndAccountDeletion(t *testing.T) {
 	requireConflict(t, err)
 	_, err = s.Create(st.ID, "2026-09-01", mInput, nil)
 	require.NoError(t, err)
+	require.NoError(t, e.db.Where("user_id = ? AND student_id = ?", u.ID, st.ID).Delete(&models.UserStudent{}).Error)
 	require.NoError(t, e.db.Unscoped().Delete(u).Error)
 	var reread models.LegalRepresentative
 	require.NoError(t, e.db.First(&reread, r.ID).Error)
@@ -479,4 +491,35 @@ func TestReportingRepresentativeValidityAndAccountDeletion(t *testing.T) {
 	var typeName string
 	require.NoError(t, e.db.Raw("SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'legal_representatives' AND column_name = 'birth_date'").Scan(&typeName).Error)
 	require.Equal(t, "date", typeName)
+}
+
+func TestReportingUsesUserStudentAsOnlyRepresentativeLink(t *testing.T) {
+	e := newTestEnv(t)
+	student, _, _ := reportingFixture(t, e.db)
+	parent := e.seedUser(t, "canonical-parent@test.invalid", "password123", "user", true)
+	require.NoError(t, e.db.Create(&models.UserStudent{UserID: parent.ID, StudentID: student.ID}).Error)
+	admin := e.seedUser(t, "canonical-parent-admin@test.invalid", "password123", "admin", true)
+	cookies := e.login(t, admin.Email, "password123")
+
+	w := e.do("GET", fmt.Sprintf("/api/admin/students/%d/legal-representatives", student.ID), "", cookies)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	var rep models.LegalRepresentative
+	require.NoError(t, e.db.Where("user_id = ?", parent.ID).First(&rep).Error)
+	require.Contains(t, w.Body.String(), fmt.Sprintf(`"legal_representative_id":%d`, rep.ID))
+
+	// An unrelated reporting row cannot be exposed as a second, independent
+	// parent-child link.
+	other := models.LegalRepresentative{LastName: "Посторонняя", FirstName: "Запись", IsActive: true, Revision: 1}
+	require.NoError(t, e.db.Create(&other).Error)
+	require.NoError(t, e.db.Create(&models.StudentLegalRepresentative{StudentID: student.ID, LegalRepresentativeID: other.ID, Relationship: "старые данные", Revision: 1}).Error)
+	w = e.do("GET", fmt.Sprintf("/api/admin/students/%d/legal-representatives", student.ID), "", cookies)
+	require.Equal(t, 200, w.Code)
+	require.NotContains(t, w.Body.String(), fmt.Sprintf(`"legal_representative_id":%d`, other.ID))
+
+	birth := "1980-01-02"
+	w = e.do("PUT", fmt.Sprintf("/api/admin/legal-representatives/%d", rep.ID), fmt.Sprintf(`{"revision":%d,"last_name":"Новая","first_name":"Фамилия","middle_name":"","birth_date":"%s","user_id":%d,"is_active":true}`, rep.Revision, birth, parent.ID), cookies)
+	require.Equal(t, 200, w.Code, w.Body.String())
+	require.NoError(t, e.db.First(&parent, parent.ID).Error)
+	require.Equal(t, "Новая", parent.LastName)
+	require.Equal(t, "Фамилия", parent.FirstName)
 }

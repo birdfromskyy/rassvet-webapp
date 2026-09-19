@@ -68,7 +68,11 @@ func snapshot(tx *gorm.DB, child uint, month models.Date, repID *uint) (models.S
 	}
 	if repID != nil {
 		var link models.StudentLegalRepresentative
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("student_id = ? AND legal_representative_id = ?", child, *repID).First(&link).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+			Joins("JOIN legal_representatives r ON r.id = student_legal_representatives.legal_representative_id").
+			Joins("JOIN user_students us ON us.student_id = student_legal_representatives.student_id AND us.user_id = r.user_id").
+			Where("student_legal_representatives.student_id = ? AND student_legal_representatives.legal_representative_id = ?", child, *repID).
+			First(&link).Error; err != nil {
 			return result, invalid("Представитель не связан с ребёнком")
 		}
 		// A representative must be valid on the last day of the reporting month.

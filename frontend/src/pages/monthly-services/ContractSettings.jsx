@@ -20,12 +20,12 @@ export default function ContractSettings() {
     setBusy(true); setError(''); setNotice('');
     try {
       setDraft(await reporting.saveSettings({ revision: draft.revision, contract_number: draft.contract_number, contract_date: draft.contract_date || null }));
-      setNotice('Договор сохранён. Уже созданные месяцы сохраняют прежние сведения до их явного обновления.');
+      setNotice('Договор сохранён');
     } catch (e) { setError(errorText(e)); setConflict(e.response?.status === 409); }
     finally { setBusy(false); }
   };
   return <Box>
-    {error && <Alert severity='error' sx={{ mb: 2 }}>{error}<Button disabled={busy} onClick={() => { if (!draft || window.confirm('Загрузить сохранённый договор вместо введённых значений?')) setReload(n => n + 1); }}>Обновить</Button></Alert>}
+    {error && <Alert severity='error' sx={{ mb: 2 }}>{error}<Button disabled={busy} onClick={() => setReload(n => n + 1)}>Загрузить сохранённые данные</Button></Alert>}
     {notice && <Alert severity='success' sx={{ mb: 2 }}>{notice}</Alert>}
     {!draft && !error && <CircularProgress aria-label='Загрузка договора' />}
     {draft && <>

@@ -3,33 +3,33 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import MonthlyServiceEditor from './MonthlyServiceEditor';
 import reporting from '../../services/monthlyReportingService';
 
-jest.mock('../../services/monthlyReportingService', () => ({ __esModule: true, default: {
-  month: jest.fn(), student: jest.fn(), representatives: jest.fn(), links: jest.fn(), legacy: jest.fn(), create: jest.fn(), save: jest.fn(), transition: jest.fn(),
+vi.mock('../../services/monthlyReportingService', () => ({ __esModule: true, default: {
+  month: vi.fn(), student: vi.fn(), representatives: vi.fn(), links: vi.fn(), legacy: vi.fn(), create: vi.fn(), save: vi.fn(), transition: vi.fn(),
 } }));
 const student = { id: 1, full_name: 'Тестов Иван', last_name: 'Тестов', first_name: 'Иван', birth_date: '2016-02-29', identity_revision: 1 };
 const service = { id: 11, code: 'T1', category: 'Социально-бытовые', name: 'Тестовая услуга', periodicity: '2 раза в неделю', standard_duration_minutes: 30, tariff_kopecks: 35571, is_active: true };
 const item = { ...service, social_service_id: 11, maximum_monthly_count: 8, actual_monthly_count: null };
 const monthly = (overrides = {}) => ({ revision: 3, status: 'draft', representative_id: null, month: '2026-09-01', snapshot: { student, representative: null }, items: [item], ...overrides });
-const props = { studentId: 1, month: '2026-09', directory: [service], onStateChange: jest.fn(), onPersonSaved: jest.fn() };
+const props = { studentId: 1, month: '2026-09', directory: [service], onStateChange: vi.fn(), onPersonSaved: vi.fn() };
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   reporting.month.mockResolvedValue(monthly()); reporting.student.mockResolvedValue(student);
   reporting.representatives.mockResolvedValue([]); reporting.links.mockResolvedValue([]); reporting.legacy.mockResolvedValue([]);
-  Object.defineProperty(window, 'crypto', { configurable: true, value: { randomUUID: jest.fn(() => 'synthetic-request-id-123') } });
-  jest.spyOn(window, 'confirm').mockReturnValue(true);
+  Object.defineProperty(window, 'crypto', { configurable: true, value: { randomUUID: vi.fn(() => 'synthetic-request-id-123') } });
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => vi.restoreAllMocks());
 const ready = () => screen.findByLabelText('Фактически: Тестовая услуга');
 test('new empty month selects grouped services and creates nullable facts', async () => {
   reporting.month.mockResolvedValue(null);
   reporting.create.mockResolvedValue(monthly({ revision: 1 }));
   render(<MonthlyServiceEditor {...props} />);
   await screen.findByText('В этом месяце услуги ещё не выбраны.');
-  fireEvent.click(screen.getByText('Выбрать услуги'));
+  fireEvent.click(screen.getByText('Изменить список услуг'));
   const dialog = screen.getByRole('dialog');
   fireEvent.click(within(dialog).getByLabelText('Социально-бытовые'));
-  fireEvent.click(within(dialog).getByText('Применить (1)'));
+  fireEvent.click(within(dialog).getByText('Сохранить услуги (1)'));
   fireEvent.click(screen.getByText('Сохранить месяц'));
   await waitFor(() => expect(reporting.create).toHaveBeenCalledWith(1, '2026-09', expect.objectContaining({ mode: 'create', representative_id: null, items: [expect.objectContaining({ actual_monthly_count: null, maximum_monthly_count: 8 })] })));
 });
@@ -45,7 +45,7 @@ test('zero is explicit, null remains empty, successful save and reload preserve 
   await waitFor(() => expect(reporting.save).toHaveBeenCalledWith(1, '2026-09', expect.objectContaining({ revision: 3, representative_id: null, items: [expect.objectContaining({ actual_monthly_count: 0 })] })));
   await screen.findByText('Сохранено');
   reporting.month.mockResolvedValue(monthly({ revision: 4, items: [{ ...item, actual_monthly_count: 0 }] }));
-  fireEvent.click(screen.getByText('Обновить данные'));
+  fireEvent.click(screen.getByText('Обновить'));
   expect((await ready()).value).toBe('0');
 });
 test.each([['network', new Error('Нет связи')], ['conflict', { response: { status: 409 } }]])('%s never destroys entered facts', async (_, failure) => {
@@ -53,7 +53,7 @@ test.each([['network', new Error('Нет связи')], ['conflict', { response:
   render(<MonthlyServiceEditor {...props} />);
   fireEvent.change(await ready(), { target: { value: '5' } });
   fireEvent.click(screen.getByText('Сохранить месяц'));
-  await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  await screen.findByText(failure.response ? /Данные уже изменены/ : 'Нет связи');
   expect(screen.getByLabelText('Фактически: Тестовая услуга').value).toBe('5');
   if (failure.response) {
     expect(screen.getByText('Сохранить месяц')).toBeDisabled();
@@ -82,7 +82,7 @@ test('copy into existing month requires confirmation and expected revision', asy
   reporting.transition.mockResolvedValue(monthly({ revision: 4 }));
   render(<MonthlyServiceEditor {...props} month='2027-01' />);
   await ready();
-  fireEvent.click(screen.getByText('Скопировать предыдущий месяц'));
+  fireEvent.click(screen.getByText('Взять назначения прошлого месяца'));
   expect(reporting.transition).not.toHaveBeenCalled();
   expect(screen.getByText(/Назначения за декабрь 2026/)).toBeInTheDocument();
   fireEvent.click(screen.getByText('Подтвердить'));
@@ -94,7 +94,7 @@ test('copy into absent month uses backend creation mode, not legacy writes', asy
   reporting.month.mockResolvedValue(null); reporting.create.mockResolvedValue(monthly());
   render(<MonthlyServiceEditor {...props} month='2027-01' />);
   await screen.findByText('Новый месяц');
-  fireEvent.click(screen.getByText('Скопировать предыдущий месяц'));
+  fireEvent.click(screen.getByText('Взять назначения прошлого месяца'));
   fireEvent.click(screen.getByText('Подтвердить'));
   await waitFor(() => expect(reporting.create).toHaveBeenCalledWith(1, '2027-01', expect.objectContaining({ mode: 'copy_previous' })));
 });
@@ -102,9 +102,9 @@ test('legacy is migrated only by explicit confirmation into selected month', asy
   reporting.month.mockResolvedValue(null); reporting.legacy.mockResolvedValue([{ ...item, social_service: service, periodicity: 'курс' }]);
   reporting.create.mockResolvedValue(monthly());
   render(<MonthlyServiceEditor {...props} month='2027-01' />);
-  await screen.findByText('Перенести текущие назначения');
+  await screen.findByText(/Создать набор за/);
   expect(reporting.create).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText('Перенести текущие назначения'));
+  fireEvent.click(screen.getByText(/Создать набор за/));
   fireEvent.change(screen.getByLabelText('Максимум: Тестовая услуга'), { target: { value: '10' } });
   fireEvent.click(screen.getByText('Подтвердить'));
   await waitFor(() => expect(reporting.create).toHaveBeenCalledWith(1, '2027-01', expect.objectContaining({ mode: 'migrate_legacy', legacy_maximums: { 11: 10 } })));
@@ -133,7 +133,7 @@ test('archived snapshots remain visible and editable without renaming from direc
 test('failed reload is not presented as successfully refreshed old data', async () => {
   render(<MonthlyServiceEditor {...props} />); await ready();
   reporting.month.mockRejectedValue(new Error('Нет связи'));
-  fireEvent.click(screen.getByText('Обновить данные'));
+  fireEvent.click(screen.getByText('Обновить'));
   await screen.findByText('Нет связи');
   expect(screen.queryByLabelText('Фактически: Тестовая услуга')).not.toBeInTheDocument();
 });

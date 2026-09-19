@@ -11,7 +11,7 @@ export default function ServicePicker({ directory, rows, onApply, onClose }) {
   const visible = choices.filter(row => matches(row, query));
   const toggle = (list, checked) => setIDs(current => checked ? [...new Set([...current, ...list])] : current.filter(id => !list.includes(id)));
   return <Dialog open onClose={onClose} fullWidth maxWidth='md'>
-    <DialogTitle>Выбрать услуги</DialogTitle>
+    <DialogTitle>Услуги по ИППСУ</DialogTitle>
     <DialogContent>
       <TextField autoFocus fullWidth label='Поиск услуг' value={query} onChange={e => setQuery(e.target.value)} margin='normal' />
       <Button onClick={() => toggle(visible.map(row => row.id), true)}>Выбрать {query ? 'найденные' : 'все'}</Button>
@@ -26,6 +26,6 @@ export default function ServicePicker({ directory, rows, onApply, onClose }) {
         </Box>;
       })}
     </DialogContent>
-    <DialogActions><Button onClick={onClose}>Отмена</Button><Button variant='contained' onClick={() => onApply(ids)}>Применить ({ids.length})</Button></DialogActions>
+    <DialogActions><Button onClick={onClose}>Отмена</Button><Button variant='contained' onClick={() => onApply(ids)}>Сохранить услуги ({ids.length})</Button></DialogActions>
   </Dialog>;
 }

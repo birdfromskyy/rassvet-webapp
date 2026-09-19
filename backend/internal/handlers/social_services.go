@@ -197,9 +197,6 @@ func (h *SocialServiceHandler) GetForStudent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !h.requireLegacyServices(c, studentID) {
-		return
-	}
 	var rows []models.StudentSocialService
 	if err := h.db.Preload("SocialService").Where("student_id = ?", studentID).Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить услуги ребёнка"})
@@ -217,9 +214,6 @@ func (h *SocialServiceHandler) GetForStudent(c *gin.Context) {
 func (h *SocialServiceHandler) SelectForStudent(c *gin.Context) {
 	studentID, ok := parseSocialServiceID(c, "id")
 	if !ok {
-		return
-	}
-	if !h.requireLegacyServices(c, studentID) {
 		return
 	}
 	var body struct {
@@ -281,9 +275,6 @@ func (h *SocialServiceHandler) UpdateForStudent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !h.requireLegacyServices(c, studentID) {
-		return
-	}
 	rowID, ok := parseSocialServiceID(c, "serviceId")
 	if !ok {
 		return
@@ -323,9 +314,6 @@ func (h *SocialServiceHandler) DeleteForStudent(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if !h.requireLegacyServices(c, studentID) {
-		return
-	}
 	rowID, ok := parseSocialServiceID(c, "serviceId")
 	if !ok {
 		return
@@ -341,19 +329,4 @@ func (h *SocialServiceHandler) DeleteForStudent(c *gin.Context) {
 	}
 	logging.AdminMutation(c, "student_social_service.delete", row, nil)
 	c.Status(http.StatusNoContent)
-}
-
-// Cutover is explicit. Never let the old frontend export timeless quantities
-// as if they belonged to an arbitrary month after migration.
-func (h *SocialServiceHandler) requireLegacyServices(c *gin.Context, studentID uint) bool {
-	var count int64
-	if err := h.db.Model(&models.StudentServiceMonth{}).Where("student_id = ?", studentID).Count(&count).Error; err != nil {
-		reportingError(c, err)
-		return false
-	}
-	if count > 0 {
-		c.JSON(http.StatusConflict, gin.H{"error": "Ребёнок переведён на месячные услуги. Используйте месячный API", "code": "monthly_reporting_required"})
-		return false
-	}
-	return true
 }

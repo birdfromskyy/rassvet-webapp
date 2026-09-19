@@ -41,21 +41,17 @@ export default function MonthlyServiceEditor({ studentId, month, directory, onSt
     request.current = null;
     Promise.all([
       reporting.month(studentId, month, controller.signal), reporting.student(studentId, controller.signal),
-      reporting.representatives(controller.signal), reporting.links(studentId, controller.signal), reporting.legacy(studentId, controller.signal),
-    ]).then(([value, student, representatives, links, legacy]) => {
+      reporting.links(studentId, controller.signal).then(async links => ({ links, representatives: await reporting.representatives(controller.signal) })),
+      reporting.legacy(studentId, controller.signal),
+    ]).then(([value, student, people, legacy]) => {
       if (id !== generation.current) return;
-      setData({ key, month: value, student, representatives, links, legacy }); accept(value);
+      setData({ key, month: value, student, representatives: people.representatives, links: people.links, legacy }); accept(value);
     }).catch(e => { if (id === generation.current && !controller.signal.aborted) setError(errorText(e)); })
       .finally(() => { if (id === generation.current) setLoading(false); });
     return () => { generation.current = id + 1; controller.abort(); };
   }, [studentId, month, key, reload, accept]);
 
   useEffect(() => { onStateChange({ dirty, busy: busy || Boolean(dialog), loading }); }, [dirty, busy, dialog, loading, onStateChange]);
-  useEffect(() => {
-    const warn = e => { if (dirty || busy || dialog) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty, busy, dialog]);
 
   const mutate = async operation => {
     if (mutation.current) return;
@@ -105,7 +101,6 @@ export default function MonthlyServiceEditor({ studentId, month, directory, onSt
     setDirty(true); setNotice('');
   };
   const reloadData = () => {
-    if ((dirty || conflict) && !window.confirm('Загрузить сохранённые данные? Несохранённый ввод на экране будет потерян.')) return;
     setReload(n => n + 1);
   };
   const summary = totals(rows);
@@ -122,13 +117,14 @@ export default function MonthlyServiceEditor({ studentId, month, directory, onSt
     <div className='monthly-services__toolbar'>
       <Chip label={saved ? (finalized ? 'Месяц зафиксирован' : 'Черновик') : 'Новый месяц'} color={finalized ? 'success' : 'default'} />
       {dirty && <Chip label='Есть несохранённые изменения' color='warning' variant='outlined' />}
-      <Button disabled={busy} onClick={() => setDialog('people')}>Ребёнок и представители</Button>
-      <Button disabled={busy} onClick={reloadData}>Обновить данные</Button>
+      <Button className='monthly-services__button monthly-services__button--secondary' disabled={busy} onClick={() => setDialog('people')}>Карточка ребёнка и родителей</Button>
+      <Button className='monthly-services__button monthly-services__button--quiet' disabled={busy} onClick={reloadData}>Обновить</Button>
     </div>
     {error && <Alert severity='error' sx={{ my: 2 }}>{error}{conflict && <Button onClick={reloadData}>Загрузить актуальные данные</Button>}</Alert>}
     {notice && <Alert severity='success' sx={{ my: 2 }}>{notice}</Alert>}
     {identityMissing && <Alert severity='warning' sx={{ my: 2 }}>Для фиксации месяца заполните фамилию, имя и дату рождения ребёнка.{saved && <Button disabled={locked} onClick={() => { setRefreshSnapshots(true); setDirty(true); }}>Обновить сведения месяца из карточки</Button>}</Alert>}
-    <div className='monthly-services__toolbar'>
+    <section className='monthly-services__representative'>
+      <div><Typography component='h2' fontWeight={700}>Представитель в Акте</Typography><Typography variant='body2'>Список формируется из родителей, привязанных к ребёнку в личном кабинете.</Typography></div>
       <TextField select label='Законный представитель' value={representative} disabled={locked} onChange={e => { setRepresentative(e.target.value); setDirty(true); }} sx={{ minWidth: { xs: 0, sm: 260 }, flex: 1 }}>
         <MenuItem value=''>Не выбран</MenuItem>
         {reps.filter(rep => data.links.some(link => link.legal_representative_id === rep.id) || rep.id === Number(representative)).map(rep => {
@@ -137,9 +133,9 @@ export default function MonthlyServiceEditor({ studentId, month, directory, onSt
           return <MenuItem key={rep.id} value={rep.id} disabled={!available && rep.id !== Number(representative)}>{personName(display)}{available ? '' : ' — архив / не действует в этом месяце'}</MenuItem>;
         })}
       </TextField>
-      {saved && !finalized && <Button disabled={locked} onClick={() => { setRefreshSnapshots(true); setDirty(true); }}>{refreshSnapshots ? 'Сведения обновятся при сохранении' : 'Обновить сведения месяца из карточек'}</Button>}
-    </div>
-    {representative === '' && <Typography variant='body2' sx={{ mt: 1, mb: 2 }}>Представитель не выбран. Это не мешает сохранить и зафиксировать услуги.</Typography>}
+      {saved && !finalized && <Button className='monthly-services__button monthly-services__button--quiet' disabled={locked} onClick={() => { setRefreshSnapshots(true); setDirty(true); }}>{refreshSnapshots ? 'Сведения обновятся при сохранении' : 'Обновить снимок'}</Button>}
+      {!data.links.length && <Alert severity='warning'>У ребёнка нет привязанного родителя. Добавьте связь в разделе пользователей — она автоматически появится здесь.</Alert>}
+    </section>
     {saved && <Box component='details' sx={{ my: 2 }}>
       <summary>Сохранённые сведения для документов</summary>
       <Typography variant='body2'>{personName(saved.snapshot.student)} · {saved.snapshot.student.birth_date || 'Дата рождения не заполнена'}</Typography>
@@ -147,13 +143,13 @@ export default function MonthlyServiceEditor({ studentId, month, directory, onSt
       <Typography variant='body2'>Договор: {saved.snapshot.contract?.contract_number || '—'} · {saved.snapshot.contract?.contract_date || '—'}</Typography>
     </Box>}
     {legacy ? <Alert severity='info' sx={{ my: 3 }}>
-      Есть услуги без привязки к месяцу. Перенести их в {monthLabel(month)}?
-      <Box><Button disabled={locked} variant='outlined' onClick={() => setDialog('migrate')}>Перенести текущие назначения</Button></Box>
+      Эти услуги были настроены до появления помесячного учёта. Чтобы подготовить Акт за {monthLabel(month)}, создайте из них набор выбранного месяца. Исходные данные сохранятся в архиве, фактическое количество потребуется заполнить заново.
+      <Box mt={1}><Button className='monthly-services__button monthly-services__button--secondary' disabled={locked} onClick={() => setDialog('migrate')}>Создать набор за {monthLabel(month)}</Button></Box>
     </Alert> : <>
       <div className='monthly-services__toolbar'>
-        <TextField label='Поиск по выбранным услугам' value={query} onChange={e => setQuery(e.target.value)} sx={{ flex: 1 }} />
-        <Button variant='outlined' disabled={locked} onClick={() => setDialog('copy')}>Скопировать предыдущий месяц</Button>
-        <Button variant='outlined' disabled={locked} onClick={() => setDialog('picker')}>Выбрать услуги</Button>
+        <TextField className='monthly-services__search' label='Найти среди выбранных услуг' value={query} onChange={e => setQuery(e.target.value)} sx={{ flex: 1 }} />
+        <Button className='monthly-services__button monthly-services__button--secondary' disabled={locked} onClick={() => setDialog('copy')}>Взять назначения прошлого месяца</Button>
+        <Button className='monthly-services__button monthly-services__button--primary' disabled={locked} onClick={() => setDialog('picker')}>Изменить список услуг</Button>
       </div>
       {!rows.length && <Typography sx={{ py: 4 }}>В этом месяце услуги ещё не выбраны.</Typography>}
       {!!rows.length && !rows.some(row => matches(row, query)) && <Typography sx={{ py: 3 }}>Услуги не найдены.</Typography>}

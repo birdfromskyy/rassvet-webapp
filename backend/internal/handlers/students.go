@@ -96,6 +96,23 @@ func normalizeOptionalString(value *string) *string {
 	return &trimmed
 }
 
+func splitStudentFullName(value string) (string, string, string) {
+	parts := strings.Fields(value)
+	if len(parts) == 0 {
+		return "", "", ""
+	}
+	lastName := parts[0]
+	firstName := ""
+	if len(parts) > 1 {
+		firstName = parts[1]
+	}
+	middleName := ""
+	if len(parts) > 2 {
+		middleName = strings.Join(parts[2:], " ")
+	}
+	return lastName, firstName, middleName
+}
+
 func (h *StudentHandler) GetStudents(c *gin.Context) {
 	var students []models.Student
 
@@ -175,6 +192,8 @@ func (h *StudentHandler) CreateStudent(c *gin.Context) {
 			return
 		}
 		req.FullName = reporting.FullName(req.LastName, req.FirstName, req.MiddleName)
+	} else {
+		req.LastName, req.FirstName, req.MiddleName = splitStudentFullName(req.FullName)
 	}
 	if err := reporting.ValidateBirthDate(req.BirthDate); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -278,15 +297,16 @@ func (h *StudentHandler) UpdateStudent(c *gin.Context) {
 		student.AllowScheduleWindows = *req.AllowScheduleWindows
 	}
 
-	// Legacy clients may still submit full_name. Never overwrite structured
-	// identity with the stale model loaded above. A real name change invalidates
-	// its old split, instead of silently attaching wrong parts to a new name.
+	// Existing forms submit the established "Фамилия Имя Отчество" string.
+	// Keep the structured identity in sync so reporting never requires the
+	// administrator to type the same name again.
 	changes := map[string]interface{}{"updated_at": time.Now()}
 	if req.FullName != "" {
+		lastName, firstName, middleName := splitStudentFullName(req.FullName)
 		changes["full_name"] = req.FullName
-		changes["last_name"] = gorm.Expr("CASE WHEN full_name = ? THEN last_name ELSE '' END", req.FullName)
-		changes["first_name"] = gorm.Expr("CASE WHEN full_name = ? THEN first_name ELSE '' END", req.FullName)
-		changes["middle_name"] = gorm.Expr("CASE WHEN full_name = ? THEN middle_name ELSE '' END", req.FullName)
+		changes["last_name"] = lastName
+		changes["first_name"] = firstName
+		changes["middle_name"] = middleName
 		changes["identity_revision"] = gorm.Expr("identity_revision + CASE WHEN full_name = ? THEN 0 ELSE 1 END", req.FullName)
 	}
 	if req.FundingType != "" {

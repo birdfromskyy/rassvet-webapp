@@ -65,17 +65,23 @@ func (s Service) SaveRepresentative(id uint, in RepresentativeInput, actor *uint
 			if err := CheckRevision(in.Revision, r.Revision); err != nil {
 				return err
 			}
+			if r.UserID != nil && (in.UserID == nil || *r.UserID != *in.UserID) {
+				return invalid("Нельзя отвязать профиль от учётной записи или перенести его к другой записи")
+			}
 		} else {
 			r.IsActive = true
 			r.CreatedBy = actor
 		}
 		if in.UserID != nil {
-			var count int64
-			if err := tx.Model(&models.User{}).Where("id = ?", *in.UserID).Count(&count).Error; err != nil {
+			var user models.User
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&user, *in.UserID).Error; err != nil {
 				return err
 			}
-			if count == 0 {
-				return invalid("Учётная запись не найдена")
+			// The account owns the structured name. The reporting profile only
+			// supplements it with document-specific data such as birth date.
+			user.LastName, user.FirstName, user.MiddleName = in.LastName, in.FirstName, in.MiddleName
+			if err := tx.Model(&user).Select("LastName", "FirstName", "MiddleName", "UpdatedAt").Updates(&user).Error; err != nil {
+				return err
 			}
 		}
 		r.LastName = in.LastName
@@ -91,6 +97,54 @@ func (s Service) SaveRepresentative(id uint, in RepresentativeInput, actor *uint
 		return tx.Save(&r).Error
 	})
 	return r, err
+}
+
+// EnsureAccountRepresentatives materializes reporting profiles for the
+// account links in UserStudent. Those account links remain the only editable
+// parent-child relationship; the rows below are an internal document index.
+func (s Service) EnsureAccountRepresentatives(child uint) error {
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var student models.Student
+		if err := tx.First(&student, child).Error; err != nil {
+			return err
+		}
+		var users []models.User
+		if err := tx.Joins("JOIN user_students us ON us.user_id = users.id").
+			Where("us.student_id = ? AND users.deleted_at IS NULL", child).
+			Order("users.last_name, users.first_name, users.id").Find(&users).Error; err != nil {
+			return err
+		}
+		for i := range users {
+			u := &users[i]
+			var rep models.LegalRepresentative
+			err := tx.Where("user_id = ?", u.ID).First(&rep).Error
+			if err == gorm.ErrRecordNotFound {
+				rep = models.LegalRepresentative{UserID: &u.ID, LastName: u.LastName, FirstName: u.FirstName, MiddleName: u.MiddleName, IsActive: true, Revision: 1}
+				if err = tx.Create(&rep).Error; err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			} else if rep.LastName != u.LastName || rep.FirstName != u.FirstName || rep.MiddleName != u.MiddleName {
+				rep.LastName, rep.FirstName, rep.MiddleName = u.LastName, u.FirstName, u.MiddleName
+				rep.Revision++
+				if err = tx.Model(&rep).Select("LastName", "FirstName", "MiddleName", "Revision", "UpdatedAt").Updates(&rep).Error; err != nil {
+					return err
+				}
+			}
+			var link models.StudentLegalRepresentative
+			err = tx.Where("student_id = ? AND legal_representative_id = ?", child, rep.ID).First(&link).Error
+			if err == gorm.ErrRecordNotFound {
+				link = models.StudentLegalRepresentative{StudentID: child, LegalRepresentativeID: rep.ID, Relationship: "законный представитель", Revision: 1}
+				if err = tx.Create(&link).Error; err != nil {
+					return err
+				}
+			} else if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 type LinkInput struct {
