@@ -16,7 +16,14 @@
     - /var/lib/rassvet-deploy
     - /var/lib/rassvet-deploy/releases
     - /run/rassvet-deploy
-    - "{{ deploy_forced_command_path | dirname }}"
+
+- name: Keep the restricted command directory traversable
+  ansible.builtin.file:
+    path: "{{ deploy_forced_command_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: Install the root-owned release implementation
   ansible.builtin.template:

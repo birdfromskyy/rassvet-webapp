@@ -44,13 +44,16 @@ and VNC recovery path are confirmed.
 
 ```bash
 cd infrastructure/ansible
-ansible-playbook site.yml --check --diff --tags deployment,application,backup \
+ansible-playbook site.yml --check --diff --tags deployment \
   --ask-become-pass --private-key ~/.ssh/rassvet_key
 ```
 
-The first real application should use the same tags. It installs new deployment
-files and updates `rassvet.service`, but does not start a release or replace the
-running containers. After applying, verify:
+Use only the `deployment` tag for the first real application. It installs new
+deployment files and updates `rassvet.service`, but does not touch `.env`,
+Compose, Nginx, SSH hardening, TLS, application secrets or the restic password.
+It does not start a release or replace the running containers. The `backup`
+role is intentionally applied separately only after its vault values have been
+verified against the existing server. After applying, verify:
 
 ```bash
 ssh -i ~/.ssh/rassvet_deploy_key deploy@157.22.193.21 status
