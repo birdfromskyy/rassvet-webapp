@@ -1,0 +1,301 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+readonly app_dir="{{ rassvet_app_dir }}"
+readonly state_dir="/var/lib/rassvet-deploy"
+readonly releases_dir="${state_dir}/releases"
+readonly current_link="${state_dir}/current-compose.yml"
+readonly current_state="${state_dir}/current.env"
+readonly lock_file="/run/rassvet-deploy/release.lock"
+readonly max_archive_bytes={{ deployment_max_archive_bytes }}
+readonly minimum_free_kib={{ deployment_minimum_free_kib }}
+incoming_archive=""
+
+cleanup() {
+  if [[ -n "$incoming_archive" ]]; then
+    rm -f "$incoming_archive"
+  fi
+}
+trap cleanup EXIT
+
+install -d -m 0700 "$state_dir" "$releases_dir" "$(dirname "$lock_file")"
+exec 9>"$lock_file"
+if ! flock -n 9; then
+  echo "Another Rassvet release operation is already running" >&2
+  exit 75
+fi
+
+log() {
+  printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
+}
+
+validate_revision() {
+  [[ "$1" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "Invalid release revision" >&2
+    exit 64
+  }
+}
+
+validate_checksum() {
+  [[ "$1" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "Invalid archive checksum" >&2
+    exit 64
+  }
+}
+
+validate_image_reference() {
+  [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._/:@-]+$ ]] || {
+    echo "Invalid Docker image reference" >&2
+    exit 65
+  }
+}
+
+require_compose_runtime() {
+  local required
+  for required in \
+    "$app_dir/.env" \
+    "$app_dir/docker-compose.yml" \
+    "$app_dir/docker-compose.prod.yml"; do
+    [[ -r "$required" ]] || {
+      echo "Required production file is not readable: ${required}" >&2
+      exit 66
+    }
+  done
+}
+
+require_backup() {
+  [[ -x /usr/local/sbin/rassvet-backup ]] || {
+    echo "Encrypted backup command is not installed" >&2
+    exit 66
+  }
+}
+
+compose() {
+  local override=${1:-}
+  shift || true
+  local -a files=(
+    -f "$app_dir/docker-compose.yml"
+    -f "$app_dir/docker-compose.prod.yml"
+  )
+  if [[ -n "$override" ]]; then
+    files+=(-f "$override")
+  fi
+
+  (
+    cd "$app_dir"
+    /usr/bin/docker compose --env-file "$app_dir/.env" "${files[@]}" "$@"
+  )
+}
+
+write_override() {
+  local destination=$1
+  local backend_image=$2
+  local frontend_image=$3
+
+  validate_image_reference "$backend_image"
+  validate_image_reference "$frontend_image"
+
+  printf '%s\n' \
+    'services:' \
+    '  backend:' \
+    "    image: ${backend_image}" \
+    '    pull_policy: never' \
+    '  frontend:' \
+    "    image: ${frontend_image}" \
+    '    pull_policy: never' \
+    >"${destination}.tmp"
+  chmod 0600 "${destination}.tmp"
+  mv -f "${destination}.tmp" "$destination"
+}
+
+wait_for_container() {
+  local container=$1
+  local deadline=$((SECONDS + 180))
+  local status
+
+  while (( SECONDS < deadline )); do
+    status=$(/usr/bin/docker inspect --format '{% raw %}{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}{% endraw %}' "$container" 2>/dev/null || true)
+    case "$status" in
+      healthy|running)
+        return 0
+        ;;
+      unhealthy|exited|dead)
+        /usr/bin/docker logs --tail 100 "$container" >&2 || true
+        return 1
+        ;;
+    esac
+    sleep 3
+  done
+
+  /usr/bin/docker logs --tail 100 "$container" >&2 || true
+  echo "Timed out waiting for ${container}" >&2
+  return 1
+}
+
+deploy_override() {
+  local override=$1
+
+  compose "$override" up -d --no-build --no-deps backend
+  wait_for_container backend
+  compose "$override" up -d --no-build --no-deps frontend
+  wait_for_container frontend
+  /usr/bin/curl --fail --silent --show-error --max-time 15 \
+    "https://{{ rassvet_domain }}/api/health" >/dev/null
+}
+
+record_current_release() {
+  local revision=$1
+  local override=$2
+  local backend_image=$3
+  local frontend_image=$4
+
+  ln -sfn "$override" "${current_link}.tmp"
+  mv -Tf "${current_link}.tmp" "$current_link"
+  printf 'REVISION=%s\nBACKEND_IMAGE=%s\nFRONTEND_IMAGE=%s\nDEPLOYED_AT=%s\n' \
+    "$revision" "$backend_image" "$frontend_image" "$(date --iso-8601=seconds)" \
+    >"${current_state}.tmp"
+  chmod 0600 "${current_state}.tmp"
+  mv -f "${current_state}.tmp" "$current_state"
+}
+
+receive_release() {
+  local revision=$1
+  local expected_checksum=$2
+  local release_dir="${releases_dir}/${revision}"
+  local archive
+  local actual_size
+  local actual_checksum
+  local backend_image="rassvet-backend:${revision}"
+  local frontend_image="rassvet-frontend:${revision}"
+  local previous_backend
+  local previous_frontend
+  local previous_override
+  local new_override
+
+  validate_revision "$revision"
+  validate_checksum "$expected_checksum"
+  require_compose_runtime
+  require_backup
+
+  if (( $(df --output=avail -k "$state_dir" | tail -n 1) < minimum_free_kib )); then
+    echo "Not enough free disk space for a safe release" >&2
+    exit 73
+  fi
+
+  install -d -m 0700 "$release_dir"
+  archive=$(mktemp "${state_dir}/incoming.XXXXXX.tar.gz")
+  incoming_archive=$archive
+
+  head -c "$((max_archive_bytes + 1))" >"$archive"
+  actual_size=$(stat -c %s "$archive")
+  if (( actual_size == 0 || actual_size > max_archive_bytes )); then
+    echo "Release archive is empty or exceeds the configured limit" >&2
+    exit 65
+  fi
+
+  actual_checksum=$(sha256sum "$archive" | cut -d ' ' -f 1)
+  [[ "$actual_checksum" == "$expected_checksum" ]] || {
+    echo "Release archive checksum mismatch" >&2
+    exit 65
+  }
+  gzip --test "$archive"
+
+  previous_backend=$(/usr/bin/docker inspect --format '{% raw %}{{.Config.Image}}{% endraw %}' backend)
+  previous_frontend=$(/usr/bin/docker inspect --format '{% raw %}{{.Config.Image}}{% endraw %}' frontend)
+  validate_image_reference "$previous_backend"
+  validate_image_reference "$previous_frontend"
+
+  previous_override="${release_dir}/rollback-compose.yml"
+  new_override="${release_dir}/docker-compose.release.yml"
+  write_override "$previous_override" "$previous_backend" "$previous_frontend"
+  write_override "$new_override" "$backend_image" "$frontend_image"
+
+  log "Creating encrypted pre-release backup"
+  /usr/local/sbin/rassvet-backup backup
+
+  log "Loading verified release images"
+  gzip -dc "$archive" | timeout 900 /usr/bin/docker load >/dev/null
+  rm -f "$archive"
+  incoming_archive=""
+
+  [[ $(/usr/bin/docker image inspect --format '{% raw %}{{index .Config.Labels "org.opencontainers.image.revision"}}{% endraw %}' "$backend_image") == "$revision" ]]
+  [[ $(/usr/bin/docker image inspect --format '{% raw %}{{index .Config.Labels "org.opencontainers.image.revision"}}{% endraw %}' "$frontend_image") == "$revision" ]]
+
+  log "Deploying revision ${revision}"
+  if ! deploy_override "$new_override"; then
+    log "Release health check failed; restoring the previous images"
+    deploy_override "$previous_override" || true
+    exit 70
+  fi
+
+  touch "${release_dir}/completed"
+  chmod 0600 "${release_dir}/completed"
+  record_current_release "$revision" "$new_override" "$backend_image" "$frontend_image"
+  log "Release ${revision} completed successfully"
+}
+
+rollback_release() {
+  local revision=$1
+  local override="${releases_dir}/${revision}/docker-compose.release.yml"
+  local backend_image="rassvet-backend:${revision}"
+  local frontend_image="rassvet-frontend:${revision}"
+
+  validate_revision "$revision"
+  require_compose_runtime
+  require_backup
+  [[ -r "$override" && -f "${releases_dir}/${revision}/completed" ]] || {
+    echo "Unknown retained release: ${revision}" >&2
+    exit 66
+  }
+  /usr/bin/docker image inspect "$backend_image" "$frontend_image" >/dev/null
+
+  log "Creating encrypted pre-rollback backup"
+  /usr/local/sbin/rassvet-backup backup
+  deploy_override "$override"
+  record_current_release "$revision" "$override" "$backend_image" "$frontend_image"
+  log "Rollback to ${revision} completed successfully"
+}
+
+start_current() {
+  require_compose_runtime
+  if [[ -L "$current_link" && -r "$current_link" ]]; then
+    compose "$current_link" up -d --no-build --remove-orphans
+  else
+    compose "" up -d --remove-orphans
+  fi
+}
+
+stop_current() {
+  require_compose_runtime
+  if [[ -L "$current_link" && -r "$current_link" ]]; then
+    compose "$current_link" down
+  else
+    compose "" down
+  fi
+}
+
+case "${1:-}" in
+  release)
+    [[ $# -eq 3 ]] || exit 64
+    receive_release "$2" "$3"
+    ;;
+  rollback)
+    [[ $# -eq 2 ]] || exit 64
+    rollback_release "$2"
+    ;;
+  start)
+    [[ $# -eq 1 ]] || exit 64
+    start_current
+    ;;
+  stop)
+    [[ $# -eq 1 ]] || exit 64
+    stop_current
+    ;;
+  *)
+    echo "Usage: $0 {release REVISION SHA256|rollback REVISION|start|stop}" >&2
+    exit 64
+    ;;
+esac

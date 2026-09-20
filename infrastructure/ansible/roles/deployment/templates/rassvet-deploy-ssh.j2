@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+set -f
+
+original_command=${SSH_ORIGINAL_COMMAND:-}
+set -- $original_command
+
+case "${1:-}" in
+  health)
+    [ "$#" -eq 1 ] || exit 64
+    exec /usr/bin/curl --fail --silent --show-error --max-time 10 \
+      https://{{ rassvet_domain }}/api/health
+    ;;
+  status)
+    [ "$#" -eq 1 ] || exit 64
+    /usr/bin/systemctl is-active rassvet.service
+    exec /usr/bin/curl --fail --silent --show-error --max-time 10 \
+      https://{{ rassvet_domain }}/api/health
+    ;;
+  release)
+    [ "$#" -eq 3 ] || exit 64
+    exec /usr/bin/sudo -n /usr/local/sbin/rassvet-release release "$2" "$3"
+    ;;
+  rollback)
+    [ "$#" -eq 2 ] || exit 64
+    exec /usr/bin/sudo -n /usr/local/sbin/rassvet-release rollback "$2"
+    ;;
+  *)
+    echo "Deploy access is restricted. Allowed commands: status, health, release, rollback." >&2
+    exit 126
+    ;;
+esac

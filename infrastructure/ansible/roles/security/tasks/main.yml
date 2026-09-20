@@ -53,24 +53,6 @@
     password_lock: true
   when: manage_deploy_user | bool
 
-- name: Install the restricted deploy command directory
-  ansible.builtin.file:
-    path: "{{ deploy_forced_command_path | dirname }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-  when: manage_deploy_user | bool
-
-- name: Install the restricted deploy SSH command
-  ansible.builtin.template:
-    src: rassvet-deploy-ssh.j2
-    dest: "{{ deploy_forced_command_path }}"
-    owner: root
-    group: root
-    mode: "0755"
-  when: manage_deploy_user | bool
-
 - name: Install the dedicated restricted deploy key
   ansible.posix.authorized_key:
     user: "{{ deploy_user_name }}"

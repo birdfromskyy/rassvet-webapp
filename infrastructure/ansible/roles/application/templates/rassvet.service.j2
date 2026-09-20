@@ -8,8 +8,8 @@ Wants=network-online.target
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory={{ rassvet_app_dir }}
-ExecStart=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
-ExecStop=/usr/bin/docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+ExecStart=/usr/local/sbin/rassvet-release start
+ExecStop=/usr/local/sbin/rassvet-release stop
 TimeoutStartSec=300
 TimeoutStopSec=30
 

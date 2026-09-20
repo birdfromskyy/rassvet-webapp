@@ -1,0 +1,172 @@
+name: Production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type DEPLOY to release the current main commit
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      archive_sha256: ${{ steps.archive.outputs.sha256 }}
+      revision: ${{ github.sha }}
+
+    steps:
+      - name: Check out the requested revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Require the current main commit and successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${RELEASE_CONFIRMATION}" = "DEPLOY"
+          test "${GITHUB_REF}" = "refs/heads/main"
+
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+          successful_runs="$(
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+              -f head_sha="${GITHUB_SHA}" \
+              -f status=success \
+              -f per_page=100 \
+              --jq '[.workflow_runs[] | select(.head_branch == "main" and .conclusion == "success")] | length'
+          )"
+          test "${successful_runs}" -ge 1
+
+      - name: Build immutable application images
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --tag "rassvet-backend:${GITHUB_SHA}" \
+            ./backend
+
+          docker build \
+            --build-arg VITE_API_URL=https://rassvethm.ru/api \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --tag "rassvet-frontend:${GITHUB_SHA}" \
+            ./frontend
+
+      - name: Package and verify release archive
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker save \
+            "rassvet-backend:${GITHUB_SHA}" \
+            "rassvet-frontend:${GITHUB_SHA}" \
+            | gzip -1 > release-images.tar.gz
+
+          gzip --test release-images.tar.gz
+          archive_sha256="$(sha256sum release-images.tar.gz | cut -d ' ' -f 1)"
+          echo "sha256=${archive_sha256}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload short-lived release artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-images-${{ github.sha }}
+          path: release-images.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  release:
+    name: Release production
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Confirm the revision is still current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REVISION: ${{ needs.build.outputs.revision }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          test "${RELEASE_REVISION}" = "${current_main}"
+
+      - name: Download release artifact in an isolated job
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-images-${{ needs.build.outputs.revision }}
+
+      - name: Verify downloaded release artifact
+        env:
+          EXPECTED_SHA256: ${{ needs.build.outputs.archive_sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${EXPECTED_SHA256}  release-images.tar.gz" | sha256sum --check --strict
+          gzip --test release-images.tar.gz
+
+      - name: Configure pinned production SSH access
+        env:
+          PRODUCTION_DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+          PRODUCTION_SSH_KNOWN_HOSTS: ${{ secrets.PRODUCTION_SSH_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${PRODUCTION_DEPLOY_SSH_KEY}"
+          test -n "${PRODUCTION_SSH_KNOWN_HOSTS}"
+
+          install -d -m 0700 "${HOME}/.ssh"
+          umask 077
+          printf '%s\n' "${PRODUCTION_DEPLOY_SSH_KEY}" > "${HOME}/.ssh/rassvet_deploy_key"
+          printf '%s\n' "${PRODUCTION_SSH_KNOWN_HOSTS}" > "${HOME}/.ssh/known_hosts"
+          ssh-keygen -y -f "${HOME}/.ssh/rassvet_deploy_key" >/dev/null
+
+      - name: Release through the restricted server entrypoint
+        env:
+          RELEASE_ARCHIVE_SHA256: ${{ needs.build.outputs.archive_sha256 }}
+          RELEASE_REVISION: ${{ needs.build.outputs.revision }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh_options=(
+            -i "${HOME}/.ssh/rassvet_deploy_key"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="${HOME}/.ssh/known_hosts"
+            -o ConnectTimeout=15
+          )
+
+          ssh "${ssh_options[@]}" deploy@157.22.193.21 \
+            "release ${RELEASE_REVISION} ${RELEASE_ARCHIVE_SHA256}" \
+            < release-images.tar.gz
+
+          ssh "${ssh_options[@]}" deploy@157.22.193.21 status
+
+      - name: Remove temporary credentials and archive
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${HOME}/.ssh/rassvet_deploy_key" release-images.tar.gz
