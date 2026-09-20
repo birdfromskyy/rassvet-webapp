@@ -26,7 +26,6 @@ const reporting = {
   saveSettings: async body => (await api.put('/admin/social-service-report-settings', body)).data.settings,
   directory: signal => get('/admin/social-services', 'services', { signal, params: { include_inactive: true } }),
   saveService: async (id, body) => (await (id ? api.put(`/admin/social-services/${id}`, body) : api.post('/admin/social-services', body))).data.service,
-  importDirectory: () => api.post('/admin/social-services/initial-directory'),
   month: async (id, month, signal) => {
     try { return await get(monthPath(id, month), 'month', { signal }); }
     catch (error) { if (error.response?.status === 404) return null; throw error; }
