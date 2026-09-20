@@ -57,8 +57,8 @@ docker build -t rassvet-frontend-ci ./frontend
 Локальные handler-тесты без PostgreSQL могут быть пропущены. В CI это невозможно:
 там тестовая БД обязательна и полностью отделена от production.
 
-## Граница этапа
+## Граница CI и CD
 
-Этот workflow не содержит CD. Подключение GitHub Secrets, SSH, пользователя
-`deploy`, registry и production deploy относится к отдельному этапу 14 и не
-должно добавляться в `ci.yml`.
+`ci.yml` не содержит deployment и не получает production secrets. Ручной
+production release вынесен в отдельный `release.yml`; его модель безопасности,
+подготовка сервера и rollback описаны в `infrastructure/CD.md`.
