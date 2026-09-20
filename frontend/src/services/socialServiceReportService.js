@@ -5,10 +5,6 @@ const socialServiceReportService = {
     const response = await api.get('/admin/social-services', { params: includeInactive ? { include_inactive: true } : {} });
     return response.data.services || [];
   },
-	importInitialDirectory: async () => {
-		const response = await api.post('/admin/social-services/initial-directory');
-		return response.data.created || 0;
-	},
   createDirectoryItem: async data => {
     const response = await api.post('/admin/social-services', data);
     return response.data.service;

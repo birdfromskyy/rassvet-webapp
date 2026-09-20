@@ -232,14 +232,6 @@ const AdminSocialServiceReports = () => {
   };
   const removeDirectory = async item => { if (!window.confirm(`Удалить услугу «${item.name}»?`)) return; try { await socialServiceReportService.deleteDirectoryItem(item.id); await loadDirectory(); } catch (error) { toast.error(error.response?.data?.error || 'Не удалось удалить'); } };
   const removeStudentItem = async item => { if (!window.confirm(`Убрать услугу «${item.social_service.name}» у ребёнка?`)) return; try { await socialServiceReportService.deleteStudentService(student.id, item.id); setSelected(await socialServiceReportService.getStudentServices(student.id)); } catch { toast.error('Не удалось удалить'); } };
-	const importInitialDirectory = async () => {
-		try {
-			const created = await socialServiceReportService.importInitialDirectory();
-			await loadDirectory();
-			toast.success(created ? `Добавлено услуг: ${created}` : 'Все услуги уже добавлены');
-		} catch (error) { toast.error(error.response?.data?.error || 'Не удалось добавить услуги'); }
-	};
-
   return <main className='admin-module'>
     <div className='admin-module__container'>
       <section className='admin-module__hero'>
@@ -266,7 +258,7 @@ const AdminSocialServiceReports = () => {
           </Box>)}
         </>}
         {tab === 1 && <>
-          <Box display='flex' justifyContent='flex-end' gap={2} mb={2}><Button variant='outlined' onClick={importInitialDirectory}>Добавить исходный список</Button><Button variant='contained' startIcon={<AddIcon />} onClick={() => setDirectoryDialog({ data: { ...EMPTY_DIRECTORY_ITEM, tariff_rub: '0,00' } })}>Добавить услугу</Button></Box>
+          <Box display='flex' justifyContent='flex-end' mb={2}><Button variant='contained' startIcon={<AddIcon />} onClick={() => setDirectoryDialog({ data: { ...EMPTY_DIRECTORY_ITEM, tariff_rub: '0,00' } })}>Добавить услугу</Button></Box>
           {Object.entries(directoryGroups).map(([category, services]) => <Box key={category} mb={3}><Typography variant='h6' sx={{ mb: 1 }}>{category}</Typography><TableContainer><Table size='small'><TableHead><TableRow><TableCell>Код</TableCell><TableCell>Услуга</TableCell><TableCell align='center'>Время</TableCell><TableCell>Периодичность</TableCell><TableCell align='right'>Тариф</TableCell><TableCell align='right'>Действия</TableCell></TableRow></TableHead><TableBody>{services.map(item => <TableRow key={item.id} sx={{ opacity: item.is_active ? 1 : .5 }}><TableCell>{item.code}</TableCell><TableCell>{item.name}</TableCell><TableCell align='center'>{item.standard_duration_minutes} мин.</TableCell><TableCell>{normalizePeriodicity(item.periodicity)}</TableCell><TableCell align='right'>{rubles(item.tariff_kopecks)} ₽</TableCell><TableCell align='right'><IconButton onClick={() => setDirectoryDialog({ id: item.id, data: { ...item, periodicity: normalizePeriodicity(item.periodicity), tariff_rub: rubles(item.tariff_kopecks) } })}><EditIcon /></IconButton><IconButton color='error' onClick={() => removeDirectory(item)}><DeleteIcon /></IconButton></TableCell></TableRow>)}</TableBody></Table></TableContainer></Box>)}
         </>}
       </section>
