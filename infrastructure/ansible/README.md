@@ -9,9 +9,10 @@
 - базовые host packages и unattended security updates;
 - Docker CE repository, daemon logging и service;
 - UFW, fail2ban, Nginx rate limiting и текущий key-only SSH hardening;
-- ограниченная техническая учётная запись `deploy` без Docker/sudo-доступа;
+- ограниченная техническая учётная запись `deploy` без Docker group и общего
+  sudo-доступа;
 - host Nginx и Certbot packages;
-- systemd unit Docker Compose приложения;
+- systemd unit Docker Compose приложения и отдельный release/rollback entrypoint;
 - encrypted restic backup и systemd timers.
 - bounded journald storage и лёгкие host/application health checks по timer.
 
@@ -38,9 +39,10 @@ prod_backups/2026-09-19_sre-baseline/credentials/restic-password
 менеджере паролей и в локальном recovery-файле, не в Ansible Vault и не в Git.
 Контроллер также должен иметь публичный ключ `~/.ssh/rassvet_key.pub`.
 Отдельная пара `~/.ssh/rassvet_deploy_key{,.pub}` используется только для
-технической учётной записи. Её forced command пока допускает лишь `status` и
-`health`; право изменять production появится только вместе с утверждённым
-release/rollback entrypoint на этапе CI/CD.
+технической учётной записи. Её forced command допускает `status`, `health`,
+передачу проверенного release и rollback к сохранённой revision. Единственное
+право sudo ограничено root-owned entrypoint `/usr/local/sbin/rassvet-release`;
+произвольные команды, Docker CLI и запись в `/opt/rassvet` недоступны.
 
 Сначала всегда:
 
@@ -72,7 +74,8 @@ ansible-playbook site.yml --tags backup --ask-become-pass \
 - отдельный Nginx jail блокирует повторяющиеся обращения к типовым scanner
   paths, а auth endpoints ограничены по частоте на уровне host Nginx;
 - application service не запускается Ansible автоматически;
-- Ansible не выполняет Docker Compose build/deploy;
+- Ansible не выполняет release: он только устанавливает проверяемый deployment
+  entrypoint; запуск остаётся отдельным ручным действием GitHub Actions;
 - restic password обязателен из Ansible Vault и скрыт через `no_log`.
 - monitoring каждые пять минут проверяет disk/inodes/RAM/OOM, systemd,
   контейнеры, HTTPS health, сертификат и возраст последнего backup; результат

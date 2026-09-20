@@ -15,6 +15,7 @@
     group: root
     mode: "0644"
   notify: Reload systemd
+  tags: [deployment]
 
 - name: Enable Rassvet service without forcing a deployment
   ansible.builtin.systemd_service:

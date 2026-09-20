@@ -15,6 +15,8 @@
       tags: [nginx]
     - role: application
       tags: [application]
+    - role: deployment
+      tags: [deployment]
     - role: backup
       tags: [backup]
     - role: monitoring

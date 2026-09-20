@@ -1,0 +1,51 @@
+---
+- name: Verify the restricted deploy account exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ deploy_user_name }}"
+
+- name: Create protected deployment state directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/rassvet-deploy
+    - /var/lib/rassvet-deploy
+    - /var/lib/rassvet-deploy/releases
+    - /run/rassvet-deploy
+
+- name: Keep the restricted command directory traversable
+  ansible.builtin.file:
+    path: "{{ deploy_forced_command_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the root-owned release implementation
+  ansible.builtin.template:
+    src: rassvet-release.j2
+    dest: /usr/local/sbin/rassvet-release
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the restricted SSH dispatcher
+  ansible.builtin.template:
+    src: rassvet-deploy-ssh.j2
+    dest: "{{ deploy_forced_command_path }}"
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow deploy to invoke only the validated release entrypoint
+  ansible.builtin.template:
+    src: rassvet-deploy-sudoers.j2
+    dest: /etc/sudoers.d/rassvet-deploy
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s

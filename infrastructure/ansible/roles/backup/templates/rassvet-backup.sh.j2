@@ -66,12 +66,24 @@ backup_files() {
     /usr/local/sbin/rassvet-backup
     /var/spool/cron/crontabs/root
   )
+  local -a optional_sources=(
+    /etc/sudoers.d/rassvet-deploy
+    /usr/local/sbin/rassvet-release
+    /usr/local/libexec/rassvet-deploy-ssh
+    /var/lib/rassvet-deploy
+  )
 
   local source
   for source in "${sources[@]}"; do
     if [[ ! -e "$source" ]]; then
       echo "Required backup source does not exist: $source" >&2
       exit 66
+    fi
+  done
+
+  for source in "${optional_sources[@]}"; do
+    if [[ -e "$source" ]]; then
+      sources+=("$source")
     fi
   done
 
