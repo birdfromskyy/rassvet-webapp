@@ -504,6 +504,22 @@ func main() {
 	// The data is informational only: it is never read by schedule generation or
 	// by manual schedule editing.
 	go func() {
+		const expiryReminderHour, expiryReminderMinute = 11, 10
+		waitForDispatch := func(catchUpToday bool) bool {
+			now := time.Now()
+			if catchUpToday && services.CentreDailyDispatchReached(now, expiryReminderHour, expiryReminderMinute) {
+				return true
+			}
+			timer := time.NewTimer(time.Until(services.NextCentreDailyDispatch(now, expiryReminderHour, expiryReminderMinute)))
+			defer timer.Stop()
+			select {
+			case <-bgCtx.Done():
+				return false
+			case <-timer.C:
+				return true
+			}
+		}
+
 		type row struct {
 			ID              uint
 			ChildName       string
@@ -627,8 +643,11 @@ func main() {
 			})
 		}
 
+		if !waitForDispatch(true) {
+			return
+		}
 		for {
-			now := time.Now()
+			now := time.Now().In(services.CentreLocation())
 			reminderDates := services.ExpiryReminderDates(now)
 			reminderDays := []int{1, 7, 21}
 
@@ -739,10 +758,8 @@ func main() {
 			}
 			log.Printf("[JOB] student_service_validity_check expired_found=%d expired_notified=%d expiring_notified=%d errors=%d", len(expiredServiceRows), expiredServiceNotified, expiringServiceNotified, serviceErrors)
 
-			select {
-			case <-bgCtx.Done():
+			if !waitForDispatch(false) {
 				return
-			case <-time.After(24 * time.Hour):
 			}
 		}
 	}()

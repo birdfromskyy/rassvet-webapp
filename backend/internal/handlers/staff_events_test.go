@@ -31,6 +31,8 @@ func TestStaffDatesAPIPrivacyAndConflicts(t *testing.T) {
 	w = e.do("GET", "/api/admin/staff-dates", "", cookies)
 	require.Equal(t, 200, w.Code)
 	require.Contains(t, w.Body.String(), "1980-02-29")
+	require.Contains(t, w.Body.String(), `"birthdays":"11:00"`)
+	require.Contains(t, w.Body.String(), `"medical":"11:05"`)
 	require.NoError(t, e.db.First(&teacher, teacher.ID).Error)
 	public, _ := json.Marshal(teacher)
 	require.NotContains(t, string(public), "birth_date")
@@ -142,30 +144,32 @@ func TestStaffReminderDeliveryRetryOptInAndExpiry(t *testing.T) {
 	}
 	fake := &staffFakeSender{fail: true}
 	worker := services.NewStaffEventService(e.db, fake)
-	now := time.Date(2026, 9, 18, 4, 0, 0, 0, time.UTC) // 09:00 UTC+5
+	now := time.Date(2026, 9, 18, 6, 0, 0, 0, time.UTC) // 11:00 UTC+5
 	require.NoError(t, worker.Dispatch(context.Background(), now.Add(-time.Minute)))
 	require.Empty(t, fake.calls)
 	require.NoError(t, worker.Dispatch(context.Background(), now))
-	require.ElementsMatch(t, []int64{101, 102}, fake.calls)
+	require.Equal(t, []int64{102}, fake.calls, "at 11:00 only birthday reminders are due")
 	require.NoError(t, worker.Dispatch(context.Background(), now.Add(time.Minute)))
-	require.Len(t, fake.calls, 2)
-	fake.fail = false
+	require.Len(t, fake.calls, 1)
 	require.NoError(t, worker.Dispatch(context.Background(), now.Add(5*time.Minute)))
-	require.Len(t, fake.calls, 4)
-	require.Equal(t, fake.ids[:2], fake.ids[2:])
+	require.Equal(t, []int64{102, 101, 102}, fake.calls, "at 11:05 medical starts and the failed birthday is retried")
+	fake.fail = false
 	require.NoError(t, worker.Dispatch(context.Background(), now.Add(10*time.Minute)))
-	require.Len(t, fake.calls, 4)
+	require.Equal(t, []int64{102, 101, 102, 101, 102}, fake.calls)
+	require.Equal(t, fake.ids[0], fake.ids[2])
+	require.Equal(t, fake.ids[0], fake.ids[4])
+	require.Equal(t, fake.ids[1], fake.ids[3])
 	require.NoError(t, worker.Dispatch(context.Background(), now.AddDate(0, 0, 1)))
-	require.Len(t, fake.calls, 4)
-	require.NoError(t, worker.Dispatch(context.Background(), now.AddDate(0, 0, 20)))
 	require.Len(t, fake.calls, 5)
-	require.Equal(t, int64(101), fake.calls[4])
-	require.Contains(t, fake.messages[4], "Сегодня")
+	require.NoError(t, worker.Dispatch(context.Background(), now.AddDate(0, 0, 20).Add(5*time.Minute)))
+	require.Len(t, fake.calls, 6)
+	require.Equal(t, int64(101), fake.calls[5])
+	require.Contains(t, fake.messages[5], "Сегодня")
 	require.NoError(t, e.db.Model(&medicalRecipient).Update("is_enabled", false).Error)
 	newDate := models.Date("2026-10-09")
 	require.NoError(t, e.db.Model(&dates).Update("medical_until", newDate).Error)
-	require.NoError(t, worker.Dispatch(context.Background(), now.AddDate(0, 0, 21)))
-	require.Len(t, fake.calls, 5)
+	require.NoError(t, worker.Dispatch(context.Background(), now.AddDate(0, 0, 21).Add(5*time.Minute)))
+	require.Len(t, fake.calls, 6)
 }
 
 func TestStaffReminderPreferencesRequireExplicitChoice(t *testing.T) {

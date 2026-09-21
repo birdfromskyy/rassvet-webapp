@@ -832,8 +832,10 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		Preload("Room").
 		Preload("Assignment").
 		Preload("GroupLesson").
+		Preload("GroupLesson.Subject").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
+		Preload("GroupLessonAttendance.Student").
 		Preload("Teachers.Teacher").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
@@ -872,7 +874,8 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 
 	var slot models.ScheduleSlot
 	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).
-		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").Preload("Teachers").
+		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").
+		Preload("GroupLesson.Subject").Preload("GroupLessonAttendance.Student").Preload("Teachers").
 		First(&slot).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Слот расписания не найден"})
@@ -1026,8 +1029,10 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		Preload("Room").
 		Preload("Assignment").
 		Preload("GroupLesson").
+		Preload("GroupLesson.Subject").
 		Preload("GroupLesson.Enrollments").
 		Preload("GroupLesson.Enrollments.Student").
+		Preload("GroupLessonAttendance.Student").
 		Preload("Teachers.Teacher").
 		First(&slot, slot.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
@@ -1122,7 +1127,8 @@ func (h *ScheduleHandler) DeleteScheduleSlot(c *gin.Context) {
 
 	var slot models.ScheduleSlot
 	if err := h.db.Where("id = ? AND schedule_id = ?", slotID, scheduleID).
-		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").Preload("Teachers").
+		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").
+		Preload("GroupLesson.Subject").Preload("GroupLessonAttendance.Student").Preload("Teachers").
 		First(&slot).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Слот расписания не найден"})

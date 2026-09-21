@@ -50,3 +50,16 @@ func TestStaffReminderWindowsAndStableKeys(t *testing.T) {
 	d.RecipientID = 3
 	require.NotEqual(t, a, staffRandomID(d))
 }
+
+func TestStaffReminderKindsHaveSeparateDispatchTimes(t *testing.T) {
+	location := CentreLocation()
+	beforeBirthday := time.Date(2026, time.September, 21, 10, 59, 0, 0, location)
+	atBirthday := time.Date(2026, time.September, 21, 11, 0, 0, 0, location)
+	atMedical := time.Date(2026, time.September, 21, 11, 5, 0, 0, location)
+
+	require.False(t, staffReminderReady("birthday", beforeBirthday))
+	require.True(t, staffReminderReady("birthday", atBirthday))
+	require.False(t, staffReminderReady("medical", atBirthday))
+	require.True(t, staffReminderReady("medical", atMedical))
+	require.False(t, staffReminderReady("unknown", atMedical))
+}

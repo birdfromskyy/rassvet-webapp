@@ -193,7 +193,7 @@ func (s *VKTeacherScheduleService) SendTomorrowTest(ctx context.Context, recipie
 		return err
 	}
 	if !found {
-		return errors.New("на завтра нет утверждённого расписания")
+		return errors.New("на завтра нет занятий в утверждённом расписании")
 	}
 	baseRandomID := secureRandomID()
 	return s.sendMessageParts(ctx, recipient.VKUserID, message, func(part int) int64 {
@@ -206,11 +206,10 @@ func equivalentScheduleSlots(before, after *models.ScheduleSlot) bool {
 		return false
 	}
 	if before.Weekday != after.Weekday || before.StartTime != after.StartTime || before.EndTime != after.EndTime ||
-		(before.RoomID == nil) != (after.RoomID == nil) || before.RoomName != after.RoomName || before.Status != after.Status ||
-		before.TeacherID != after.TeacherID {
-		return false
-	}
-	if before.RoomID != nil && after.RoomID != nil && *before.RoomID != *after.RoomID {
+		before.SlotType != after.SlotType || before.RoomName != after.RoomName || before.Status != after.Status ||
+		before.TeacherID != after.TeacherID || !sameOptionalUint(before.AssignmentID, after.AssignmentID) ||
+		!sameOptionalUint(before.GroupLessonID, after.GroupLessonID) || !sameOptionalUint(before.StudentID, after.StudentID) ||
+		!sameOptionalUint(before.SubjectID, after.SubjectID) || !sameOptionalUint(before.RoomID, after.RoomID) {
 		return false
 	}
 	left := slotTeacherIDs(before)
@@ -224,6 +223,13 @@ func equivalentScheduleSlots(before, after *models.ScheduleSlot) bool {
 		}
 	}
 	return true
+}
+
+func sameOptionalUint(left, right *uint) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 func (s *VKTeacherScheduleService) processPending(ctx context.Context) {
@@ -259,12 +265,20 @@ func (s *VKTeacherScheduleService) processEvent(parent context.Context, event *m
 		s.markEventFailed(event, err)
 		return
 	}
-	message := "🔄 Изменение расписания\n\n" + strings.TrimSpace(event.Summary)
 	today := dateOnly(time.Now().In(s.location), s.location)
+	relevantDates, err := relevantScheduleDates(encodedDates, today, s.location)
+	if err != nil {
+		s.markEventFailed(event, err)
+		return
+	}
+	if len(relevantDates) == 0 {
+		s.markEventSent(event)
+		return
+	}
+	message := "🔄 Изменение расписания\n\n" + strings.TrimSpace(event.Summary)
 	tomorrow := today.AddDate(0, 0, 1)
-	for _, encodedDate := range encodedDates {
-		date, err := time.ParseInLocation("2006-01-02", encodedDate, s.location)
-		if err != nil || !sameDate(date, tomorrow) {
+	for _, date := range relevantDates {
+		if !sameDate(date, tomorrow) {
 			continue
 		}
 		var delivered int64
@@ -285,7 +299,7 @@ func (s *VKTeacherScheduleService) processEvent(parent context.Context, event *m
 		}
 	}
 	ctx, cancel := context.WithTimeout(parent, 12*time.Second)
-	err := s.sendMessageParts(ctx, recipient.VKUserID, message, func(part int) int64 {
+	err = s.sendMessageParts(ctx, recipient.VKUserID, message, func(part int) int64 {
 		return scheduleEventRandomID(event.ID, recipient.VKUserID, part)
 	})
 	cancel()
@@ -295,6 +309,20 @@ func (s *VKTeacherScheduleService) processEvent(parent context.Context, event *m
 	}
 	s.markEventSent(event)
 	log.Printf("[VK-SCHEDULE] event=change_sent outbox_id=%d teacher_id=%d recipient_id=%d", event.ID, event.TeacherID, event.RecipientID)
+}
+
+func relevantScheduleDates(values []string, today time.Time, location *time.Location) ([]time.Time, error) {
+	dates := make([]time.Time, 0, len(values))
+	for _, value := range values {
+		date, err := time.ParseInLocation("2006-01-02", value, location)
+		if err != nil {
+			return nil, fmt.Errorf("parse affected schedule date %q: %w", value, err)
+		}
+		if !date.Before(today) {
+			dates = append(dates, date)
+		}
+	}
+	return dates, nil
 }
 
 func (s *VKTeacherScheduleService) runEveningDeliveries(ctx context.Context, now time.Time) {
@@ -377,7 +405,9 @@ func (s *VKTeacherScheduleService) formatTeacherDay(teacherID uint, date time.Ti
 	}
 	var slots []models.ScheduleSlot
 	err := s.db.
-		Preload("Student").Preload("Subject").Preload("Room").Preload("GroupLesson").
+		Preload("Student").Preload("Subject").Preload("Room").
+		Preload("GroupLesson").Preload("GroupLesson.Subject").
+		Preload("GroupLessonAttendance.Student").
 		Where("schedule_id = ? AND weekday = ? AND status != ? AND (teacher_id = ? OR EXISTS (SELECT 1 FROM schedule_slot_teachers sst WHERE sst.schedule_slot_id = schedule_slots.id AND sst.teacher_id = ?))",
 			schedule.ID, weekday, models.ScheduleSlotStatusCancelled, teacherID, teacherID).
 		Order("start_time ASC, id ASC").Find(&slots).Error
@@ -385,13 +415,12 @@ func (s *VKTeacherScheduleService) formatTeacherDay(teacherID uint, date time.Ti
 		return "", false, err
 	}
 
-	lines := []string{fmt.Sprintf("📅 %s — %s", heading, russianFullDate(date))}
 	if len(slots) == 0 {
-		lines = append(lines, "Занятий нет.")
-	} else {
-		for _, slot := range slots {
-			lines = append(lines, formatScheduleSlot(slot))
-		}
+		return "", false, nil
+	}
+	lines := []string{fmt.Sprintf("📅 %s — %s", heading, russianFullDate(date))}
+	for _, slot := range slots {
+		lines = append(lines, formatScheduleSlot(slot))
 	}
 	return strings.Join(lines, "\n\n"), true, nil
 }
@@ -422,16 +451,25 @@ func scheduleSlotChanges(before, after *models.ScheduleSlot) string {
 	if before == nil || after == nil {
 		return ""
 	}
-	changes := make([]string, 0, 3)
+	changes := make([]string, 0, 6)
 	if before.StartTime != after.StartTime || before.EndTime != after.EndTime {
-		changes = append(changes, fmt.Sprintf("Время: %s–%s → %s–%s.", before.StartTime, before.EndTime, after.StartTime, after.EndTime))
+		changes = append(changes, fmt.Sprintf("🕒 Время: %s–%s → %s–%s.", before.StartTime, before.EndTime, after.StartTime, after.EndTime))
+	}
+	oldSubject, newSubject := scheduleSlotSubject(*before), scheduleSlotSubject(*after)
+	if !sameOptionalUint(before.SubjectID, after.SubjectID) || oldSubject != newSubject {
+		changes = append(changes, fmt.Sprintf("📚 Предмет: %s → %s.", valueOrDash(oldSubject), valueOrDash(newSubject)))
+	}
+	oldAudience, newAudience := scheduleSlotAudience(*before), scheduleSlotAudience(*after)
+	if before.SlotType != after.SlotType || !sameOptionalUint(before.StudentID, after.StudentID) ||
+		!sameOptionalUint(before.GroupLessonID, after.GroupLessonID) || oldAudience != newAudience {
+		changes = append(changes, fmt.Sprintf("🧒 Ребёнок/группа: %s → %s.", valueOrDash(oldAudience), valueOrDash(newAudience)))
 	}
 	oldRoom, newRoom := scheduleSlotRoom(*before), scheduleSlotRoom(*after)
 	if oldRoom != newRoom {
-		changes = append(changes, fmt.Sprintf("Кабинет: %s → %s.", valueOrDash(oldRoom), valueOrDash(newRoom)))
+		changes = append(changes, fmt.Sprintf("🚪 Кабинет: %s → %s.", valueOrDash(oldRoom), valueOrDash(newRoom)))
 	}
 	if before.Status != after.Status {
-		changes = append(changes, fmt.Sprintf("Статус: %s.", scheduleStatusLabel(after.Status)))
+		changes = append(changes, fmt.Sprintf("📌 Статус: %s.", scheduleStatusLabel(after.Status)))
 	}
 	if len(changes) == 0 {
 		return ""
@@ -440,21 +478,55 @@ func scheduleSlotChanges(before, after *models.ScheduleSlot) string {
 }
 
 func formatScheduleSlot(slot models.ScheduleSlot) string {
-	title := "Занятие"
-	if slot.SlotType == models.SlotTypeGroup && slot.GroupLesson != nil && strings.TrimSpace(slot.GroupLesson.Name) != "" {
-		title = slot.GroupLesson.Name
-	} else if slot.Subject != nil && strings.TrimSpace(slot.Subject.Name) != "" {
-		title = slot.Subject.Name
+	lines := []string{
+		fmt.Sprintf("🕒 %s–%s", slot.StartTime, slot.EndTime),
+		"📚 Предмет: " + valueOrDash(scheduleSlotSubject(slot)),
 	}
+	if slot.SlotType == models.SlotTypeGroup {
+		groupName := ""
+		if slot.GroupLesson != nil {
+			groupName = strings.TrimSpace(slot.GroupLesson.Name)
+		}
+		lines = append(lines, "👥 Группа: "+valueOrDash(groupName))
+		if students := scheduleSlotStudents(slot); students != "" {
+			lines = append(lines, "🧒 Дети: "+students)
+		}
+	} else {
+		lines = append(lines, "🧒 Ребёнок: "+valueOrDash(scheduleSlotStudents(slot)))
+	}
+	lines = append(lines, "🚪 Кабинет: "+valueOrDash(scheduleSlotRoom(slot)))
+	return strings.Join(lines, "\n")
+}
+
+func scheduleSlotSubject(slot models.ScheduleSlot) string {
+	if slot.Subject != nil && strings.TrimSpace(slot.Subject.Name) != "" {
+		return strings.TrimSpace(slot.Subject.Name)
+	}
+	if slot.GroupLesson != nil && slot.GroupLesson.Subject != nil {
+		return strings.TrimSpace(slot.GroupLesson.Subject.Name)
+	}
+	return ""
+}
+
+func scheduleSlotStudents(slot models.ScheduleSlot) string {
 	if slot.Student != nil && strings.TrimSpace(slot.Student.FullName) != "" {
-		title += " — " + slot.Student.FullName
+		return strings.TrimSpace(slot.Student.FullName)
 	}
-	room := scheduleSlotRoom(slot)
-	line := fmt.Sprintf("%s–%s · %s", slot.StartTime, slot.EndTime, title)
-	if room != "" {
-		line += "\nКабинет: " + room
+	names := make([]string, 0, len(slot.GroupLessonAttendance))
+	for _, attendance := range slot.GroupLessonAttendance {
+		if name := strings.TrimSpace(attendance.Student.FullName); name != "" {
+			names = append(names, name)
+		}
 	}
-	return line
+	sort.Strings(names)
+	return strings.Join(names, ", ")
+}
+
+func scheduleSlotAudience(slot models.ScheduleSlot) string {
+	if slot.SlotType == models.SlotTypeGroup && slot.GroupLesson != nil && strings.TrimSpace(slot.GroupLesson.Name) != "" {
+		return strings.TrimSpace(slot.GroupLesson.Name)
+	}
+	return scheduleSlotStudents(slot)
 }
 
 func scheduleSlotRoom(slot models.ScheduleSlot) string {
