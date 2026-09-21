@@ -4,6 +4,9 @@ manage_timezone: true
 
 ssh_port: 22
 ssh_permit_root_login: "no"
+ssh_tcp_forwarding_mode: local
+ssh_permitted_forward_targets:
+  - "172.29.0.5:5432"
 
 manage_admin_user: true
 admin_user_name: birdfromsky
