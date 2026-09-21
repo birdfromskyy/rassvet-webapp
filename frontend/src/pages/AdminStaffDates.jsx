@@ -35,13 +35,13 @@ export default function AdminStaffDates() {
   const [error, setError] = useState('');
   const [dialogError, setDialogError] = useState('');
   const [draft, setDraft] = useState(null);
-  const [hour, setHour] = useState(9);
+  const [reminderTimes, setReminderTimes] = useState({ birthdays: '11:00', medical: '11:05' });
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
     Promise.all([service.list(controller.signal), service.recipients(controller.signal)]).then(([data, recipients]) => {
       if (controller.signal.aborted) return;
-      setRows(data.staff); setHour(data.reminder_hour); setRecipients(recipients);
+      setRows(data.staff); setReminderTimes(data.reminder_times || { birthdays: '11:00', medical: '11:05' }); setRecipients(recipients);
     }).catch(() => { if (!controller.signal.aborted) setError('Не удалось загрузить данные сотрудников'); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -64,7 +64,7 @@ export default function AdminStaffDates() {
       {error && <Alert severity='error' action={<Button onClick={() => setReload(n => n + 1)}>Повторить</Button>}>{error}</Alert>}
       {loading && <CircularProgress aria-label='Загрузка сотрудников' />}
       {!loading && !error && (tab === 2 ? <>
-        <Alert severity='info' sx={{ mb: 2 }}>Напоминания в {String(hour).padStart(2, '0')}:00 по времени центра (UTC+5). Медосмотр: за 20 дней и в день окончания. День рождения: за 2 дня.</Alert>
+        <Alert severity='info' sx={{ mb: 2 }}>Дни рождения: в {reminderTimes.birthdays}, за 2 дня. Медосмотры: в {reminderTimes.medical}, за 20 дней и в день окончания. Время центра — UTC+5.</Alert>
         <Button variant='outlined' sx={{ mb: 2 }} onClick={() => navigate('/admin/cms/vk-notifications')}>Добавить или настроить страницу VK</Button>
         <TableContainer><Table><TableHead><TableRow><TableCell>Получатель</TableCell><TableCell>Медосмотры</TableCell><TableCell>Дни рождения</TableCell><TableCell /></TableRow></TableHead><TableBody>
           {recipients.map(row => <TableRow key={row.id}><TableCell>{row.profile_url}{!row.enabled && <Chip sx={{ ml: 1 }} label='Доставка отключена' size='small' />}</TableCell><TableCell>{row.medical ? 'Включены' : 'Выключены'}</TableCell><TableCell>{row.birthdays ? 'Включены' : 'Выключены'}</TableCell><TableCell><Button variant='outlined' startIcon={<Settings />} onClick={() => { setDialogError(''); setDraft({ type: 'recipient', row, medical: row.medical, birthdays: row.birthdays }); }}>Настроить</Button></TableCell></TableRow>)}

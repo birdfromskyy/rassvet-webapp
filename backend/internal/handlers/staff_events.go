@@ -51,7 +51,13 @@ func (h staffDatesHandler) list(c *gin.Context) {
 		reportingError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"staff": rows, "timezone": "Asia/Yekaterinburg", "reminder_hour": 9})
+	birthdayTime, medicalTime := services.StaffReminderTimes()
+	c.JSON(200, gin.H{
+		"staff": rows, "timezone": "Asia/Yekaterinburg",
+		"reminder_times": gin.H{"birthdays": birthdayTime, "medical": medicalTime},
+		// Keep the old field during a rolling frontend/backend deployment.
+		"reminder_hour": 11,
+	})
 }
 func (h staffDatesHandler) save(c *gin.Context) {
 	id, ok := reportingID(c, "id")

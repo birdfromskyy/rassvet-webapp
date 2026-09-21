@@ -14,7 +14,12 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const staffReminderHour = 9
+const (
+	birthdayReminderHour   = 11
+	birthdayReminderMinute = 0
+	medicalReminderHour    = 11
+	medicalReminderMinute  = 5
+)
 
 type StaffMember struct {
 	Kind         string            `json:"kind"`
@@ -45,7 +50,7 @@ func teacherAccountLinks(db *gorm.DB) ([]teacherAccountLink, error) {
 	return links, err
 }
 
-func StaffLocation() *time.Location { loc, _ := time.LoadLocation("Asia/Yekaterinburg"); return loc }
+func StaffLocation() *time.Location { return CentreLocation() }
 func staffDay(now time.Time) time.Time {
 	local := now.In(StaffLocation())
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, StaffLocation())
@@ -240,10 +245,26 @@ func staffRandomID(d models.StaffReminderDelivery) int64 {
 	return int64(binary.BigEndian.Uint32(h[:4])&0x7ffffffe) + 1
 }
 
+func staffReminderReady(kind string, now time.Time) bool {
+	switch kind {
+	case "birthday":
+		return CentreDailyDispatchReached(now, birthdayReminderHour, birthdayReminderMinute)
+	case "medical":
+		return CentreDailyDispatchReached(now, medicalReminderHour, medicalReminderMinute)
+	default:
+		return false
+	}
+}
+
+func StaffReminderTimes() (birthday, medical string) {
+	return fmt.Sprintf("%02d:%02d", birthdayReminderHour, birthdayReminderMinute),
+		fmt.Sprintf("%02d:%02d", medicalReminderHour, medicalReminderMinute)
+}
+
 // A transactional advisory lock serializes replicas. Pending deliveries survive
 // restarts, retry every five minutes, and keep the same VK idempotency key.
 func (s *StaffEventService) Dispatch(ctx context.Context, now time.Time) error {
-	if !s.vk.Configured() || now.In(StaffLocation()).Hour() < staffReminderHour {
+	if !s.vk.Configured() || !CentreDailyDispatchReached(now, birthdayReminderHour, birthdayReminderMinute) {
 		return nil
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -264,6 +285,9 @@ func (s *StaffEventService) Dispatch(ctx context.Context, now time.Time) error {
 		}
 		for _, person := range staff {
 			for _, due := range staffDueEvents(person) {
+				if !staffReminderReady(due.kind, now) {
+					continue
+				}
 				for _, pref := range prefs {
 					if (due.kind == "medical" && !pref.Medical) || (due.kind == "birthday" && !pref.Birthdays) {
 						continue

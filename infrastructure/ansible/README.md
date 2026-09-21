@@ -68,7 +68,11 @@ ansible-playbook site.yml --tags backup --ask-become-pass \
   только при первом создании пользователя;
 - root SSH отключён (`PermitRootLogin no`); не применять роль `security` без
   проверенного ключа `birdfromsky`, sudo-пароля и доступа к FirstVDS VNC;
-- SSH forwarding отключён; вход разрешён только `birdfromsky` и `deploy`;
+- SSH agent/X11 и TUN-device forwarding отключены; вход разрешён только
+  `birdfromsky` и `deploy`;
+- локальный SSH forwarding разрешён только к PostgreSQL
+  `172.29.0.5:5432`; внешний порт базы не публикуется, remote forwarding и
+  произвольный pivot через SSH запрещены;
 - первый fail2ban-бан длится один час после 8 ошибок за 10 минут, повторные
   нарушения увеличивают срок вплоть до суток;
 - отдельный Nginx jail блокирует повторяющиеся обращения к типовым scanner

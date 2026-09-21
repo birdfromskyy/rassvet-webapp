@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"backend/internal/models"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNextScheduleDispatchUsesYekaterinburgTime(t *testing.T) {
@@ -47,6 +48,48 @@ func TestScheduleSlotChangesNamesChangedFields(t *testing.T) {
 	}
 }
 
+func TestFormatScheduleSlotUsesReadableEmojiLines(t *testing.T) {
+	roomID := uint(1)
+	slot := models.ScheduleSlot{
+		StartTime: "10:00", EndTime: "10:40", RoomID: &roomID,
+		Subject: &models.Subject{Name: "Логопед"},
+		Student: &models.Student{FullName: "Иванов Иван"},
+		Room:    &models.Room{Name: "Кабинет 1"},
+	}
+
+	require.Equal(t, strings.Join([]string{
+		"🕒 10:00–10:40",
+		"📚 Предмет: Логопед",
+		"🧒 Ребёнок: Иванов Иван",
+		"🚪 Кабинет: Кабинет 1",
+	}, "\n"), formatScheduleSlot(slot))
+}
+
+func TestFormatGroupScheduleSlotIncludesGroupAndChildren(t *testing.T) {
+	slot := models.ScheduleSlot{
+		SlotType:    models.SlotTypeGroup,
+		StartTime:   "11:00",
+		EndTime:     "12:00",
+		Subject:     &models.Subject{Name: "Ритмика"},
+		GroupLesson: &models.GroupLesson{Name: "Солнышко"},
+		GroupLessonAttendance: []models.GroupLessonAttendance{
+			{Student: models.Student{FullName: "Петров Пётр"}},
+			{Student: models.Student{FullName: "Иванов Иван"}},
+		},
+	}
+
+	message := formatScheduleSlot(slot)
+	for _, expected := range []string{
+		"🕒 11:00–12:00",
+		"📚 Предмет: Ритмика",
+		"👥 Группа: Солнышко",
+		"🧒 Дети: Иванов Иван, Петров Пётр",
+		"🚪 Кабинет: не указан",
+	} {
+		require.Contains(t, message, expected)
+	}
+}
+
 func TestMondayForSunday(t *testing.T) {
 	location, err := time.LoadLocation(vkScheduleTimezone)
 	if err != nil {
@@ -71,6 +114,17 @@ func TestSlotHasNotEndedUsesCentreDateAndTime(t *testing.T) {
 	if !slotHasNotEnded(date, slot, time.Date(2026, time.September, 18, 15, 29, 0, 0, location), location) {
 		t.Fatal("a same-day future lesson must remain eligible")
 	}
+}
+
+func TestRelevantScheduleDatesDropsPastDays(t *testing.T) {
+	location := CentreLocation()
+	today := time.Date(2026, time.September, 21, 0, 0, 0, 0, location)
+	dates, err := relevantScheduleDates([]string{"2026-09-20", "2026-09-21", "2026-09-22"}, today, location)
+	require.NoError(t, err)
+	require.Equal(t, []string{"2026-09-21", "2026-09-22"}, formatDates(dates))
+
+	_, err = relevantScheduleDates([]string{"not-a-date"}, today, location)
+	require.Error(t, err)
 }
 
 func TestSplitVKMessagePreservesAllContent(t *testing.T) {

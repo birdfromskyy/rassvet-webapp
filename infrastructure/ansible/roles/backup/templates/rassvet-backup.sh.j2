@@ -64,13 +64,13 @@ backup_files() {
     /etc/systemd/system/rassvet-restic-maintenance.service
     /etc/systemd/system/rassvet-restic-maintenance.timer
     /usr/local/sbin/rassvet-backup
-    /var/spool/cron/crontabs/root
   )
   local -a optional_sources=(
     /etc/sudoers.d/rassvet-deploy
     /usr/local/sbin/rassvet-release
     /usr/local/libexec/rassvet-deploy-ssh
     /var/lib/rassvet-deploy
+    /var/spool/cron/crontabs/root
   )
 
   local source

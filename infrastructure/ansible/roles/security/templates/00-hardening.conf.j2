@@ -6,7 +6,8 @@ PubkeyAuthentication yes
 MaxAuthTries 3
 LoginGraceTime 20
 X11Forwarding no
-AllowTcpForwarding no
+AllowTcpForwarding {{ ssh_tcp_forwarding_mode }}
+PermitOpen {{ ssh_permitted_forward_targets | join(' ') }}
 AllowAgentForwarding no
 GatewayPorts no
 PermitTunnel no

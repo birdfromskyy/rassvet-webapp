@@ -8,6 +8,23 @@
     fail_msg: Configure encrypted group_vars/vault.yml before applying the backup role.
   no_log: true
 
+- name: Inspect the root crontab for the legacy backup job
+  ansible.builtin.stat:
+    path: /var/spool/cron/crontabs/root
+  register: root_crontab
+
+- name: Remove the legacy unencrypted backup cron entry
+  ansible.builtin.lineinfile:
+    path: /var/spool/cron/crontabs/root
+    regexp: '^0 3 \* \* \* /opt/rassvet/scripts/backup\.sh >> /var/log/rassvet-backup\.log 2>&1$'
+    state: absent
+  when: root_crontab.stat.exists
+
+- name: Remove the legacy unencrypted backup script
+  ansible.builtin.file:
+    path: /opt/rassvet/scripts/backup.sh
+    state: absent
+
 - name: Install restic extraction dependency
   ansible.builtin.apt:
     name: bzip2
