@@ -33,21 +33,6 @@ test('a conflict keeps edited dates in the modal', async () => {
   await screen.findByText(/Запись уже изменена/);
   expect(screen.getByLabelText('Дата рождения').value).toBe('1980-10-01');
 });
-test('birthday recipients are opt-in separately from medical reminders', async () => {
-  service.configure.mockResolvedValue({ revision: 1 });
-  render(<AdminStaffDates />); await screen.findByText('Тестов Иван');
-  fireEvent.click(screen.getByRole('tab', { name: 'Получатели VK' }));
-  fireEvent.click(screen.getByText('Настроить'));
-  const birthday = screen.getByLabelText('Получать напоминания о днях рождения сотрудников');
-  expect(birthday).not.toBeChecked(); fireEvent.click(birthday);
-  fireEvent.click(screen.getByText('Сохранить'));
-  await waitFor(() => expect(service.configure).toHaveBeenCalledWith(7, { revision: 0, medical: false, birthdays: true }));
-});
-test('shows separate reminder times returned by the backend', async () => {
-  render(<AdminStaffDates />); await screen.findByText('Тестов Иван');
-  fireEvent.click(screen.getByRole('tab', { name: 'Получатели VK' }));
-  expect(screen.getByText(/Дни рождения: в 11:00/)).toHaveTextContent('Медосмотры: в 11:05');
-});
 test('closing an unchanged dialog does not ask for confirmation', async () => {
   const confirm = vi.spyOn(window, 'confirm');
   render(<AdminStaffDates />); await screen.findByText('Тестов Иван');

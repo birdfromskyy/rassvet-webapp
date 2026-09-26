@@ -27,6 +27,7 @@ import {
 import { toast } from "react-toastify";
 import vkNotificationService from "../services/vkNotificationService";
 import scheduleService from "../services/scheduleService";
+import staffEventsService from "../services/staffEventsService";
 import "./AdminModule.scss";
 
 const emptyForm = {
@@ -35,13 +36,36 @@ const emptyForm = {
   receive_admin_notifications: true,
   receive_schedule_notifications: false,
   teacher_id: "",
+  receive_medical_reminders: false,
+  receive_birthday_reminders: false,
+  staff_reminder_revision: 0,
 };
+
+export const buildRecipientPayload = (form) => {
+  const teacherID = Number(form.teacher_id) || 0;
+  return {
+    profile_url: String(form.profile_url || "").trim(),
+    // Send all switch values explicitly, including `false`: this is required
+    // for new records because database defaults must not overwrite a choice.
+    is_enabled: Boolean(form.is_enabled),
+    receive_admin_notifications: Boolean(form.receive_admin_notifications),
+    receive_schedule_notifications: teacherID > 0 && Boolean(form.receive_schedule_notifications),
+    teacher_id: teacherID,
+  };
+};
+
+export const buildStaffReminderPayload = (form) => ({
+  revision: Number(form.staff_reminder_revision) || 0,
+  medical: Boolean(form.receive_medical_reminders),
+  birthdays: Boolean(form.receive_birthday_reminders),
+});
 
 function AdminVKNotifications() {
   const navigate = useNavigate();
   const [recipients, setRecipients] = useState([]);
   const [configured, setConfigured] = useState(false);
   const [teachers, setTeachers] = useState([]);
+  const [staffReminderPreferences, setStaffReminderPreferences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -53,13 +77,15 @@ function AdminVKNotifications() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, teacherList] = await Promise.all([
+      const [data, teacherList, staffReminderData] = await Promise.all([
         vkNotificationService.getAll(),
         scheduleService.getTeachers(),
+        staffEventsService.recipients(),
       ]);
       setRecipients(data.recipients || []);
       setConfigured(Boolean(data.configured));
       setTeachers(teacherList || []);
+      setStaffReminderPreferences(staffReminderData || []);
     } catch {
       toast.error("Не удалось загрузить получателей VK");
     } finally {
@@ -71,18 +97,22 @@ function AdminVKNotifications() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm });
     setOpen(true);
   };
 
   const openEdit = (recipient) => {
+    const staffPreference = staffReminderPreferences.find((item) => item.id === recipient.id);
     setEditing(recipient);
     setForm({
       profile_url: recipient.profile_url,
-      is_enabled: recipient.is_enabled,
-      receive_admin_notifications: recipient.receive_admin_notifications,
-      receive_schedule_notifications: recipient.receive_schedule_notifications,
+      is_enabled: Boolean(recipient.is_enabled),
+      receive_admin_notifications: Boolean(recipient.receive_admin_notifications),
+      receive_schedule_notifications: Boolean(recipient.receive_schedule_notifications),
       teacher_id: recipient.teacher_id || "",
+      receive_medical_reminders: Boolean(staffPreference?.medical),
+      receive_birthday_reminders: Boolean(staffPreference?.birthdays),
+      staff_reminder_revision: staffPreference?.revision || 0,
     });
     setOpen(true);
   };
@@ -94,9 +124,18 @@ function AdminVKNotifications() {
     }
     setSaving(true);
     try {
-      const payload = { ...form, teacher_id: Number(form.teacher_id) || 0 };
-      if (editing) await vkNotificationService.update(editing.id, payload);
-      else await vkNotificationService.create(payload);
+      const payload = buildRecipientPayload(form);
+      const recipient = editing
+        ? await vkNotificationService.update(editing.id, payload)
+        : await vkNotificationService.create(payload);
+      try {
+        await staffEventsService.configure(recipient.id, buildStaffReminderPayload(form));
+      } catch (error) {
+        await load();
+        setOpen(false);
+        toast.error(error.response?.data?.error || "Получатель сохранён, но настройки напоминаний не удалось сохранить");
+        return;
+      }
       toast.success(editing ? "Получатель обновлён" : "Получатель добавлен");
       setOpen(false);
       await load();
@@ -140,7 +179,7 @@ function AdminVKNotifications() {
     setTestingID(recipient.id);
     try {
       await vkNotificationService.sendTest(recipient.id);
-      toast.success("Тестовое уведомление отправлено");
+      toast.success("Тест доставки отправлен");
     } catch (error) {
       toast.error(error.response?.data?.error || "VK не принял тестовое уведомление");
     } finally {
@@ -161,6 +200,7 @@ function AdminVKNotifications() {
   };
 
   const activeCount = recipients.filter((recipient) => recipient.is_enabled).length;
+  const staffPreferenceFor = (recipientID) => staffReminderPreferences.find((item) => item.id === recipientID);
 
   return (
     <main className="admin-module">
@@ -196,7 +236,7 @@ function AdminVKNotifications() {
           ) : (
             <div className="admin-vk-list">
               {recipients.map((recipient) => (
-                <article className="admin-vk-recipient" key={recipient.id}>
+                <article className="admin-vk-recipient admin-vk-recipient--complete" key={recipient.id}>
                   <div className="admin-vk-recipient__identity">
                     <span className="admin-vk-recipient__avatar">VK</span>
                     <div>
@@ -213,6 +253,15 @@ function AdminVKNotifications() {
                     control={<Switch checked={recipient.is_enabled} onChange={() => toggle(recipient)} />}
                     label="Получать"
                   />
+                  {(() => {
+                    const preference = staffPreferenceFor(recipient.id);
+                    return (
+                      <div className="admin-vk-recipient__preferences">
+                        <span>Медосмотры: <b>{preference?.medical ? "включены" : "выключены"}</b></span>
+                        <span>Дни рождения: <b>{preference?.birthdays ? "включены" : "выключены"}</b></span>
+                      </div>
+                    );
+                  })()}
                   <div className="admin-vk-recipient__tests">
                     <Button
                       variant="outlined"
@@ -220,7 +269,7 @@ function AdminVKNotifications() {
                       disabled={!configured || !recipient.is_enabled || testingID !== null}
                       onClick={() => sendTest(recipient)}
                     >
-                      Тестовое уведомление
+                      Проверить доставку
                     </Button>
                     {recipient.receive_schedule_notifications && (
                       <Button
@@ -290,6 +339,17 @@ function AdminVKNotifications() {
               )}
               label="Расписание преподавателя"
             />
+            <Box className="admin-vk-form__section">
+              <span className="admin-vk-form__section-title">Напоминания сотрудникам</span>
+              <FormControlLabel
+                control={<Switch checked={form.receive_medical_reminders} onChange={(event) => setForm((current) => ({ ...current, receive_medical_reminders: event.target.checked }))} />}
+                label="Медосмотры"
+              />
+              <FormControlLabel
+                control={<Switch checked={form.receive_birthday_reminders} onChange={(event) => setForm((current) => ({ ...current, receive_birthday_reminders: event.target.checked }))} />}
+                label="Дни рождения сотрудников"
+              />
+            </Box>
           </DialogContent>
           <DialogActions className="admin-module-dialog__actions">
             <Button onClick={() => setOpen(false)} disabled={saving}>Отмена</Button>
