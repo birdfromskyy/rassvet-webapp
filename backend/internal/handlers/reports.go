@@ -22,21 +22,23 @@ func NewReportHandler(db *gorm.DB) *ReportHandler {
 }
 
 type monthlyStudentReportRow struct {
-	StudentID   uint    `json:"student_id"`
-	StudentName string  `json:"student_name"`
-	SubjectID   uint    `json:"subject_id"`
-	SubjectName string  `json:"subject_name"`
-	DurationMin int     `json:"duration_min"`
-	Lessons     int     `json:"lessons"`
-	Hours       float64 `json:"hours"`
-	TariffRub   int     `json:"tariff_rub"`
-	AmountRub   int     `json:"amount_rub"`
+	StudentID      uint    `json:"student_id"`
+	ParticipantKey string  `json:"participant_key,omitempty"`
+	StudentName    string  `json:"student_name"`
+	SubjectID      uint    `json:"subject_id"`
+	SubjectName    string  `json:"subject_name"`
+	DurationMin    int     `json:"duration_min"`
+	Lessons        int     `json:"lessons"`
+	Hours          float64 `json:"hours"`
+	TariffRub      int     `json:"tariff_rub"`
+	AmountRub      int     `json:"amount_rub"`
 }
 
 type monthlyStudentTotalRow struct {
-	StudentID   uint   `json:"student_id"`
-	StudentName string `json:"student_name"`
-	AmountRub   int    `json:"amount_rub"`
+	StudentID      uint   `json:"student_id"`
+	ParticipantKey string `json:"participant_key,omitempty"`
+	StudentName    string `json:"student_name"`
+	AmountRub      int    `json:"amount_rub"`
 }
 
 type monthlyTeacherReportRow struct {
@@ -58,6 +60,7 @@ type reportLessonRow struct {
 	DurationMin int     `json:"duration_min"`
 	Hours       float64 `json:"hours"`
 	SlotType    string  `json:"slot_type"`
+	LessonKind  string  `json:"lesson_kind"`
 	StudentName string  `json:"student_name"`
 	GroupName   string  `json:"group_name"`
 	TeacherName string  `json:"teacher_name"`
@@ -133,7 +136,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 	}
 
 	studentRows := map[string]*monthlyStudentReportRow{}
-	studentTotals := map[uint]*monthlyStudentTotalRow{}
+	studentTotals := map[string]*monthlyStudentTotalRow{}
 	teacherRows := map[string]*monthlyTeacherReportRow{}
 	lessons := []reportLessonRow{}
 	durationCounts := map[string]int{"30": 0, "50": 0, "other": 0}
@@ -222,6 +225,10 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 		for _, slotStudent := range slotStudents {
 			studentIDs = append(studentIDs, slotStudent.ID)
 		}
+		participantCount := len(reportStudents)
+		if slot.IsConsultation() {
+			participantCount = 1
+		}
 		lessons = append(lessons, reportLessonRow{
 			Date:        lessonDate.Format("2006-01-02"),
 			Weekday:     slot.Weekday,
@@ -230,6 +237,7 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			DurationMin: duration,
 			Hours:       hours,
 			SlotType:    slot.SlotType,
+			LessonKind:  slot.LessonKind,
 			StudentName: reportSlotStudentLabel(slot),
 			GroupName:   groupName,
 			TeacherName: teacherName,
@@ -238,8 +246,32 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			StudentIDs:  studentIDs,
 			TeacherIDs:  teacherIDs,
 			TariffRub:   tariffRub,
-			AmountRub:   tariffRub * len(reportStudents),
+			AmountRub:   tariffRub * participantCount,
 		})
+
+		if slot.IsConsultation() {
+			participantKey := "consultation:" + strconv.Itoa(int(slot.ID))
+			studentName := slot.GuestChildFullName()
+			sKey := participantKey + ":" + strconv.Itoa(int(subjectID)) + ":" + strconv.Itoa(duration)
+			studentRows[sKey] = &monthlyStudentReportRow{
+				ParticipantKey: participantKey,
+				StudentName:    studentName,
+				SubjectID:      subjectID,
+				SubjectName:    subjectName,
+				DurationMin:    duration,
+				Lessons:        1,
+				Hours:          hours,
+				TariffRub:      tariffRub,
+				AmountRub:      tariffRub,
+			}
+			studentTotals[participantKey] = &monthlyStudentTotalRow{
+				ParticipantKey: participantKey,
+				StudentName:    studentName,
+				AmountRub:      tariffRub,
+			}
+			totalAmountRub += tariffRub
+			continue
+		}
 
 		for _, student := range reportStudents {
 			studentName := student.FullName
@@ -249,13 +281,15 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			sKey := strconv.Itoa(int(student.ID)) + ":" + strconv.Itoa(int(subjectID)) + ":" + subjectName + ":" + strconv.Itoa(duration)
 			sRow := studentRows[sKey]
 			if sRow == nil {
+				participantKey := "student:" + strconv.Itoa(int(student.ID))
 				sRow = &monthlyStudentReportRow{
-					StudentID:   student.ID,
-					StudentName: studentName,
-					SubjectID:   subjectID,
-					SubjectName: subjectName,
-					DurationMin: duration,
-					TariffRub:   tariffRub,
+					StudentID:      student.ID,
+					ParticipantKey: participantKey,
+					StudentName:    studentName,
+					SubjectID:      subjectID,
+					SubjectName:    subjectName,
+					DurationMin:    duration,
+					TariffRub:      tariffRub,
 				}
 				studentRows[sKey] = sRow
 			}
@@ -264,10 +298,11 @@ func (h *ReportHandler) GetMonthlyReport(c *gin.Context) {
 			sRow.AmountRub += tariffRub
 			totalAmountRub += tariffRub
 
-			total := studentTotals[student.ID]
+			participantKey := "student:" + strconv.Itoa(int(student.ID))
+			total := studentTotals[participantKey]
 			if total == nil {
-				total = &monthlyStudentTotalRow{StudentID: student.ID, StudentName: studentName}
-				studentTotals[student.ID] = total
+				total = &monthlyStudentTotalRow{StudentID: student.ID, ParticipantKey: participantKey, StudentName: studentName}
+				studentTotals[participantKey] = total
 			}
 			total.AmountRub += tariffRub
 		}
@@ -457,6 +492,9 @@ func reportSlotHasStudent(students []models.Student, studentID uint) bool {
 }
 
 func reportSlotStudentLabel(slot models.ScheduleSlot) string {
+	if slot.IsConsultation() {
+		return slot.GuestChildFullName()
+	}
 	if slot.SlotType == models.SlotTypeGroup {
 		students := slotReportStudents(slot)
 		names := ""

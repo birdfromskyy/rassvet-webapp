@@ -42,6 +42,11 @@ const getSlotSubject = (slot) =>
   slot.subject?.name || slot.group_lesson?.name || "Занятие";
 
 const getSlotStudentLabel = (slot) => {
+  if (slot.lesson_kind === "consultation") {
+    return [slot.guest_child_last_name, slot.guest_child_first_name, slot.guest_child_middle_name]
+      .filter(Boolean)
+      .join(" ") || "—";
+  }
   if (slot.slot_type !== "group") return slot.student?.full_name || "—";
   if (Array.isArray(slot.group_lesson_attendance) && slot.group_lesson_attendance.length) {
     return (
@@ -79,8 +84,19 @@ const getDuration = (start, end) => {
   return eh * 60 + em - (sh * 60 + sm);
 };
 
+const getDashboardSlotColor = (slot) => {
+  if (slot.lesson_kind === "consultation") return "consultation";
+  if (slot.slot_type === "group") return "group";
+  // The dashboard intentionally keeps every individual lesson neutral;
+  // the paid/budget distinction remains available on the admin schedule.
+  return "individual";
+};
+
 const SlotItem = ({ slot, asTeacher }) => (
-  <article className="dashboard-schedule__item" key={slot.id}>
+  <article
+    className={`dashboard-schedule__item dashboard-schedule__item--${getDashboardSlotColor(slot)}`}
+    key={slot.id}
+  >
     <div className="dashboard-schedule__time">
       {slot.start_time}–{slot.end_time}
       <span className="dashboard-schedule__duration">
@@ -97,7 +113,7 @@ const SlotItem = ({ slot, asTeacher }) => (
         <span className="dashboard-schedule__label">
           {asTeacher ? "Предмет: " : "Преподаватель: "}
         </span>
-		{asTeacher ? getSlotSubject(slot) : getSlotTeacherLabel(slot)}
+		{asTeacher ? `${slot.lesson_kind === "consultation" ? "Консультация · " : ""}${getSlotSubject(slot)}` : getSlotTeacherLabel(slot)}
       </p>
     </div>
   </article>

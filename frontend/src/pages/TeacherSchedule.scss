@@ -198,6 +198,11 @@
     border-left-color: #4caf50;
     background: rgba(76, 175, 80, 0.05);
   }
+
+  &--consultation {
+    border-left-color: #d97706;
+    background: rgba(245, 158, 11, 0.10);
+  }
 }
 
 .schedule__slot-time {
@@ -219,6 +224,11 @@
   &--group {
     background: rgba(76, 175, 80, 0.16);
     color: #2e7d32;
+  }
+
+  &--consultation {
+    background: rgba(245, 158, 11, 0.18);
+    color: #8a4b00;
   }
 }
 

@@ -119,6 +119,45 @@ func Migrate(db *gorm.DB) {
 		log.Fatal("Failed to migrate database:", err)
 	}
 
+	// Existing rows are ordinary lessons. Keep the migration additive and make
+	// the consultation shape impossible to corrupt through a future API bug.
+	if err := db.Exec("UPDATE schedule_slots SET lesson_kind = ? WHERE lesson_kind IS NULL OR lesson_kind = ''", models.ScheduleLessonKindRegular).Error; err != nil {
+		log.Fatal("Failed to initialize schedule lesson kinds:", err)
+	}
+	if err := db.Exec(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint WHERE conname = 'schedule_slots_lesson_kind_shape_v1_check'
+			) THEN
+				ALTER TABLE schedule_slots
+				ADD CONSTRAINT schedule_slots_lesson_kind_shape_v1_check CHECK (
+					(
+						lesson_kind = 'regular'
+						AND guest_child_last_name = ''
+						AND guest_child_first_name = ''
+						AND guest_child_middle_name = ''
+					)
+					OR
+					(
+						lesson_kind = 'consultation'
+						AND slot_type = 'individual'
+						AND assignment_id IS NULL
+						AND student_id IS NULL
+						AND group_lesson_id IS NULL
+						AND subject_id IS NOT NULL
+						AND room_id IS NOT NULL
+						AND btrim(guest_child_last_name) <> ''
+						AND btrim(guest_child_first_name) <> ''
+					)
+				) NOT VALID;
+			END IF;
+		END $$;
+		ALTER TABLE schedule_slots VALIDATE CONSTRAINT schedule_slots_lesson_kind_shape_v1_check;
+	`).Error; err != nil {
+		log.Fatal("Failed to enforce schedule consultation shape:", err)
+	}
+
 	// Create unique indexes manually to avoid GORM's DROP CONSTRAINT without IF EXISTS bug
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug)")
 	db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_site_settings_key ON site_settings(key)")

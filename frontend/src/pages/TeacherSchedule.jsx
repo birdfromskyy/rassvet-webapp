@@ -44,6 +44,7 @@ const getDayDate = (weekStart, weekday) => {
 }
 
 const getSlotSubject = slot => slot.subject?.name || slot.group_lesson?.name || '—'
+const isConsultation = slot => slot?.lesson_kind === 'consultation'
 const getSlotTeacherLabel = slot => {
   if (slot.slot_type === 'group' && Array.isArray(slot.teachers) && slot.teachers.length) {
     return slot.teachers.map(link => link.teacher?.full_name || `#${link.teacher_id}`).join(', ')
@@ -51,6 +52,9 @@ const getSlotTeacherLabel = slot => {
   return slot.teacher?.full_name || '—'
 }
 const getSlotStudent = slot => {
+	if (slot.lesson_kind === 'consultation') {
+		return [slot.guest_child_last_name, slot.guest_child_first_name, slot.guest_child_middle_name].filter(Boolean).join(' ') || '—'
+	}
 	if (slot.slot_type !== 'group') return slot.student?.full_name || '—'
 	if (Array.isArray(slot.group_lesson_attendance) && slot.group_lesson_attendance.length) {
 		return slot.group_lesson_attendance
@@ -222,6 +226,10 @@ const TeacherSchedule = ({ user }) => {
               <div className="schedule__legend-dot" style={{ background: 'rgba(76,175,80,0.25)' }} />
               Групповое
             </div>
+            <div className="schedule__legend-item">
+              <div className="schedule__legend-dot" style={{ background: 'rgba(245,158,11,0.28)' }} />
+              Консультация
+            </div>
           </div>
 
           {(loading || optionsLoading) && (
@@ -255,12 +263,12 @@ const TeacherSchedule = ({ user }) => {
                   {daySlots.map(slot => (
                     <div
                       key={slot.id}
-                      className={`schedule__slot ${slot.slot_type === 'group' ? 'schedule__slot--group' : 'schedule__slot--individual'}`}
+                      className={`schedule__slot ${isConsultation(slot) ? 'schedule__slot--consultation' : slot.slot_type === 'group' ? 'schedule__slot--group' : 'schedule__slot--individual'}`}
                     >
                       <div>
                         <div className="schedule__slot-time">{slot.start_time}–{slot.end_time}</div>
-                        <span className={`schedule__slot-label ${slot.slot_type === 'group' ? 'schedule__slot-label--group' : ''}`}>
-                          {slot.slot_type === 'group' ? 'Групповое' : 'Индивидуальное'}
+                        <span className={`schedule__slot-label ${isConsultation(slot) ? 'schedule__slot-label--consultation' : slot.slot_type === 'group' ? 'schedule__slot-label--group' : ''}`}>
+                          {isConsultation(slot) ? 'Консультация' : slot.slot_type === 'group' ? 'Групповое' : 'Индивидуальное'}
                         </span>
                       </div>
                       <div className="schedule__slot-cell">

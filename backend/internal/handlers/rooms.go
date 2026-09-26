@@ -37,7 +37,7 @@ type UpdateRoomSubjectsRequest struct {
 func (h *RoomHandler) GetRooms(c *gin.Context) {
 	var rooms []models.Room
 
-	query := h.db.Order("id ASC")
+	query := h.db.Preload("Subjects").Order("id ASC")
 	if c.Query("archived") == "true" {
 		query = query.Where("archived_at IS NOT NULL")
 	} else {

@@ -264,6 +264,20 @@
     border-radius: 18px;
     background: $paper;
     border: 1px solid $border;
+
+    &--individual {
+      background: #ffffff;
+    }
+
+    &--group {
+      background: rgba(76, 175, 80, 0.1);
+      border-color: rgba(76, 175, 80, 0.28);
+    }
+
+    &--consultation {
+      background: rgba(245, 158, 11, 0.14);
+      border-color: rgba(245, 158, 11, 0.32);
+    }
   }
 
   .dashboard-schedule__time {
@@ -321,6 +335,11 @@
   @media (max-width: 900px) {
     .dashboard__main-grid {
       grid-template-columns: 1fr;
+    }
+
+    .dashboard-schedule__item {
+      grid-template-columns: 1fr;
+      gap: 8px;
     }
   }
 }

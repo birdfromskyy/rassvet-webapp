@@ -159,6 +159,101 @@ func TestStudentReport_UsesCurrentTariffRuleWithoutChangingSchedule(t *testing.T
 	assert.Equal(t, "10:30", unchanged.EndTime)
 }
 
+func TestStudentReport_ConsultationUsesIndividualTariffOnce(t *testing.T) {
+	e := newTestEnv(t)
+	e.seedUser(t, "admin-consultation@test.ru", "Passw0rd", "admin", true)
+	teacher := &models.Teacher{FullName: "Королева Вера Ивановна", IsActive: true}
+	subject := &models.Subject{Name: "Психолог", DefaultDurationMin: 30, IsActive: true}
+	room := &models.Room{Name: "Кабинет психолога", IsActive: true}
+	require.NoError(t, e.db.Create(teacher).Error)
+	require.NoError(t, e.db.Create(subject).Error)
+	require.NoError(t, e.db.Create(room).Error)
+
+	price := 1500
+	duration := 30
+	tariff := &models.CommercialTariff{
+		ServiceName: "Индивидуальная консультация психолога", VolumeLabel: "30 мин",
+		DurationMinutes: &duration, PriceRub: &price,
+		EffectiveFrom: time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC), IsActive: true,
+	}
+	require.NoError(t, e.db.Create(tariff).Error)
+	require.NoError(t, e.db.Create(&models.ReportTariffRule{
+		SubjectID: &subject.ID, SlotType: models.SlotTypeIndividual, DurationMinutes: duration,
+		CommercialTariffID: tariff.ID, IsActive: true,
+	}).Error)
+
+	weekStart := time.Date(2026, time.September, 28, 0, 0, 0, 0, time.UTC)
+	schedule := &models.Schedule{WeekStartDate: weekStart, WeekEndDate: weekStart.AddDate(0, 0, 6), Status: models.ScheduleStatusApproved}
+	require.NoError(t, e.db.Create(schedule).Error)
+	slot := &models.ScheduleSlot{
+		ScheduleID: schedule.ID, SlotType: models.SlotTypeIndividual, LessonKind: models.ScheduleLessonKindConsultation,
+		TeacherID: teacher.ID, SubjectID: &subject.ID, RoomID: &room.ID,
+		GuestChildLastName: "Иванов", GuestChildFirstName: "Иван", GuestChildMiddleName: "Иванович",
+		Weekday: 2, StartTime: "10:40", EndTime: "11:10",
+		Origin: models.ScheduleSlotOriginManual, Status: models.ScheduleSlotStatusScheduled,
+	}
+	require.NoError(t, e.db.Create(slot).Error)
+
+	cookies := e.login(t, "admin-consultation@test.ru", "Passw0rd")
+	w := e.do(http.MethodGet, "/api/admin/reports/monthly?start_date=2026-09-29&end_date=2026-09-29", "", cookies)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	var report struct {
+		Students       []monthlyStudentReportRow `json:"students"`
+		StudentTotals  []monthlyStudentTotalRow  `json:"student_totals"`
+		Lessons        []reportLessonRow         `json:"lessons"`
+		TotalAmountRub int                       `json:"total_amount_rub"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &report))
+	require.Len(t, report.Students, 1)
+	assert.Equal(t, uint(0), report.Students[0].StudentID)
+	assert.Equal(t, "consultation:"+itoa(slot.ID), report.Students[0].ParticipantKey)
+	assert.Equal(t, "Иванов Иван Иванович", report.Students[0].StudentName)
+	assert.Equal(t, price, report.Students[0].TariffRub)
+	assert.Equal(t, price, report.Students[0].AmountRub)
+	require.Len(t, report.StudentTotals, 1)
+	assert.Equal(t, price, report.StudentTotals[0].AmountRub)
+	require.Len(t, report.Lessons, 1)
+	assert.Equal(t, models.ScheduleLessonKindConsultation, report.Lessons[0].LessonKind)
+	assert.Equal(t, "Иванов Иван Иванович", report.Lessons[0].StudentName)
+	assert.Equal(t, price, report.Lessons[0].AmountRub)
+	assert.Equal(t, price, report.TotalAmountRub)
+}
+
+func TestStudentReport_ConsultationIsExcludedByRealStudentFilter(t *testing.T) {
+	e := newTestEnv(t)
+	e.seedUser(t, "admin-consultation-filter@test.ru", "Passw0rd", "admin", true)
+	student := &models.Student{FullName: "Существующий ребёнок", FundingType: models.FundingTypeBudget, IsActive: true}
+	teacher := &models.Teacher{FullName: "Королева Вера Ивановна", IsActive: true}
+	subject := &models.Subject{Name: "Психолог для фильтра", DefaultDurationMin: 30, IsActive: true}
+	room := &models.Room{Name: "Кабинет для фильтра", IsActive: true}
+	require.NoError(t, e.db.Create(student).Error)
+	require.NoError(t, e.db.Create(teacher).Error)
+	require.NoError(t, e.db.Create(subject).Error)
+	require.NoError(t, e.db.Create(room).Error)
+
+	weekStart := time.Date(2026, time.September, 28, 0, 0, 0, 0, time.UTC)
+	schedule := &models.Schedule{WeekStartDate: weekStart, WeekEndDate: weekStart.AddDate(0, 0, 6), Status: models.ScheduleStatusApproved}
+	require.NoError(t, e.db.Create(schedule).Error)
+	require.NoError(t, e.db.Create(&models.ScheduleSlot{
+		ScheduleID: schedule.ID, SlotType: models.SlotTypeIndividual, LessonKind: models.ScheduleLessonKindConsultation,
+		TeacherID: teacher.ID, SubjectID: &subject.ID, RoomID: &room.ID,
+		GuestChildLastName: "Гостев", GuestChildFirstName: "Ребёнок",
+		Weekday: 2, StartTime: "10:40", EndTime: "11:10", Origin: models.ScheduleSlotOriginManual, Status: models.ScheduleSlotStatusScheduled,
+	}).Error)
+
+	cookies := e.login(t, "admin-consultation-filter@test.ru", "Passw0rd")
+	w := e.do(http.MethodGet, "/api/admin/reports/monthly?start_date=2026-09-29&end_date=2026-09-29&student_id="+itoa(student.ID), "", cookies)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var report struct {
+		Students []monthlyStudentReportRow `json:"students"`
+		Lessons  []reportLessonRow         `json:"lessons"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &report))
+	assert.Empty(t, report.Students)
+	assert.Empty(t, report.Lessons)
+}
+
 func TestStudentReport_GroupTariffIsAppliedToEveryChild(t *testing.T) {
 	e := newTestEnv(t)
 	e.seedUser(t, "admin@test.ru", "Passw0rd", "admin", true)

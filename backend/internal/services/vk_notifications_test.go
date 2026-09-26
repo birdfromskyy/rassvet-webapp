@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"backend/internal/models"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,6 +65,35 @@ func TestVKSendMessageUsesOnlyMessagesSend(t *testing.T) {
 		client:     client,
 	}
 	require.NoError(t, service.sendMessage(context.Background(), 123, "Тест", 77))
+}
+
+func TestVKSendTestUsesMessagesScopeOnlyAndKeepsPayloadMinimal(t *testing.T) {
+	client := &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		require.Equal(t, "/messages.send", request.URL.Path)
+		body, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		form, err := url.ParseQuery(string(body))
+		require.NoError(t, err)
+		require.Equal(t, "456", form.Get("user_id"))
+		require.Equal(t, "Тест доставки уведомлений", form.Get("message"))
+		require.NotEmpty(t, form.Get("random_id"))
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"response":56}`)),
+			Header:     make(http.Header),
+		}, nil
+	})}
+	service := &VKNotificationService{
+		token:      "secret-token",
+		apiVersion: "5.199",
+		apiBaseURL: "https://api.vk.test/",
+		client:     client,
+	}
+
+	require.NoError(t, service.SendTest(context.Background(), models.VKNotificationRecipient{
+		VKUserID:  456,
+		IsEnabled: true,
+	}))
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)

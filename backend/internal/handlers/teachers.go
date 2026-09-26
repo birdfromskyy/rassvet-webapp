@@ -84,7 +84,11 @@ type UpdateTeacherAvailabilityRequest struct {
 func (h *TeacherHandler) GetTeachers(c *gin.Context) {
 	var teachers []models.Teacher
 
-	query := h.db.Preload("UserLinks").Order("id ASC")
+	query := h.db.
+		Preload("UserLinks").
+		Preload("Subjects").
+		Preload("Availability").
+		Order("id ASC")
 	if c.Query("archived") == "true" {
 		query = query.Where("archived_at IS NOT NULL")
 	} else {

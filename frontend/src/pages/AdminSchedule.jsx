@@ -121,6 +121,7 @@ const SLOT_STATUS_LABELS = {
 
 const EMPTY_SLOT_FORM = {
 	slot_type: 'individual',
+	lesson_kind: 'regular',
 	assignment_id: '',
 	group_lesson_id: '',
 	teacher_id: '',
@@ -128,6 +129,10 @@ const EMPTY_SLOT_FORM = {
 	teacher_hours_mode: 'full',
 	room_id: '',
 	room_name: '',
+	subject_id: '',
+	guest_child_last_name: '',
+	guest_child_first_name: '',
+	guest_child_middle_name: '',
 	weekday: 1,
 	start_time: '09:00',
 	end_time: '09:50',
@@ -144,14 +149,33 @@ const EMPTY_EDIT_FORM = {
 	teacher_ids: [],
 	teacher_hours_mode: 'full',
 	ignore_student_windows: false,
+	teacher_id: '',
+	subject_id: '',
+	guest_child_last_name: '',
+	guest_child_first_name: '',
+	guest_child_middle_name: '',
 }
 
-// Row background colors: green=group, red=paid individual, blue=budget individual
+// Row background colors: green=group, red=paid, blue=budget, amber=consultation.
 const getSlotBgColor = slot => {
+	if (slot.lesson_kind === 'consultation') return 'rgba(245,158,11,0.14)'
 	if (slot.slot_type === 'group') return 'rgba(76,175,80,0.10)'
 	if (slot.assignment?.funding_type === 'paid') return 'rgba(244,67,54,0.10)'
 	return 'rgba(33,150,243,0.10)'
 }
+
+const isConsultation = slot => slot?.lesson_kind === 'consultation'
+const getGuestChildName = slot => [slot?.guest_child_last_name, slot?.guest_child_first_name, slot?.guest_child_middle_name].filter(Boolean).join(' ')
+const getSlotStudentLabel = slot => isConsultation(slot) ? (getGuestChildName(slot) || '—') : (slot?.student?.full_name || slot?.student_id || '—')
+const getConsultationSubjects = (subjects, teachers, teacherId, currentSubjectId = null) => {
+	const teacher = teachers.find(item => item.id === Number(teacherId))
+	if (!teacher) return []
+	const allowed = new Set((teacher.subjects || []).map(link => Number(link.subject_id)))
+	return subjects.filter(subject => allowed.has(subject.id) || subject.id === Number(currentSubjectId))
+}
+const getConsultationRooms = (rooms, subjectId, currentRoomId = null) => rooms.filter(room =>
+	(room.subjects || []).some(link => Number(link.subject_id) === Number(subjectId)) || room.id === Number(currentRoomId)
+)
 
 const getMonday = date => {
 	const d = new Date(date)
@@ -527,9 +551,9 @@ const AdminSchedule = () => {
 	const resetAuto = () => {
 		const doIt = () => doResetAuto()
 		if (isPastWeek) {
-			openPastWeekConfirm('Удалить авто-слоты прошедшей недели и перегенерировать? Ручные слоты сохранятся.', doIt)
+			openPastWeekConfirm('Удалить авто-слоты прошедшей недели и перегенерировать? Ручные занятия и консультации сохранятся.', doIt)
 		} else if (isCurrentWeek) {
-			openPastWeekConfirm('Удалить авто-слоты текущей недели и перегенерировать? Ручные слоты сохранятся.', doIt)
+			openPastWeekConfirm('Удалить авто-слоты текущей недели и перегенерировать? Ручные занятия и консультации сохранятся.', doIt)
 		} else {
 			doIt()
 		}
@@ -672,6 +696,7 @@ const AdminSchedule = () => {
 			paid:      'FFFDE8E8',
 			budget:    'FFE8F0FE',
 			group:     'FFE8F5E9',
+			consultation: 'FFFFF3E0',
 			white:     'FFFFFFFF',
 		}
 
@@ -724,15 +749,16 @@ const AdminSchedule = () => {
 				}
 
 				const isGroup = slot.slot_type === 'group'
-				const isPaid = !isGroup && slot.assignment?.funding_type === 'paid'
-				const bg = isGroup ? C.group : isPaid ? C.paid : C.budget
-				const studentLabel = isGroup ? (slot.group_lesson?.name || 'Группа') : (slot.student?.full_name || '—')
-				const fundingLabel = isGroup ? 'Группа' : isPaid ? 'Платник' : 'Бюджет'
+				const consultation = isConsultation(slot)
+				const isPaid = !isGroup && !consultation && slot.assignment?.funding_type === 'paid'
+				const bg = consultation ? C.consultation : isGroup ? C.group : isPaid ? C.paid : C.budget
+				const studentLabel = isGroup ? (slot.group_lesson?.name || 'Группа') : getSlotStudentLabel(slot)
+				const fundingLabel = consultation ? 'Платное' : isGroup ? 'Группа' : isPaid ? 'Платник' : 'Бюджет'
 
 				const row = ws.addRow([
 					'',
 					`${slot.start_time}–${slot.end_time}`,
-					isGroup ? 'Групповое' : 'Индив.',
+					consultation ? 'Консультация' : isGroup ? 'Групповое' : 'Индив.',
 					studentLabel,
 					slot.subject?.name || '—',
 					slot.room_name || slot.room?.name || '—',
@@ -771,8 +797,13 @@ const AdminSchedule = () => {
 		}
 
 		const slotsByStudent = {}
+		const consultationSlots = []
 		for (const slot of scheduleData.slots) {
 			if (slot.status === 'cancelled') continue
+			if (isConsultation(slot)) {
+				consultationSlots.push(slot)
+				continue
+			}
 			if (slot.slot_type === 'group') {
 				for (const enr of getActiveGroupEnrollments(slot)) {
 					const name = enr.student?.full_name || `ID ${enr.student_id}`
@@ -786,7 +817,7 @@ const AdminSchedule = () => {
 			slotsByStudent[name].push(slot)
 		}
 
-		if (!Object.keys(slotsByStudent).length) {
+		if (!Object.keys(slotsByStudent).length && consultationSlots.length === 0) {
 			toast.error('Нет слотов для экспорта')
 			return
 		}
@@ -802,7 +833,41 @@ const AdminSchedule = () => {
 			white: 'FFFFFFFF',
 		}
 
-		for (const [studentName, slots] of Object.entries(slotsByStudent)) {
+		if (consultationSlots.length > 0) {
+			const ws = workbook.addWorksheet('Консультации')
+			ws.columns = [{ width: 15 }, { width: 13 }, { width: 32 }, { width: 28 }, { width: 30 }, { width: 18 }]
+			const title = ws.addRow(['Консультации', '', '', '', '', ''])
+			ws.mergeCells(`A${title.number}:F${title.number}`)
+			title.height = 24
+			title.getCell(1).font = { bold: true, size: 14, color: { argb: C.white } }
+			title.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.titleBg } }
+			title.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+			const period = ws.addRow([`Неделя: ${weekLabel}`, '', '', '', '', ''])
+			ws.mergeCells(`A${period.number}:F${period.number}`)
+			period.getCell(1).alignment = { horizontal: 'center' }
+			const header = ws.addRow(['День', 'Время', 'Ребёнок', 'Предмет', 'Преподаватель', 'Кабинет'])
+			header.eachCell(cell => {
+				cell.font = { bold: true, color: { argb: C.white } }
+				cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: C.headerBg } }
+				cell.alignment = { horizontal: 'center', vertical: 'middle' }
+			})
+			for (const slot of [...consultationSlots].sort((a, b) => a.weekday !== b.weekday ? a.weekday - b.weekday : a.start_time.localeCompare(b.start_time))) {
+				const row = ws.addRow([
+					WEEKDAY_NAMES[slot.weekday] || slot.weekday,
+					`${slot.start_time}-${slot.end_time}`,
+					getSlotStudentLabel(slot),
+					slot.subject?.name || '-',
+					getSlotTeacherLabel(slot),
+					slot.room_name || slot.room?.name || '-',
+				])
+				row.eachCell(cell => {
+					cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3E0' } }
+					cell.border = { bottom: { style: 'hair', color: { argb: 'FFDDDDDD' } } }
+				})
+			}
+		}
+
+		for (const [studentName, slots] of Object.entries(slotsByStudent).sort(([left], [right]) => left.localeCompare(right, 'ru'))) {
 			const ws = workbook.addWorksheet(studentName.slice(0, 31))
 			ws.columns = [{ width: 15 }, { width: 13 }, { width: 14 }, { width: 24 }, { width: 24 }, { width: 16 }]
 
@@ -924,8 +989,24 @@ const AdminSchedule = () => {
 					end_time: slotForm.end_time,
 					acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
 				}
-				: {
+				: slotForm.slot_type === 'consultation'
+					? {
+						slot_type: 'individual',
+						lesson_kind: 'consultation',
+						guest_child_last_name: slotForm.guest_child_last_name.trim(),
+						guest_child_first_name: slotForm.guest_child_first_name.trim(),
+						guest_child_middle_name: slotForm.guest_child_middle_name.trim(),
+						teacher_id: Number(slotForm.teacher_id),
+						subject_id: Number(slotForm.subject_id),
+						room_id: Number(slotForm.room_id),
+						weekday: Number(slotForm.weekday),
+						start_time: slotForm.start_time,
+						end_time: slotForm.end_time,
+						acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
+					}
+					: {
 					slot_type: 'individual',
+					lesson_kind: 'regular',
 					assignment_id: assignment.id,
 					student_id: assignment.student_id,
 					teacher_id: assignment.teacher_id,
@@ -995,6 +1076,47 @@ const AdminSchedule = () => {
 			return
 		}
 
+		if (slotForm.slot_type === 'consultation') {
+			if (!slotForm.guest_child_last_name.trim() || !slotForm.guest_child_first_name.trim()) {
+				toast.error('Укажите фамилию и имя ребёнка')
+				return
+			}
+			const selectedTeacher = teachers.find(t => t.id === Number(slotForm.teacher_id))
+			const teacher = assignments.find(a => a.teacher_id === Number(slotForm.teacher_id))?.teacher || selectedTeacher
+			const subject = subjects.find(s => s.id === Number(slotForm.subject_id))
+			if (!teacher) {
+				toast.error('Выберите преподавателя')
+				return
+			}
+			if (!subject) {
+				toast.error('Выберите предмет')
+				return
+			}
+			if (!slotForm.room_id) {
+				toast.error('Выберите кабинет')
+				return
+			}
+			await confirmReportTariffBeforeAction({
+				slot_type: 'individual', subject_id: Number(slotForm.subject_id),
+				start_time: slotForm.start_time, end_time: slotForm.end_time,
+			}, `Консультация · ${subject.name}`, async () => {
+				const conflicts = findConflictingSlots(
+					Number(slotForm.weekday), slotForm.start_time, slotForm.end_time,
+					Number(slotForm.room_id), [Number(slotForm.teacher_id)], [],
+				)
+				const warnings = checkTeacherAvailabilityWarnings(
+					Number(slotForm.weekday), slotForm.start_time, slotForm.end_time, teacher,
+				)
+				if (conflicts.length > 0 || warnings.length > 0) {
+					pendingSlotAction.current = doCreateSlot
+					setConflictDialog({ open: true, conflicts, warnings, deleteConflicts: conflicts.length > 0 })
+					return
+				}
+				await doCreateSlot()
+			})
+			return
+		}
+
 		const assignment = assignments.find(a => a.id === Number(slotForm.assignment_id))
 		if (!assignment) {
 			toast.error('Выберите назначение')
@@ -1035,6 +1157,11 @@ const AdminSchedule = () => {
 			teacher_ids: getSlotTeacherIds(slot),
 			teacher_hours_mode: slot.teacher_hours_mode || slot.group_lesson?.teacher_hours_mode || 'full',
 			ignore_student_windows: slot.group_lesson?.ignore_student_windows || false,
+			teacher_id: slot.teacher_id || '',
+			subject_id: slot.subject_id || '',
+			guest_child_last_name: slot.guest_child_last_name || '',
+			guest_child_first_name: slot.guest_child_first_name || '',
+			guest_child_middle_name: slot.guest_child_middle_name || '',
 		})
 		setAddGroupStudentId('')
 		setEditDialog({ open: true, slot, groupAttendance: [], groupAttendanceLoading: slot.slot_type === 'group' })
@@ -1052,9 +1179,46 @@ const AdminSchedule = () => {
 		try {
 			const slot = editDialog.slot
 			const { teacher_hours_mode, teacher_ids, ...basePayload } = editForm
-			const payload = slot.slot_type === 'group'
-				? { ...basePayload, teacher_ids, teacher_hours_mode, acknowledge_missing_report_tariff: reportTariffAcknowledged.current }
-				: { ...basePayload, acknowledge_missing_report_tariff: reportTariffAcknowledged.current }
+			let payload
+			if (slot.slot_type === 'group') {
+				payload = {
+					weekday: basePayload.weekday,
+					start_time: basePayload.start_time,
+					end_time: basePayload.end_time,
+					status: basePayload.status,
+					room_name: basePayload.room_name,
+					teacher_ids,
+					teacher_hours_mode,
+					acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
+				}
+			} else if (isConsultation(slot)) {
+				// Keep the editor contract explicit: every field visible for a
+				// consultation is sent on every save. This avoids a stale dialog
+				// snapshot silently dropping a change made in one of the dependent
+				// teacher → subject → room controls.
+				payload = {
+					weekday: Number(basePayload.weekday),
+					start_time: basePayload.start_time,
+					end_time: basePayload.end_time,
+					room_id: Number(basePayload.room_id),
+					teacher_id: Number(basePayload.teacher_id),
+					subject_id: Number(basePayload.subject_id),
+					guest_child_last_name: basePayload.guest_child_last_name.trim(),
+					guest_child_first_name: basePayload.guest_child_first_name.trim(),
+					guest_child_middle_name: basePayload.guest_child_middle_name.trim(),
+					status: basePayload.status,
+					acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
+				}
+			} else {
+				payload = {
+					weekday: basePayload.weekday,
+					start_time: basePayload.start_time,
+					end_time: basePayload.end_time,
+					status: basePayload.status,
+					room_id: Number(basePayload.room_id),
+					acknowledge_missing_report_tariff: reportTariffAcknowledged.current,
+				}
+			}
 			if (slot.slot_type === 'group' && slot.group_lesson && editForm.ignore_student_windows !== slot.group_lesson.ignore_student_windows) {
 				await scheduleService.updateGroupLesson(slot.group_lesson.id, { ignore_student_windows: editForm.ignore_student_windows })
 			}
@@ -1070,34 +1234,53 @@ const AdminSchedule = () => {
 
 	const saveEditSlot = async () => {
 		const slot = editDialog.slot
+		if (isConsultation(slot)) {
+			if (!editForm.guest_child_last_name.trim() || !editForm.guest_child_first_name.trim()) {
+				toast.error('Укажите фамилию и имя ребёнка')
+				return
+			}
+			if (!editForm.teacher_id || !editForm.subject_id || !editForm.room_id) {
+				toast.error('Выберите преподавателя, предмет и кабинет')
+				return
+			}
+		}
 		const proceed = async () => {
-			const conflicts = findConflictingSlots(
+			const isCancellation = editForm.status === 'cancelled'
+			const conflicts = isCancellation ? [] : findConflictingSlots(
 				editForm.weekday,
 				editForm.start_time,
 				editForm.end_time,
 				slot?.slot_type === 'group' ? null : editForm.room_id,
-				slot?.slot_type === 'group' ? editForm.teacher_ids : getSlotTeacherIds(slot),
-				getSlotStudentIds(slot),
+				slot?.slot_type === 'group' ? editForm.teacher_ids : (isConsultation(slot) ? [Number(editForm.teacher_id)] : getSlotTeacherIds(slot)),
+				isConsultation(slot) ? [] : getSlotStudentIds(slot),
 				slot?.id,
 			)
-			if (conflicts.length > 0) {
+			const warnings = !isCancellation && isConsultation(slot)
+				? checkTeacherAvailabilityWarnings(
+					editForm.weekday,
+					editForm.start_time,
+					editForm.end_time,
+					teachers.find(teacher => teacher.id === Number(editForm.teacher_id)),
+				)
+				: []
+			if (conflicts.length > 0 || warnings.length > 0) {
 				pendingSlotAction.current = doSaveEditSlot
-				setConflictDialog({ open: true, conflicts, warnings: [], deleteConflicts: true })
+				setConflictDialog({ open: true, conflicts, warnings, deleteConflicts: conflicts.length > 0 })
 				return
 			}
 			await doSaveEditSlot()
 		}
-		const durationChanged = slot && (slot.start_time !== editForm.start_time || slot.end_time !== editForm.end_time)
-		if (!durationChanged) {
+		const tariffDimensionsChanged = slot && (slot.start_time !== editForm.start_time || slot.end_time !== editForm.end_time || (isConsultation(slot) && Number(slot.subject_id) !== Number(editForm.subject_id)))
+		if (!tariffDimensionsChanged) {
 			await proceed()
 			return
 		}
 		await confirmReportTariffBeforeAction({
 			slot_type: slot.slot_type,
-			subject_id: slot.slot_type === 'individual' ? slot.subject_id : undefined,
+			subject_id: slot.slot_type === 'individual' ? (isConsultation(slot) ? Number(editForm.subject_id) : slot.subject_id) : undefined,
 			start_time: editForm.start_time,
 			end_time: editForm.end_time,
-		}, slot.slot_type === 'group' ? (slot.group_lesson?.name || 'Групповое занятие') : (slot.subject?.name || 'Выбранный предмет'), proceed, 'save')
+		}, slot.slot_type === 'group' ? (slot.group_lesson?.name || 'Групповое занятие') : (subjects.find(subject => subject.id === Number(editForm.subject_id))?.name || slot.subject?.name || 'Выбранный предмет'), proceed, 'save')
 	}
 
 	const pinSlotAsManual = async slot => {
@@ -1124,7 +1307,7 @@ const AdminSchedule = () => {
 	const confirmDeleteSlot = slot => {
 		const label = slot.slot_type === 'group'
 			? `Групповое занятие «${slot.group_lesson?.name || '—'}»`
-			: `${slot.student?.full_name || '—'} · ${slot.subject?.name || '—'}`
+			: `${getSlotStudentLabel(slot)} · ${slot.subject?.name || '—'}${isConsultation(slot) ? ' · Консультация' : ''}`
 		setDeleteSlotDialog({ open: true, slotId: slot.id, slotLabel: label })
 	}
 
@@ -1244,6 +1427,7 @@ const AdminSchedule = () => {
 		const end = timeToMinutes(endTime)
 		return scheduleData.slots.filter(s => {
 			if (excludeSlotId && s.id === excludeSlotId) return false
+			if (s.status === 'cancelled') return false
 			if (s.weekday !== weekday) return false
 			const sStart = timeToMinutes(s.start_time)
 			const sEnd = timeToMinutes(s.end_time)
@@ -1289,13 +1473,21 @@ const AdminSchedule = () => {
 		return warnings
 	}
 
+	const checkTeacherAvailabilityWarnings = (weekday, startTime, endTime, teacher) => {
+		if (!teacher || !Array.isArray(teacher.availability) || isWithinAvailabilityWindow(weekday, startTime, endTime, teacher.availability)) return []
+		return [
+			`Преподаватель «${teacher.full_name || '—'}» недоступен в это время. ` +
+			`Доступность на ${WEEKDAY_NAMES[weekday] || weekday}: ${describeWindowsForDay(weekday, teacher.availability)}`,
+		]
+	}
+
 	const describeConflictingSlot = s => {
 		const time = `${s.start_time}–${s.end_time}`
 		const day = WEEKDAY_NAMES[s.weekday] || s.weekday
 		if (s.slot_type === 'group') {
 			return `${day} ${time}: ${s.group_lesson?.name || 'Группа'} (${getSlotTeacherLabel(s)}, ${s.room_name || s.room?.name || '—'})`
 		}
-		return `${day} ${time}: ${s.student?.full_name || '—'} → ${s.teacher?.full_name || '—'} (${s.subject?.name || '—'}, ${s.room?.name || '—'})`
+		return `${day} ${time}: ${getSlotStudentLabel(s)} → ${s.teacher?.full_name || '—'} (${s.subject?.name || '—'}, ${s.room?.name || '—'})`
 	}
 
 	const handleConflictConfirm = async () => {
@@ -1340,10 +1532,12 @@ const AdminSchedule = () => {
 			if (filterTeacherId && !getSlotTeacherIds(slot).includes(Number(filterTeacherId))) continue
 			if (filterRoomId && slot.room_id !== Number(filterRoomId)) continue
 			if (filterFundingType) {
-				if (filterFundingType === 'group') {
+				if (filterFundingType === 'consultation') {
+					if (!isConsultation(slot)) continue
+				} else if (filterFundingType === 'group') {
 					if (slot.slot_type !== 'group') continue
 				} else {
-					if (slot.slot_type === 'group') continue
+					if (slot.slot_type === 'group' || isConsultation(slot)) continue
 					if (slot.assignment?.funding_type !== filterFundingType) continue
 				}
 			}
@@ -1459,24 +1653,24 @@ const AdminSchedule = () => {
 						{(isDraft || (!schedule && !loading)) && (
 							<Button
 								variant='contained'
-								startIcon={<GenerateIcon />}
-								onClick={generate}
-								disabled={generating}
-								color={isPastWeek ? 'warning' : 'primary'}
-							>
-								{generating ? 'Генерация...' : isPastWeek ? '⚠ Сгенерировать' : 'Сгенерировать'}
-							</Button>
-						)}
-
-						{(isDraft || (!schedule && !loading)) && (
-							<Button
-								variant='contained'
 								color='success'
 								startIcon={<ApproveIcon />}
 								onClick={approve}
 								disabled={!schedule}
 							>
 								Утвердить
+							</Button>
+						)}
+
+						{(isDraft || (!schedule && !loading)) && (
+							<Button
+								variant='contained'
+								startIcon={<GenerateIcon />}
+								onClick={generate}
+								disabled={generating}
+								color={isPastWeek ? 'warning' : 'primary'}
+							>
+								{generating ? 'Генерация...' : isPastWeek ? '⚠ Сгенерировать' : 'Сгенерировать'}
 							</Button>
 						)}
 
@@ -1618,7 +1812,10 @@ const AdminSchedule = () => {
 									value={students.find(s => s.id === Number(filterStudentId)) || null}
 									getOptionLabel={opt => opt.full_name}
 									isOptionEqualToValue={(opt, val) => opt.id === val.id}
-									onChange={(_, val) => setFilterStudentId(val ? String(val.id) : '')}
+									onChange={(_, val) => {
+										setFilterStudentId(val ? String(val.id) : '')
+										if (val && filterFundingType === 'consultation') setFilterFundingType('')
+									}}
 									renderInput={params => <TextField {...params} label='Ученик' fullWidth />}
 								/>
 							</Box>
@@ -1658,11 +1855,15 @@ const AdminSchedule = () => {
 									<Select
 										value={filterFundingType}
 										label='Вид занятия'
-										onChange={e => setFilterFundingType(e.target.value)}
+										onChange={e => {
+											setFilterFundingType(e.target.value)
+											if (e.target.value === 'consultation') setFilterStudentId('')
+										}}
 									>
 										<MenuItem value=''>Все</MenuItem>
 										<MenuItem value='paid'>Платники (индив.)</MenuItem>
 										<MenuItem value='budget'>Бюджетники (индив.)</MenuItem>
+										<MenuItem value='consultation'>Консультации</MenuItem>
 										<MenuItem value='group'>Групповые занятия</MenuItem>
 									</Select>
 								</FormControl>
@@ -1686,6 +1887,10 @@ const AdminSchedule = () => {
 						{/* Color legend */}
 						<Box display='flex' gap={2} mt={1.5} flexWrap='wrap'>
 							<Box display='flex' alignItems='center' gap={0.5}>
+								<Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'rgba(245,158,11,0.28)' }} />
+								<Typography variant='caption'>Консультация</Typography>
+							</Box>
+							<Box display='flex' alignItems='center' gap={0.5}>
 								<Box sx={{ width: 16, height: 16, borderRadius: 0.5, bgcolor: 'rgba(244,67,54,0.25)' }} />
 								<Typography variant='caption'>Платник (индив.)</Typography>
 							</Box>
@@ -1706,7 +1911,7 @@ const AdminSchedule = () => {
 					<div className='admin-schedule-stats'>
 						{[
 							{ value: stats.total_requested, label: 'Запрошено', sub: `${stats.ind_requested} инд. + ${stats.grp_requested} групп.` },
-							{ value: stats.scheduled, label: 'Поставлено', sub: `${stats.ind_scheduled} инд. + ${stats.grp_scheduled} групп.` },
+							{ value: stats.scheduled, label: 'Поставлено', sub: `${stats.ind_scheduled} инд. + ${stats.grp_scheduled} групп. + ${stats.consultation_scheduled || 0} конс.` },
 							{
 								value: stats.unplaced,
 								label: 'Не поставлено',
@@ -1776,7 +1981,7 @@ const AdminSchedule = () => {
 											{daySlots.map(slot => (
 												<TableRow
 													key={slot.id}
-													sx={{ bgcolor: getSlotBgColor(slot) }}
+													sx={{ bgcolor: getSlotBgColor(slot), '&:hover': { bgcolor: isConsultation(slot) ? 'rgba(245,158,11,0.24)' : undefined } }}
 												>
 													<TableCell>
 														{slot.start_time}–{slot.end_time}
@@ -1790,13 +1995,13 @@ const AdminSchedule = () => {
 																	({slot.group_lesson?.enrollments?.length || 0} уч.)
 																</Typography>
 															</>
-															: (slot.student?.full_name || slot.student_id)
+															: <>{getSlotStudentLabel(slot)}{isConsultation(slot) && <Chip label='Консультация' size='small' sx={{ ml: 1, bgcolor: 'rgba(245,158,11,0.22)', color: '#8a4b00' }} />}</>
 														}
 													</TableCell>
 													<TableCell>
-										{(slot.teachers || []).length
-											? slot.teachers.map(link => link.teacher?.full_name || link.teacher_id).join(', ')
-											: (slot.teacher?.full_name || slot.teacher_id)}
+														{(slot.teachers || []).length
+															? slot.teachers.map(link => link.teacher?.full_name || link.teacher_id).join(', ')
+															: (slot.teacher?.full_name || slot.teacher_id)}
 													</TableCell>
 													<TableCell>
 														{slot.subject?.name || slot.subject_id}
@@ -2181,12 +2386,20 @@ const AdminSchedule = () => {
 									setSlotForm({
 										...slotForm,
 										slot_type: e.target.value,
+										lesson_kind: e.target.value === 'consultation' ? 'consultation' : 'regular',
 										assignment_id: '',
 										group_lesson_id: '',
+										teacher_id: '',
+										subject_id: '',
+										room_id: '',
+										guest_child_last_name: '',
+										guest_child_first_name: '',
+										guest_child_middle_name: '',
 									})
 								}
 							>
 								<MenuItem value='individual'>Индивидуальное</MenuItem>
+								<MenuItem value='consultation'>Консультация</MenuItem>
 								<MenuItem value='group'>Групповое</MenuItem>
 							</Select>
 						</FormControl>
@@ -2211,6 +2424,52 @@ const AdminSchedule = () => {
 									<TextField {...params} label='Назначение' required />
 								)}
 							/>
+						)}
+						{slotForm.slot_type === 'consultation' && (
+							<>
+								<Box display='grid' gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }} gap={2}>
+									<TextField
+										label='Фамилия ребёнка'
+										value={slotForm.guest_child_last_name}
+										onChange={e => setSlotForm({ ...slotForm, guest_child_last_name: e.target.value })}
+										required
+										inputProps={{ maxLength: 100 }}
+									/>
+									<TextField
+										label='Имя ребёнка'
+										value={slotForm.guest_child_first_name}
+										onChange={e => setSlotForm({ ...slotForm, guest_child_first_name: e.target.value })}
+										required
+										inputProps={{ maxLength: 100 }}
+									/>
+								</Box>
+								<TextField
+									label='Отчество ребёнка (необязательно)'
+									value={slotForm.guest_child_middle_name}
+									onChange={e => setSlotForm({ ...slotForm, guest_child_middle_name: e.target.value })}
+									inputProps={{ maxLength: 100 }}
+								/>
+								<Autocomplete
+									options={teachers.filter(teacher => teacher.is_active)}
+									value={teachers.find(teacher => teacher.id === Number(slotForm.teacher_id)) || null}
+									getOptionLabel={teacher => teacher.full_name || ''}
+									onChange={(_, value) => setSlotForm({
+										...slotForm,
+										teacher_id: value?.id || '',
+										subject_id: '',
+										room_id: '',
+									})}
+									renderInput={params => <TextField {...params} label='Преподаватель' required />}
+								/>
+								<Autocomplete
+									options={getConsultationSubjects(subjects, teachers, slotForm.teacher_id)}
+									value={subjects.find(subject => subject.id === Number(slotForm.subject_id)) || null}
+									getOptionLabel={subject => subject.name || ''}
+									onChange={(_, value) => setSlotForm({ ...slotForm, subject_id: value?.id || '', room_id: '' })}
+									disabled={!slotForm.teacher_id}
+									renderInput={params => <TextField {...params} label='Предмет' required />}
+								/>
+							</>
 						)}
 						{slotForm.slot_type === 'group' && (
 							<>
@@ -2278,10 +2537,13 @@ const AdminSchedule = () => {
 							/>
 						) : (
 							<Autocomplete
-								options={rooms}
+								options={slotForm.slot_type === 'consultation'
+									? getConsultationRooms(rooms, slotForm.subject_id)
+									: rooms}
 								value={rooms.find(r => r.id === Number(slotForm.room_id)) || null}
 								getOptionLabel={r => r?.name || ''}
 								onChange={(event, value) => setSlotForm({ ...slotForm, room_id: value?.id || '' })}
+								disabled={slotForm.slot_type === 'consultation' && !slotForm.subject_id}
 								renderInput={params => (
 									<TextField {...params} label='Кабинет' required />
 								)}
@@ -2394,7 +2656,7 @@ const AdminSchedule = () => {
 				<DialogTitle className='admin-module-dialog__title'>
 					{editDialog.slot?.slot_type === 'group'
 						? `Групповое занятие: ${editDialog.slot?.group_lesson?.name || ''}`
-						: 'Редактировать слот'}
+						: isConsultation(editDialog.slot) ? 'Редактировать консультацию' : 'Редактировать слот'}
 				</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
 					<Box display='flex' flexDirection='column' gap={2} sx={{ mt: 1 }}>
@@ -2432,6 +2694,35 @@ const AdminSchedule = () => {
 								fullWidth
 							/>
 						</Box>
+						{isConsultation(editDialog.slot) && (
+							<>
+								<Box display='grid' gridTemplateColumns={{ xs: '1fr', sm: '1fr 1fr' }} gap={2}>
+									<TextField label='Фамилия ребёнка' value={editForm.guest_child_last_name} onChange={e => setEditForm({ ...editForm, guest_child_last_name: e.target.value })} required inputProps={{ maxLength: 100 }} />
+									<TextField label='Имя ребёнка' value={editForm.guest_child_first_name} onChange={e => setEditForm({ ...editForm, guest_child_first_name: e.target.value })} required inputProps={{ maxLength: 100 }} />
+								</Box>
+								<TextField label='Отчество ребёнка (необязательно)' value={editForm.guest_child_middle_name} onChange={e => setEditForm({ ...editForm, guest_child_middle_name: e.target.value })} inputProps={{ maxLength: 100 }} />
+				<Autocomplete
+					options={teachers.filter(teacher => teacher.is_active)}
+					value={teachers.find(teacher => teacher.id === Number(editForm.teacher_id)) || null}
+					getOptionLabel={teacher => teacher.full_name || ''}
+					onChange={(_, value) => setEditForm(current => ({ ...current, teacher_id: value?.id || '', subject_id: '', room_id: '' }))}
+					renderInput={params => <TextField {...params} label='Преподаватель' required />}
+				/>
+								<Autocomplete
+									options={getConsultationSubjects(
+										subjects,
+										teachers,
+										editForm.teacher_id,
+										Number(editForm.teacher_id) === Number(editDialog.slot?.teacher_id) ? editDialog.slot?.subject_id : null,
+									)}
+					value={subjects.find(subject => subject.id === Number(editForm.subject_id)) || null}
+					getOptionLabel={subject => subject.name || ''}
+					onChange={(_, value) => setEditForm(current => ({ ...current, subject_id: value?.id || '', room_id: '' }))}
+									disabled={!editForm.teacher_id}
+									renderInput={params => <TextField {...params} label='Предмет' required />}
+								/>
+							</>
+						)}
 						{editDialog.slot?.slot_type === 'group' ? (
 							<TextField
 								label='Кабинет / место проведения'
@@ -2444,13 +2735,17 @@ const AdminSchedule = () => {
 							<FormControl fullWidth>
 								<InputLabel>Кабинет</InputLabel>
 								<Select
-									value={editForm.room_id}
-									label='Кабинет'
-									onChange={e =>
-										setEditForm({ ...editForm, room_id: e.target.value })
-									}
+					value={editForm.room_id}
+					label='Кабинет'
+					onChange={e => setEditForm(current => ({ ...current, room_id: e.target.value }))}
 								>
-									{rooms.map(r => (
+									{(isConsultation(editDialog.slot)
+										? getConsultationRooms(
+											rooms,
+											editForm.subject_id,
+											Number(editForm.subject_id) === Number(editDialog.slot?.subject_id) ? editDialog.slot?.room_id : null,
+										)
+										: rooms).map(r => (
 										<MenuItem key={r.id} value={r.id}>
 											{r.name}
 										</MenuItem>
@@ -2814,7 +3109,7 @@ const AdminSchedule = () => {
 				<DialogTitle className='admin-module-dialog__title'>Очистить авто-слоты?</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='body2'>
-						Все авто-слоты этой недели будут удалены. Ручные слоты сохранятся. Перегенерации не будет.
+						Все сгенерированные авто-слоты этой недели будут удалены. Консультации сохранятся даже с меткой «Авто». Перегенерации не будет.
 					</Typography>
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>
@@ -2843,7 +3138,7 @@ const AdminSchedule = () => {
 				<DialogTitle className='admin-module-dialog__title'>Очистить ручные слоты?</DialogTitle>
 				<DialogContent className='admin-module-dialog__content'>
 					<Typography variant='body2'>
-						Все ручные слоты будут удалены. Авто-слоты останутся без изменений.
+						Все ручные занятия, включая ручные консультации, будут удалены. Авто-слоты останутся без изменений.
 					</Typography>
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>
@@ -2876,7 +3171,7 @@ const AdminSchedule = () => {
 					<Typography variant='body2'>
 						{bulkOriginDialog.origin === 'manual'
 							? 'Все занятия расписания будут помечены как ручные. Они не будут удалены при следующей генерации.'
-							: 'Все занятия расписания будут помечены как авто. При следующей генерации авто-занятия будут заменены.'}
+							: 'Все занятия расписания будут помечены как авто. При следующей генерации обычные авто-занятия будут заменены, а консультации сохранятся.'}
 					</Typography>
 				</DialogContent>
 				<DialogActions className='admin-module-dialog__actions'>

@@ -155,9 +155,12 @@ type CandidateSlot struct {
 }
 
 type ScheduleStats struct {
-	TotalRequested int `json:"total_requested"`
-	Scheduled      int `json:"scheduled"`
-	Unplaced       int `json:"unplaced"`
+	TotalRequested        int `json:"total_requested"`
+	Scheduled             int `json:"scheduled"`
+	IndividualScheduled   int `json:"ind_scheduled"`
+	GroupScheduled        int `json:"grp_scheduled"`
+	ConsultationScheduled int `json:"consultation_scheduled"`
+	Unplaced              int `json:"unplaced"`
 }
 
 type ScheduleResponse struct {
@@ -954,7 +957,7 @@ func (g *ScheduleGenerator) RestoreAutoSlots(slots []models.ScheduleSlot) error 
 func (g *ScheduleGenerator) copyAutoSlots(slots []models.ScheduleSlot) []models.ScheduleSlot {
 	result := make([]models.ScheduleSlot, 0)
 	for _, slot := range slots {
-		if slot.Origin == models.ScheduleSlotOriginAuto && slot.Status != models.ScheduleSlotStatusCancelled {
+		if slot.Origin == models.ScheduleSlotOriginAuto && !slot.IsConsultation() && slot.Status != models.ScheduleSlotStatusCancelled {
 			result = append(result, slot)
 		}
 	}
@@ -968,7 +971,7 @@ func (g *ScheduleGenerator) collectNewestAutoSlots(scheduleID uint, limit int) [
 
 	var slots []models.ScheduleSlot
 	if err := g.db.
-		Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
+		Where("schedule_id = ? AND origin = ? AND lesson_kind <> ?", scheduleID, models.ScheduleSlotOriginAuto, models.ScheduleLessonKindConsultation).
 		Order("id DESC").
 		Limit(limit).
 		Find(&slots).Error; err != nil {
@@ -1642,7 +1645,7 @@ func (g *ScheduleGenerator) resolveAllowedRoomsForTeacher(teacherID uint, subjec
 func (g *ScheduleGenerator) BackupAutoSlots(scheduleID uint) error {
 	var autoSlots []models.ScheduleSlot
 	if err := g.db.
-		Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
+		Where("schedule_id = ? AND origin = ? AND lesson_kind <> ?", scheduleID, models.ScheduleSlotOriginAuto, models.ScheduleLessonKindConsultation).
 		Find(&autoSlots).Error; err != nil {
 		return fmt.Errorf("failed to load auto slots for backup: %w", err)
 	}
@@ -1658,21 +1661,25 @@ func (g *ScheduleGenerator) BackupAutoSlots(scheduleID uint) error {
 	backups := make([]models.ScheduleSlotBackup, 0, len(autoSlots))
 	for _, s := range autoSlots {
 		backups = append(backups, models.ScheduleSlotBackup{
-			ScheduleID:    s.ScheduleID,
-			SlotType:      s.SlotType,
-			AssignmentID:  s.AssignmentID,
-			GroupLessonID: s.GroupLessonID,
-			StudentID:     s.StudentID,
-			TeacherID:     s.TeacherID,
-			SubjectID:     s.SubjectID,
-			RoomID:        s.RoomID,
-			RoomName:      s.RoomName,
-			Weekday:       s.Weekday,
-			StartTime:     s.StartTime,
-			EndTime:       s.EndTime,
-			Origin:        s.Origin,
-			Status:        s.Status,
-			BackedUpAt:    now,
+			ScheduleID:           s.ScheduleID,
+			SlotType:             s.SlotType,
+			LessonKind:           s.LessonKind,
+			AssignmentID:         s.AssignmentID,
+			GroupLessonID:        s.GroupLessonID,
+			StudentID:            s.StudentID,
+			TeacherID:            s.TeacherID,
+			SubjectID:            s.SubjectID,
+			RoomID:               s.RoomID,
+			RoomName:             s.RoomName,
+			Weekday:              s.Weekday,
+			StartTime:            s.StartTime,
+			EndTime:              s.EndTime,
+			Origin:               s.Origin,
+			Status:               s.Status,
+			GuestChildLastName:   s.GuestChildLastName,
+			GuestChildFirstName:  s.GuestChildFirstName,
+			GuestChildMiddleName: s.GuestChildMiddleName,
+			BackedUpAt:           now,
 		})
 	}
 
@@ -1686,7 +1693,7 @@ func (g *ScheduleGenerator) CleanupAutoSlots(scheduleID uint) error {
 	return g.db.Transaction(func(tx *gorm.DB) error {
 		var slotIDs []uint
 		if err := tx.Model(&models.ScheduleSlot{}).
-			Where("schedule_id = ? AND origin = ?", scheduleID, models.ScheduleSlotOriginAuto).
+			Where("schedule_id = ? AND origin = ? AND lesson_kind <> ?", scheduleID, models.ScheduleSlotOriginAuto, models.ScheduleLessonKindConsultation).
 			Pluck("id", &slotIDs).Error; err != nil {
 			return fmt.Errorf("failed to load auto slots for cleanup: %w", err)
 		}
@@ -1953,6 +1960,19 @@ func (g *ScheduleGenerator) buildScheduleResponse(scheduleID uint) (*ScheduleRes
 	}
 
 	totalRequested := g.CountRequestedVisits(assignments)
+	individualScheduled, groupScheduled, consultationScheduled := 0, 0, 0
+	for _, slot := range slots {
+		if slot.Status == models.ScheduleSlotStatusCancelled {
+			continue
+		}
+		if slot.IsConsultation() {
+			consultationScheduled++
+		} else if slot.SlotType == models.SlotTypeGroup {
+			groupScheduled++
+		} else {
+			individualScheduled++
+		}
+	}
 
 	return &ScheduleResponse{
 		Schedule: ginScheduleResponse{
@@ -1968,9 +1988,12 @@ func (g *ScheduleGenerator) buildScheduleResponse(scheduleID uint) (*ScheduleRes
 		Slots:  slots,
 		Issues: issues,
 		Stats: ScheduleStats{
-			TotalRequested: totalRequested,
-			Scheduled:      len(slots),
-			Unplaced:       len(issues),
+			TotalRequested:        totalRequested,
+			Scheduled:             individualScheduled + groupScheduled + consultationScheduled,
+			IndividualScheduled:   individualScheduled,
+			GroupScheduled:        groupScheduled,
+			ConsultationScheduled: consultationScheduled,
+			Unplaced:              len(issues),
 		},
 	}, nil
 }

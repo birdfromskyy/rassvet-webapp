@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -147,7 +148,7 @@ func currentUserRole(c *gin.Context) string {
 func scheduleGenerationFields(jobID, mode string, actorID uint, actorRole string, result *services.ScheduleResponse, elapsed time.Duration) map[string]any {
 	autoSlots, groupAutoSlots := 0, 0
 	for _, slot := range result.Slots {
-		if slot.Origin == models.ScheduleSlotOriginAuto {
+		if slot.Origin == models.ScheduleSlotOriginAuto && !slot.IsConsultation() {
 			autoSlots++
 			if slot.SlotType == models.SlotTypeGroup {
 				groupAutoSlots++
@@ -174,22 +175,26 @@ func scheduleGenerationFields(jobID, mode string, actorID uint, actorRole string
 
 func scheduleSlotAuditSnapshot(slot models.ScheduleSlot) map[string]any {
 	return map[string]any{
-		"id":                 slot.ID,
-		"schedule_id":        slot.ScheduleID,
-		"slot_type":          slot.SlotType,
-		"assignment_id":      slot.AssignmentID,
-		"group_lesson_id":    slot.GroupLessonID,
-		"student_id":         slot.StudentID,
-		"teacher_id":         slot.TeacherID,
-		"subject_id":         slot.SubjectID,
-		"room_id":            slot.RoomID,
-		"room_name":          slot.RoomName,
-		"weekday":            slot.Weekday,
-		"start_time":         slot.StartTime,
-		"end_time":           slot.EndTime,
-		"origin":             slot.Origin,
-		"status":             slot.Status,
-		"teacher_hours_mode": slot.TeacherHoursMode,
+		"id":                      slot.ID,
+		"schedule_id":             slot.ScheduleID,
+		"slot_type":               slot.SlotType,
+		"lesson_kind":             slot.LessonKind,
+		"assignment_id":           slot.AssignmentID,
+		"group_lesson_id":         slot.GroupLessonID,
+		"student_id":              slot.StudentID,
+		"teacher_id":              slot.TeacherID,
+		"subject_id":              slot.SubjectID,
+		"room_id":                 slot.RoomID,
+		"room_name":               slot.RoomName,
+		"weekday":                 slot.Weekday,
+		"start_time":              slot.StartTime,
+		"end_time":                slot.EndTime,
+		"origin":                  slot.Origin,
+		"status":                  slot.Status,
+		"teacher_hours_mode":      slot.TeacherHoursMode,
+		"guest_child_last_name":   slot.GuestChildLastName,
+		"guest_child_first_name":  slot.GuestChildFirstName,
+		"guest_child_middle_name": slot.GuestChildMiddleName,
 	}
 }
 
@@ -246,19 +251,23 @@ func logAcknowledgedMissingReportTariff(c *gin.Context, slot models.ScheduleSlot
 }
 
 type CreateManualSlotRequest struct {
-	SlotType         string `json:"slot_type"`
-	AssignmentID     uint   `json:"assignment_id"`
-	GroupLessonID    uint   `json:"group_lesson_id"`
-	StudentID        uint   `json:"student_id"`
-	TeacherID        uint   `json:"teacher_id"`
-	TeacherIDs       []uint `json:"teacher_ids"`
-	TeacherHoursMode string `json:"teacher_hours_mode"`
-	SubjectID        uint   `json:"subject_id"`
-	RoomID           uint   `json:"room_id"`
-	RoomName         string `json:"room_name"`
-	Weekday          int    `json:"weekday" binding:"required"`
-	StartTime        string `json:"start_time" binding:"required"`
-	EndTime          string `json:"end_time" binding:"required"`
+	SlotType             string `json:"slot_type"`
+	LessonKind           string `json:"lesson_kind"`
+	AssignmentID         uint   `json:"assignment_id"`
+	GroupLessonID        uint   `json:"group_lesson_id"`
+	StudentID            uint   `json:"student_id"`
+	TeacherID            uint   `json:"teacher_id"`
+	TeacherIDs           []uint `json:"teacher_ids"`
+	TeacherHoursMode     string `json:"teacher_hours_mode"`
+	SubjectID            uint   `json:"subject_id"`
+	RoomID               uint   `json:"room_id"`
+	RoomName             string `json:"room_name"`
+	Weekday              int    `json:"weekday" binding:"required"`
+	StartTime            string `json:"start_time" binding:"required"`
+	EndTime              string `json:"end_time" binding:"required"`
+	GuestChildLastName   string `json:"guest_child_last_name"`
+	GuestChildFirstName  string `json:"guest_child_first_name"`
+	GuestChildMiddleName string `json:"guest_child_middle_name"`
 	// A missing reporting tariff does not block a real lesson, but it must be
 	// acknowledged explicitly so its zero amount is never accidental.
 	AcknowledgeMissingReportTariff bool `json:"acknowledge_missing_report_tariff"`
@@ -266,6 +275,8 @@ type CreateManualSlotRequest struct {
 
 type UpdateScheduleSlotRequest struct {
 	RoomID                         *uint   `json:"room_id"`
+	TeacherID                      *uint   `json:"teacher_id"`
+	SubjectID                      *uint   `json:"subject_id"`
 	Weekday                        *int    `json:"weekday"`
 	StartTime                      string  `json:"start_time"`
 	EndTime                        string  `json:"end_time"`
@@ -273,6 +284,9 @@ type UpdateScheduleSlotRequest struct {
 	RoomName                       string  `json:"room_name"`
 	TeacherIDs                     []uint  `json:"teacher_ids"`
 	TeacherHoursMode               *string `json:"teacher_hours_mode"`
+	GuestChildLastName             *string `json:"guest_child_last_name"`
+	GuestChildFirstName            *string `json:"guest_child_first_name"`
+	GuestChildMiddleName           *string `json:"guest_child_middle_name"`
 	AcknowledgeMissingReportTariff bool    `json:"acknowledge_missing_report_tariff"`
 }
 
@@ -658,6 +672,18 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Тип слота должен быть individual или group"})
 		return
 	}
+	lessonKind := strings.TrimSpace(req.LessonKind)
+	if lessonKind == "" {
+		lessonKind = models.ScheduleLessonKindRegular
+	}
+	if lessonKind != models.ScheduleLessonKindRegular && lessonKind != models.ScheduleLessonKindConsultation {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Некорректный вид занятия"})
+		return
+	}
+	if slotType == models.SlotTypeGroup && lessonKind != models.ScheduleLessonKindRegular {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Консультация может быть только индивидуальным занятием"})
+		return
+	}
 
 	if slotType == models.SlotTypeIndividual && req.TeacherID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID преподавателя должен быть положительным числом"})
@@ -692,6 +718,7 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 	slot := models.ScheduleSlot{
 		ScheduleID: uint(scheduleID),
 		SlotType:   slotType,
+		LessonKind: lessonKind,
 		TeacherID:  req.TeacherID,
 		RoomName:   strings.TrimSpace(req.RoomName),
 		Weekday:    req.Weekday,
@@ -701,7 +728,27 @@ func (h *ScheduleHandler) CreateScheduleSlot(c *gin.Context) {
 		Status:     models.ScheduleSlotStatusScheduled,
 	}
 
-	if slotType == models.SlotTypeIndividual {
+	if lessonKind == models.ScheduleLessonKindConsultation {
+		if req.AssignmentID != 0 || req.StudentID != 0 || req.GroupLessonID != 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "К консультации нельзя привязать назначение, существующего ребёнка или группу"})
+			return
+		}
+		if req.SubjectID == 0 || req.RoomID == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Для консультации необходимо указать предмет и кабинет"})
+			return
+		}
+		slot.GuestChildLastName = strings.TrimSpace(req.GuestChildLastName)
+		slot.GuestChildFirstName = strings.TrimSpace(req.GuestChildFirstName)
+		slot.GuestChildMiddleName = strings.TrimSpace(req.GuestChildMiddleName)
+		subjectID := req.SubjectID
+		roomID := req.RoomID
+		slot.SubjectID = &subjectID
+		slot.RoomID = &roomID
+		if err := h.ensureManualConsultationRelations(slot); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	} else if slotType == models.SlotTypeIndividual {
 		if req.AssignmentID == 0 || req.StudentID == 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Для индивидуального слота необходимо указать ID назначения и ученика"})
 			return
@@ -886,6 +933,41 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	}
 	beforeSlot := slot
 	before := scheduleSlotAuditSnapshot(beforeSlot)
+	consultationFieldsProvided := req.TeacherID != nil || req.SubjectID != nil ||
+		req.GuestChildLastName != nil || req.GuestChildFirstName != nil || req.GuestChildMiddleName != nil
+	if !slot.IsConsultation() && consultationFieldsProvided {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Преподаватель, предмет и гостевое ФИО этим запросом изменяются только у консультации"})
+		return
+	}
+	if slot.IsConsultation() {
+		if req.TeacherID != nil {
+			if *req.TeacherID == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Выберите преподавателя"})
+				return
+			}
+			slot.TeacherID = *req.TeacherID
+		}
+		if req.SubjectID != nil {
+			if *req.SubjectID == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Выберите предмет"})
+				return
+			}
+			slot.SubjectID = req.SubjectID
+			// The slot was preloaded with its previous subject. Clear that stale
+			// association so GORM cannot write its old foreign key back during
+			// Save and silently undo the administrator's new selection.
+			slot.Subject = nil
+		}
+		if req.GuestChildLastName != nil {
+			slot.GuestChildLastName = strings.TrimSpace(*req.GuestChildLastName)
+		}
+		if req.GuestChildFirstName != nil {
+			slot.GuestChildFirstName = strings.TrimSpace(*req.GuestChildFirstName)
+		}
+		if req.GuestChildMiddleName != nil {
+			slot.GuestChildMiddleName = strings.TrimSpace(*req.GuestChildMiddleName)
+		}
+	}
 
 	if req.RoomID != nil {
 		if *req.RoomID == 0 {
@@ -894,10 +976,13 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		}
 		slot.RoomID = req.RoomID
 		slot.RoomName = ""
+		// See Subject above: the old preloaded Room must not overwrite RoomID.
+		slot.Room = nil
 	}
 	if strings.TrimSpace(req.RoomName) != "" {
 		slot.RoomName = strings.TrimSpace(req.RoomName)
 		slot.RoomID = nil
+		slot.Room = nil
 	}
 
 	if req.Weekday != nil {
@@ -908,7 +993,13 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		slot.Weekday = *req.Weekday
 	}
 
-	durationChanged := req.StartTime != "" || req.EndTime != ""
+	durationChanged := (req.StartTime != "" && req.StartTime != beforeSlot.StartTime) ||
+		(req.EndTime != "" && req.EndTime != beforeSlot.EndTime)
+	// The client submits the complete consultation form on every save. Ask for
+	// missing-tariff acknowledgement only when a tariff dimension actually
+	// changes, rather than merely because subject_id is present in the request.
+	subjectChanged := !optionalUintValuesEqual(slot.SubjectID, beforeSlot.SubjectID)
+	tariffDimensionsChanged := durationChanged || subjectChanged
 	if req.StartTime != "" {
 		if !isValidTimeHHMM(req.StartTime) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Время начала должно быть в формате ЧЧ:ММ"})
@@ -931,7 +1022,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 	}
 
 	var tariffMatch reportTariffMatch
-	if durationChanged {
+	if tariffDimensionsChanged {
 		var allowed bool
 		tariffMatch, allowed = h.requireReportTariffAcknowledgement(c, slot, req.AcknowledgeMissingReportTariff)
 		if !allowed {
@@ -966,9 +1057,27 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 		slot.TeacherHoursMode = &mode
 	}
 
-	structuralChange := req.RoomID != nil || req.Weekday != nil || req.StartTime != "" || req.EndTime != "" || strings.TrimSpace(req.RoomName) != "" || groupTeacherChange
+	consultationFieldsChanged := slot.TeacherID != beforeSlot.TeacherID ||
+		!optionalUintValuesEqual(slot.SubjectID, beforeSlot.SubjectID) ||
+		slot.GuestChildLastName != beforeSlot.GuestChildLastName ||
+		slot.GuestChildFirstName != beforeSlot.GuestChildFirstName ||
+		slot.GuestChildMiddleName != beforeSlot.GuestChildMiddleName
+	structuralChange := req.RoomID != nil || req.Weekday != nil || req.StartTime != "" || req.EndTime != "" || strings.TrimSpace(req.RoomName) != "" || groupTeacherChange || consultationFieldsChanged
+	if slot.IsConsultation() {
+		consultationRestore := beforeSlot.Status == models.ScheduleSlotStatusCancelled && slot.Status != models.ScheduleSlotStatusCancelled
+		structuralChange = consultationFieldsChanged ||
+			!optionalUintValuesEqual(slot.RoomID, beforeSlot.RoomID) || slot.RoomName != beforeSlot.RoomName ||
+			slot.Weekday != beforeSlot.Weekday || slot.StartTime != beforeSlot.StartTime || slot.EndTime != beforeSlot.EndTime ||
+			consultationRestore
+	}
 	if structuralChange {
 		slot.Origin = models.ScheduleSlotOriginManual
+		if slot.IsConsultation() {
+			if err := h.ensureManualConsultationRelations(slot); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+		}
 		// Validate room-subject compatibility when room changes on individual slots
 		if req.RoomID != nil && slot.SubjectID != nil && slot.SlotType == models.SlotTypeIndividual {
 			var roomSubject models.RoomSubject
@@ -1041,7 +1150,7 @@ func (h *ScheduleHandler) UpdateScheduleSlot(c *gin.Context) {
 
 	logging.AdminMutation(c, "schedule.slot.update", before, scheduleSlotAuditSnapshot(slot))
 	h.recordVKScheduleChange("updated", &beforeSlot, &slot)
-	if durationChanged && req.AcknowledgeMissingReportTariff {
+	if tariffDimensionsChanged && req.AcknowledgeMissingReportTariff {
 		logAcknowledgedMissingReportTariff(c, slot, tariffMatch)
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -1360,7 +1469,7 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 	}
 
 	var prevManualSlots []models.ScheduleSlot
-	if err := h.db.Where("schedule_id = ? AND origin = ?", prevSchedule.ID, models.ScheduleSlotOriginManual).
+	if err := h.db.Where("schedule_id = ? AND origin = ? AND lesson_kind <> ?", prevSchedule.ID, models.ScheduleSlotOriginManual, models.ScheduleLessonKindConsultation).
 		Preload("Teachers").
 		Find(&prevManualSlots).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
@@ -1389,6 +1498,7 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 		newSlot := models.ScheduleSlot{
 			ScheduleID:       schedule.ID,
 			SlotType:         s.SlotType,
+			LessonKind:       s.LessonKind,
 			AssignmentID:     s.AssignmentID,
 			GroupLessonID:    s.GroupLessonID,
 			StudentID:        s.StudentID,
@@ -1494,12 +1604,14 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 	h.markResolvedGenerationIssues(issues, slots)
 
 	indRequested, grpRequested := h.countRequestedVisitsFromSchedule(schedule)
-	var indScheduled, grpScheduled int
+	var indScheduled, grpScheduled, consultationScheduled int
 	for _, s := range slots {
 		if s.Status == models.ScheduleSlotStatusCancelled {
 			continue
 		}
-		if s.GroupLessonID != nil {
+		if s.IsConsultation() {
+			consultationScheduled++
+		} else if s.GroupLessonID != nil {
 			grpScheduled++
 		} else {
 			indScheduled++
@@ -1546,15 +1658,16 @@ func (h *ScheduleHandler) respondWithSchedule(c *gin.Context, schedule *models.S
 		"issues":                  issues,
 		"zero_scheduled_students": zeroScheduledStudents,
 		"stats": gin.H{
-			"total_requested": indRequested + grpRequested,
-			"ind_requested":   indRequested,
-			"grp_requested":   grpRequested,
-			"scheduled":       indScheduled,
-			"ind_scheduled":   indScheduled,
-			"grp_scheduled":   grpScheduled,
-			"unplaced":        unplaced,
-			"config_errors":   configErrors,
-			"conflict_errors": conflictErrors,
+			"total_requested":        indRequested + grpRequested,
+			"ind_requested":          indRequested,
+			"grp_requested":          grpRequested,
+			"scheduled":              indScheduled + grpScheduled + consultationScheduled,
+			"ind_scheduled":          indScheduled,
+			"grp_scheduled":          grpScheduled,
+			"consultation_scheduled": consultationScheduled,
+			"unplaced":               unplaced,
+			"config_errors":          configErrors,
+			"conflict_errors":        conflictErrors,
 		},
 	})
 }
@@ -1809,6 +1922,77 @@ func (h *ScheduleHandler) ensureManualSlotRelations(assignmentID, studentID, tea
 	return nil
 }
 
+func validateGuestChildNamePart(value, label string, required bool) error {
+	value = strings.TrimSpace(value)
+	if required && value == "" {
+		return fmt.Errorf("Укажите %s ребёнка", label)
+	}
+	if utf8.RuneCountInString(value) > 100 {
+		return fmt.Errorf("Поле «%s» не должно быть длиннее 100 символов", label)
+	}
+	if strings.ContainsAny(value, "\r\n\t") {
+		return fmt.Errorf("Поле «%s» содержит недопустимый перенос строки", label)
+	}
+	return nil
+}
+
+func optionalUintValuesEqual(left, right *uint) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
+}
+
+func validateConsultationShape(slot models.ScheduleSlot) error {
+	if slot.SlotType != models.SlotTypeIndividual || !slot.IsConsultation() {
+		return fmt.Errorf("Консультация должна быть индивидуальным занятием")
+	}
+	if slot.AssignmentID != nil || slot.StudentID != nil || slot.GroupLessonID != nil {
+		return fmt.Errorf("К консультации нельзя привязать назначение, существующего ребёнка или группу")
+	}
+	if err := validateGuestChildNamePart(slot.GuestChildLastName, "фамилию", true); err != nil {
+		return err
+	}
+	if err := validateGuestChildNamePart(slot.GuestChildFirstName, "имя", true); err != nil {
+		return err
+	}
+	if err := validateGuestChildNamePart(slot.GuestChildMiddleName, "отчество", false); err != nil {
+		return err
+	}
+	if slot.TeacherID == 0 || slot.SubjectID == nil || *slot.SubjectID == 0 || slot.RoomID == nil || *slot.RoomID == 0 {
+		return fmt.Errorf("Для консультации выберите преподавателя, предмет и кабинет")
+	}
+	return nil
+}
+
+func (h *ScheduleHandler) ensureManualConsultationRelations(slot models.ScheduleSlot) error {
+	if err := validateConsultationShape(slot); err != nil {
+		return err
+	}
+
+	var teacher models.Teacher
+	if err := h.db.Where("is_active = ? AND archived_at IS NULL", true).First(&teacher, slot.TeacherID).Error; err != nil {
+		return fmt.Errorf("Выбранный преподаватель не найден или неактивен")
+	}
+	var subject models.Subject
+	if err := h.db.Where("is_active = ? AND archived_at IS NULL", true).First(&subject, *slot.SubjectID).Error; err != nil {
+		return fmt.Errorf("Выбранный предмет не найден или неактивен")
+	}
+	var teacherSubject models.TeacherSubject
+	if err := h.db.Where("teacher_id = ? AND subject_id = ?", slot.TeacherID, *slot.SubjectID).First(&teacherSubject).Error; err != nil {
+		return fmt.Errorf("Выбранный преподаватель не ведёт этот предмет")
+	}
+	var room models.Room
+	if err := h.db.Where("is_active = ? AND archived_at IS NULL", true).First(&room, *slot.RoomID).Error; err != nil {
+		return fmt.Errorf("Выбранный кабинет не найден или неактивен")
+	}
+	var roomSubject models.RoomSubject
+	if err := h.db.Where("room_id = ? AND subject_id = ?", *slot.RoomID, *slot.SubjectID).First(&roomSubject).Error; err != nil {
+		return fmt.Errorf("Данный кабинет не предназначен для этого предмета")
+	}
+	return nil
+}
+
 // ========== SLOT EXCLUSIONS (для групповых слотов) ==========
 
 func (h *ScheduleHandler) ensureSlotHasNoConflicts(slot models.ScheduleSlot, excludeSlotID uint) error {
@@ -1824,11 +2008,40 @@ func (h *ScheduleHandler) validateScheduleConflicts(scheduleID uint) error {
 		return fmt.Errorf("не удалось проверить занятия")
 	}
 	for _, slot := range slots {
+		if err := h.validateScheduleSlotIntegrity(slot); err != nil {
+			return err
+		}
 		if err := h.ensureSlotHasNoConflicts(slot, slot.ID); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (h *ScheduleHandler) validateScheduleSlotIntegrity(slot models.ScheduleSlot) error {
+	switch slot.LessonKind {
+	case "", models.ScheduleLessonKindRegular:
+		if strings.TrimSpace(slot.GuestChildLastName) != "" || strings.TrimSpace(slot.GuestChildFirstName) != "" || strings.TrimSpace(slot.GuestChildMiddleName) != "" {
+			return fmt.Errorf("Обычное занятие содержит гостевое ФИО")
+		}
+		return nil
+	case models.ScheduleLessonKindConsultation:
+		// A cancelled consultation remains historical data and must not make the
+		// whole week impossible to approve merely because one of its directory
+		// entries was deactivated later. Its stored shape is still validated.
+		var err error
+		if slot.Status == models.ScheduleSlotStatusCancelled {
+			err = validateConsultationShape(slot)
+		} else {
+			err = h.ensureManualConsultationRelations(slot)
+		}
+		if err != nil {
+			return fmt.Errorf("Некорректная консультация: %w", err)
+		}
+		return nil
+	default:
+		return fmt.Errorf("Занятие содержит неизвестный вид")
+	}
 }
 
 func (h *ScheduleHandler) ensureSlotHasNoConflictsWithDB(db *gorm.DB, slot models.ScheduleSlot, excludeSlotID uint) error {

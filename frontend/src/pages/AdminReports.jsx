@@ -47,7 +47,8 @@ const reportPersonLabel = person => {
 	return person.full_name || ''
 }
 
-const lessonTypeLabel = type => (type === 'group' ? 'Групповое' : 'Индивидуальное')
+const lessonTypeLabel = (type, lessonKind) =>
+	lessonKind === 'consultation' ? 'Консультация' : (type === 'group' ? 'Групповое' : 'Индивидуальное')
 const lessonPersonLabel = lesson =>
 	lesson.slot_type === 'group' ? lesson.group_name : lesson.student_name
 
@@ -149,7 +150,7 @@ const addLessonsSection = (ws, lessons) => {
 	lessons.forEach(lesson => {
 		const dr = ws.addRow([
 			displayDate(lesson.date), `${lesson.start_time}-${lesson.end_time}`, `${lesson.duration_min} мин`,
-			lessonTypeLabel(lesson.slot_type), lessonPersonLabel(lesson) || '-',
+			lessonTypeLabel(lesson.slot_type, lesson.lesson_kind), lessonPersonLabel(lesson) || '-',
 			lesson.subject_name || '-', lesson.room_name || '-', lesson.teacher_name || '-',
 		])
 		dr.eachCell(cell => fillCell(cell, reportColors.lessonBg))
@@ -172,11 +173,12 @@ const addStudentSummary = (ws, rows) => {
 	styleHeaderRow(header)
 	const studentGroups = new Map()
 	rows.forEach(row => {
-		const existing = studentGroups.get(row.student_id)
+		const participantKey = row.participant_key || `student:${row.student_id}`
+		const existing = studentGroups.get(participantKey)
 		if (existing) {
 			existing.rows.push(row)
 		} else {
-			studentGroups.set(row.student_id, { studentID: row.student_id, studentName: row.student_name, rows: [row] })
+			studentGroups.set(participantKey, { studentID: row.student_id, studentName: row.student_name, rows: [row] })
 		}
 	})
 	const rowsByStudent = Array.from(studentGroups.values())
@@ -230,7 +232,7 @@ const addStudentLessons = (ws, lessons, forOneStudent = false) => {
 	lessons.forEach(lesson => {
 		const dr = ws.addRow([
 			displayDate(lesson.date), `${lesson.start_time}-${lesson.end_time}`, `${lesson.duration_min} мин`,
-			lessonTypeLabel(lesson.slot_type), lessonPersonLabel(lesson) || '-',
+			lessonTypeLabel(lesson.slot_type, lesson.lesson_kind), lessonPersonLabel(lesson) || '-',
 			lesson.subject_name || '-', Number(lesson.tariff_rub || 0),
 			Number(forOneStudent ? lesson.tariff_rub || 0 : lesson.amount_rub || 0),
 			lesson.room_name || '-', lesson.teacher_name || '-',
@@ -360,6 +362,10 @@ const AdminReports = () => {
 		const generalSheet = workbook.addWorksheet(safeSheetName('Общий — итоги', usedNames))
 		setupSheet(generalSheet, 'Отчётность по детям', periodLabel, studentSummaryCols)
 		addStudentSummary(generalSheet, studentRows)
+
+		const consultationsSheet = workbook.addWorksheet(safeSheetName('Консультации', usedNames))
+		setupSheet(consultationsSheet, 'Консультации', periodLabel, studentLessonCols)
+		addStudentLessons(consultationsSheet, lessons.filter(lesson => lesson.lesson_kind === 'consultation'))
 
 		const lessonsSheet = workbook.addWorksheet(safeSheetName('Общий — занятия', usedNames))
 		setupSheet(lessonsSheet, 'Отчётность по детям: все занятия', periodLabel, studentLessonCols)
@@ -566,7 +572,7 @@ const AdminReports = () => {
 											<TableCell>{displayDate(lesson.date)}</TableCell>
 											<TableCell>{lesson.start_time}–{lesson.end_time}</TableCell>
 											<TableCell align='center'>{lesson.duration_min} мин</TableCell>
-											<TableCell>{lessonTypeLabel(lesson.slot_type)}</TableCell>
+											<TableCell>{lessonTypeLabel(lesson.slot_type, lesson.lesson_kind)}</TableCell>
 											<TableCell>{lessonPersonLabel(lesson) || '-'}</TableCell>
 											<TableCell>{lesson.subject_name || '-'}</TableCell>
 											{tab === 1 && <TableCell align='center'>{new Intl.NumberFormat('ru-RU').format(Number(lesson.tariff_rub || 0))}</TableCell>}

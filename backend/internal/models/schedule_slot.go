@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	ScheduleSlotOriginAuto   = "auto"
@@ -13,25 +16,32 @@ const (
 
 	SlotTypeIndividual = "individual"
 	SlotTypeGroup      = "group"
+
+	ScheduleLessonKindRegular      = "regular"
+	ScheduleLessonKindConsultation = "consultation"
 )
 
 type ScheduleSlot struct {
-	ID               uint    `json:"id" gorm:"primaryKey"`
-	ScheduleID       uint    `json:"schedule_id" gorm:"not null;index:idx_schedule_weekday"`
-	SlotType         string  `json:"slot_type" gorm:"type:varchar(20);not null;default:'individual'"`
-	AssignmentID     *uint   `json:"assignment_id,omitempty" gorm:"index"`
-	GroupLessonID    *uint   `json:"group_lesson_id,omitempty" gorm:"index"`
-	StudentID        *uint   `json:"student_id,omitempty" gorm:"index:idx_schedule_student_weekday"`
-	TeacherID        uint    `json:"teacher_id" gorm:"not null;index:idx_schedule_teacher_weekday"`
-	SubjectID        *uint   `json:"subject_id,omitempty" gorm:"index"`
-	RoomID           *uint   `json:"room_id,omitempty" gorm:"index:idx_schedule_room_weekday"`
-	RoomName         string  `json:"room_name,omitempty" gorm:"type:varchar(255)"`
-	Weekday          int     `json:"weekday" gorm:"not null;index:idx_schedule_weekday"` // 1=Mon ... 7=Sun
-	StartTime        string  `json:"start_time" gorm:"type:varchar(5);not null"`         // HH:MM
-	EndTime          string  `json:"end_time" gorm:"type:varchar(5);not null"`           // HH:MM
-	Origin           string  `json:"origin" gorm:"type:varchar(20);not null;default:'auto'"`
-	Status           string  `json:"status" gorm:"type:varchar(20);not null;default:'scheduled'"`
-	TeacherHoursMode *string `json:"teacher_hours_mode,omitempty" gorm:"type:varchar(10)"`
+	ID                   uint    `json:"id" gorm:"primaryKey"`
+	ScheduleID           uint    `json:"schedule_id" gorm:"not null;index:idx_schedule_weekday"`
+	SlotType             string  `json:"slot_type" gorm:"type:varchar(20);not null;default:'individual'"`
+	LessonKind           string  `json:"lesson_kind" gorm:"type:varchar(20);not null;default:'regular';index"`
+	AssignmentID         *uint   `json:"assignment_id,omitempty" gorm:"index"`
+	GroupLessonID        *uint   `json:"group_lesson_id,omitempty" gorm:"index"`
+	StudentID            *uint   `json:"student_id,omitempty" gorm:"index:idx_schedule_student_weekday"`
+	TeacherID            uint    `json:"teacher_id" gorm:"not null;index:idx_schedule_teacher_weekday"`
+	SubjectID            *uint   `json:"subject_id,omitempty" gorm:"index"`
+	RoomID               *uint   `json:"room_id,omitempty" gorm:"index:idx_schedule_room_weekday"`
+	RoomName             string  `json:"room_name,omitempty" gorm:"type:varchar(255)"`
+	Weekday              int     `json:"weekday" gorm:"not null;index:idx_schedule_weekday"` // 1=Mon ... 7=Sun
+	StartTime            string  `json:"start_time" gorm:"type:varchar(5);not null"`         // HH:MM
+	EndTime              string  `json:"end_time" gorm:"type:varchar(5);not null"`           // HH:MM
+	Origin               string  `json:"origin" gorm:"type:varchar(20);not null;default:'auto'"`
+	Status               string  `json:"status" gorm:"type:varchar(20);not null;default:'scheduled'"`
+	TeacherHoursMode     *string `json:"teacher_hours_mode,omitempty" gorm:"type:varchar(10)"`
+	GuestChildLastName   string  `json:"guest_child_last_name,omitempty" gorm:"type:varchar(100);not null;default:''"`
+	GuestChildFirstName  string  `json:"guest_child_first_name,omitempty" gorm:"type:varchar(100);not null;default:''"`
+	GuestChildMiddleName string  `json:"guest_child_middle_name,omitempty" gorm:"type:varchar(100);not null;default:''"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -45,6 +55,25 @@ type ScheduleSlot struct {
 	Room                  *Room                   `json:"room,omitempty" gorm:"foreignKey:RoomID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	GroupLessonAttendance []GroupLessonAttendance `json:"group_lesson_attendance,omitempty" gorm:"foreignKey:ScheduleSlotID"`
 	Teachers              []ScheduleSlotTeacher   `json:"teachers,omitempty" gorm:"foreignKey:ScheduleSlotID"`
+}
+
+func (s ScheduleSlot) IsConsultation() bool {
+	return s.LessonKind == ScheduleLessonKindConsultation
+}
+
+func (s ScheduleSlot) GuestChildFullName() string {
+	parts := []string{
+		strings.TrimSpace(s.GuestChildLastName),
+		strings.TrimSpace(s.GuestChildFirstName),
+		strings.TrimSpace(s.GuestChildMiddleName),
+	}
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return strings.Join(result, " ")
 }
 
 type ScheduleSlotTeacher struct {

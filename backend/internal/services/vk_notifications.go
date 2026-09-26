@@ -116,7 +116,9 @@ func (s *VKNotificationService) SendTest(ctx context.Context, recipient models.V
 	if !recipient.IsEnabled {
 		return errors.New("доставка этому получателю отключена")
 	}
-	message := "Тестовое уведомление\n\nИнтеграция уведомлений Центра «РАСсвет» с VK работает корректно."
+	// Keep the delivery probe intentionally minimal. Schedule notifications carry
+	// only their heading and lessons, so the test must not add invented prose.
+	message := "Тест доставки уведомлений"
 	return s.sendMessage(ctx, recipient.VKUserID, message, secureRandomID())
 }
 

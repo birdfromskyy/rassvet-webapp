@@ -10,7 +10,7 @@ RUN go build -o main cmd/main.go
 
 FROM alpine:3.23
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates ttf-dejavu
 WORKDIR /app
 
 COPY --from=builder /app/main .
