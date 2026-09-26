@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getUploadUrl } from "../../services/cmsService";
 
-const getVkEmbedUrl = (url) => {
+const getVkEmbed = (url) => {
   if (!url) return null;
   let parsed;
   try { parsed = new URL(url); } catch { return null; }
@@ -9,11 +9,11 @@ const getVkEmbedUrl = (url) => {
   const hostname = parsed.hostname.toLowerCase();
   const isVkHost = ["vk.com", "vk.ru", "vkvideo.ru"].some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
   if (!isVkHost) return null;
-  if (parsed.pathname.includes("video_ext.php")) return url;
+  if (parsed.pathname.includes("video_ext.php")) return { url, orientation: "landscape" };
   const videoMatch = `${parsed.pathname}${parsed.search}`.match(/video(-?\d+)_(\d+)/);
-  if (videoMatch) return `https://vk.com/video_ext.php?oid=${videoMatch[1]}&id=${videoMatch[2]}&hd=2`;
   const clipMatch = `${parsed.pathname}${parsed.search}`.match(/clip(-?\d+)_(\d+)/);
-  if (clipMatch) return `https://vk.com/video_ext.php?oid=${clipMatch[1]}&id=${clipMatch[2]}&hd=2`;
+  if (clipMatch) return { url: `https://vk.com/video_ext.php?oid=${clipMatch[1]}&id=${clipMatch[2]}&hd=2`, orientation: "portrait" };
+  if (videoMatch) return { url: `https://vk.com/video_ext.php?oid=${videoMatch[1]}&id=${videoMatch[2]}&hd=2`, orientation: "landscape" };
   return null;
 };
 
@@ -51,12 +51,17 @@ function NewsArticleView({
   showImageCaptions = true,
 }) {
   const [lightbox, setLightbox] = useState(null);
+  const [activeVideo, setActiveVideo] = useState(null);
   useEffect(() => {
-    if (!lightbox) return undefined;
-    const onKey = (event) => { if (event.key === "Escape") setLightbox(null); };
+    if (!lightbox && !activeVideo) return undefined;
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      setLightbox(null);
+      setActiveVideo(null);
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [lightbox]);
+  }, [lightbox, activeVideo]);
 
   const formatDate = (dateString) => new Date(dateString).toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const renderBlock = (block, index) => {
@@ -70,8 +75,8 @@ function NewsArticleView({
       return imageUrl ? <figure key={key} className="nd-block nd-block--image"><button type="button" className="nd-img-btn" onClick={() => setLightbox(imageUrl)} title="Нажмите, чтобы увеличить"><img src={imageUrl} alt={block.title || "Изображение"} className="nd-block__image" /></button>{showImageCaptions && block.title && <figcaption>{block.title}</figcaption>}</figure> : null;
     }
     if (block.type === "video") {
-      const embedUrl = getVkEmbedUrl(block.content);
-      if (embedUrl) return <div key={key} className="nd-video"><iframe src={embedUrl} title="Видео" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen /></div>;
+      const embed = getVkEmbed(block.content);
+      if (embed) return <button key={key} type="button" className={`nd-video nd-video--${embed.orientation}`} onClick={() => setActiveVideo(embed)} aria-label="Открыть видео на весь экран"><iframe src={embed.url} title="Предпросмотр видео" tabIndex="-1" allow="encrypted-media" /><span className="nd-video__overlay" aria-hidden="true" /><span className="nd-video__play" aria-hidden="true">▶</span></button>;
       const videoHref = safeUrl(block.content);
       return videoHref ? <div key={key} className="nd-file"><a href={videoHref} target="_blank" rel="noopener noreferrer">Открыть видео</a></div> : null;
     }
@@ -88,6 +93,7 @@ function NewsArticleView({
       <div className="nd-body"><div className="page-container nd-body__inner">{getUploadUrl(article.featured_image) && <button type="button" className="nd-img-btn nd-cover-btn" onClick={() => setLightbox(getUploadUrl(article.featured_image))} title="Нажмите, чтобы увеличить"><img src={getUploadUrl(article.featured_image)} alt={article.title} className="nd-cover" /></button>}<div className="nd-content">{article.blocks?.map(renderBlock)}{conclusion && <strong className="nd-conclusion">{conclusion}</strong>}</div></div></div>
     </article>
     {lightbox && <div className="nd-lightbox" onClick={() => setLightbox(null)}><button type="button" className="nd-lightbox__close" onClick={() => setLightbox(null)} aria-label="Закрыть">×</button><img src={lightbox} alt="Увеличенное изображение" onClick={(event) => event.stopPropagation()} /></div>}
+    {activeVideo && <div className="nd-video-modal" onClick={() => setActiveVideo(null)}><button type="button" className="nd-video-modal__close" onClick={() => setActiveVideo(null)} aria-label="Закрыть видео">×</button><div className={`nd-video-modal__card nd-video-modal__card--${activeVideo.orientation}`} onClick={(event) => event.stopPropagation()}><iframe src={activeVideo.url} title="Видео" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen /></div></div>}
   </>;
 }
 

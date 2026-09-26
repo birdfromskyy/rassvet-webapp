@@ -26,3 +26,14 @@ func TestValidateArticleStatus(t *testing.T) {
 	require.NoError(t, validateArticleStatus("published"))
 	require.Error(t, validateArticleStatus("scheduled"))
 }
+
+func TestValidateArticleVideoBlocksRejectsWallPosts(t *testing.T) {
+	require.Error(t, validateArticleVideoBlocks([]BlockRequest{{
+		Type:    "video",
+		Content: "https://vk.com/wall-228149734_123",
+	}}))
+	require.NoError(t, validateArticleVideoBlocks([]BlockRequest{{
+		Type:    "video",
+		Content: "https://vk.com/clip-228149734_456239192",
+	}}))
+}

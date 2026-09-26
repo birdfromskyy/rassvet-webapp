@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { getUploadUrl } from '../../services/cmsService'
 import './NewsCard.scss'
 
-const NewsCard = ({ article, variant = 'default' }) => {
+const NewsCard = ({ article, variant = 'default', returnTo }) => {
   const navigate = useNavigate()
 
   const handleClick = () => {
-    navigate(`/news/${article.slug}`)
+    navigate(`/news/${article.slug}`, returnTo ? { state: { newsReturnTo: returnTo } } : undefined)
   }
 
   const formatDate = dateString => {

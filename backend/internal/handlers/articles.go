@@ -4,6 +4,7 @@ import (
 	"backend/internal/models"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -59,6 +60,25 @@ func parseArticlePublishedAt(raw string) (*time.Time, error) {
 func validateArticleStatus(status string) error {
 	if status != "" && status != "draft" && status != "published" {
 		return fmt.Errorf("некорректный статус новости")
+	}
+	return nil
+}
+
+func validateArticleVideoBlocks(blocks []BlockRequest) error {
+	for _, block := range blocks {
+		if block.Type != "video" || strings.TrimSpace(block.Content) == "" {
+			continue
+		}
+
+		parsed, err := url.Parse(strings.TrimSpace(block.Content))
+		if err != nil {
+			continue
+		}
+		// VK wall posts look like /wall-123_456. They cannot be shown in the
+		// video player and otherwise leave a broken embed in the article.
+		if strings.Contains(strings.ToLower(parsed.Path), "/wall") {
+			return fmt.Errorf("в блоке «Видео» указана ссылка на запись со стены. Укажите ссылку на видео или клип")
+		}
 	}
 	return nil
 }
@@ -174,6 +194,10 @@ func (h *ArticleHandler) CreateArticle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateArticleVideoBlocks(req.Blocks); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	publishedAt, err := parseArticlePublishedAt(req.PublishedAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -235,6 +259,10 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := validateArticleVideoBlocks(req.Blocks); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	publishedAt, err := parseArticlePublishedAt(req.PublishedAt)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -280,7 +308,7 @@ func (h *ArticleHandler) UpdateArticle(c *gin.Context) {
 // saveBlocks, so the list-page switch cannot overwrite article content.
 func (h *ArticleHandler) SetPublicationStatus(c *gin.Context) {
 	var article models.Article
-	if err := h.db.First(&article, c.Param("id")).Error; err != nil {
+	if err := h.db.Preload("Blocks").First(&article, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Статья не найдена"})
 		return
 	}
@@ -288,6 +316,16 @@ func (h *ArticleHandler) SetPublicationStatus(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+	if req.Status == "published" {
+		blocks := make([]BlockRequest, 0, len(article.Blocks))
+		for _, block := range article.Blocks {
+			blocks = append(blocks, BlockRequest{Type: block.Type, Content: block.Content})
+		}
+		if err := validateArticleVideoBlocks(blocks); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 	article.Status = req.Status
 	if article.PublishedAt == nil {

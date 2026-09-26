@@ -128,6 +128,22 @@ const slugify = (str) => {
     .replace(/^-|-$/g, "");
 };
 
+const getWallPostVideoError = (value) => {
+  const url = String(value || "").trim();
+  if (!url) return "";
+
+  try {
+    const path = new URL(url).pathname.toLowerCase();
+    if (path.includes("/wall")) {
+      return "Укажите ссылку на видео или клип, а не на запись со стены.";
+    }
+  } catch {
+    // The API will handle unsupported or malformed video provider URLs.
+  }
+
+  return "";
+};
+
 export default function AdminNews() {
   const navigate = useNavigate();
 
@@ -216,6 +232,14 @@ export default function AdminNews() {
   const handleSave = async () => {
     if (!meta.title || !meta.slug) {
       toast.error("Укажите заголовок и slug");
+      return;
+    }
+
+    const invalidVideo = blocks.find(
+      (block) => block.type === "video" && getWallPostVideoError(block.content)
+    );
+    if (invalidVideo) {
+      toast.error(getWallPostVideoError(invalidVideo.content));
       return;
     }
 
@@ -733,7 +757,9 @@ function BlockEditor({
           value={block.content}
           onChange={(e) => onChange({ content: e.target.value })}
           fullWidth
-          placeholder="https://vk.com/video..."
+          placeholder="https://vk.com/video... или https://vk.com/clip..."
+          error={Boolean(getWallPostVideoError(block.content))}
+          helperText={getWallPostVideoError(block.content) || "Вставьте ссылку на видео или клип, не на запись со стены."}
         />
       )}
 

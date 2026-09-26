@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import NewsCard from "../../components/NewsCard/NewsCard";
 import newsService from "../../services/newsService";
 import Header from "../../components/Header/Header";
@@ -10,15 +11,33 @@ import "./News.scss";
 /* News list page — "Rassvet 2.0" design (Skills/Design2.md).
    Same data & behaviour: paginated + searchable published articles. */
 
+const getPageFromParams = (value) => {
+  const page = Number(value);
+  return Number.isInteger(page) && page > 0 ? page : 1;
+};
+
 const News = () => {
   const rootRef = useRef(null);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const page = getPageFromParams(searchParams.get("page"));
+  const search = searchParams.get("search") || "";
+  const [searchInput, setSearchInput] = useState(search);
+
+  const updateParams = useCallback((updates, options) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === "") next.delete(key);
+        else next.set(key, String(value));
+      });
+      return next;
+    }, options);
+  }, [setSearchParams]);
 
   useEffect(() => {
     document.title = "Новости";
@@ -27,34 +46,56 @@ const News = () => {
   useBrandFont();
 
   useEffect(() => {
-    const fetchArticles = async () => {
-      setLoading(true);
-      try {
-        const params = { page, limit: 9, ...(search && { search }) };
-        const data = await newsService.getPublishedArticles(params);
+    let isCurrent = true;
+    setLoading(true);
+    setError(null);
+
+    newsService
+      .getPublishedArticles({ page, limit: 8, ...(search && { search }) })
+      .then((data) => {
+        if (!isCurrent) return;
+        const pages = Math.max(1, data.pagination?.pages || 1);
+        if (page > pages) {
+          updateParams({ page: pages === 1 ? undefined : pages }, { replace: true });
+          return;
+        }
         setArticles(data.articles || []);
-        setTotalPages(data.pagination?.pages || 1);
-      } catch (err) {
+        setTotalPages(pages);
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
         console.error(err);
         setError("Не удалось загрузить новости");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchArticles();
-  }, [page, search]);
+      })
+      .finally(() => {
+        if (isCurrent) setLoading(false);
+      });
+
+    return () => { isCurrent = false; };
+  }, [page, search, updateParams]);
 
   useReveal(rootRef, [articles.length, loading]);
 
   /* Live search: debounce keystrokes, then filter. The hero is compact,
      so results are already visible below — no scrolling needed. */
   useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  useEffect(() => {
+    const normalizedSearch = searchInput.trim();
+    if (normalizedSearch === search) return undefined;
     const t = setTimeout(() => {
-      setSearch(searchInput.trim());
-      setPage(1);
+      updateParams({ search: normalizedSearch || undefined, page: undefined }, { replace: true });
     }, 400);
     return () => clearTimeout(t);
-  }, [searchInput]);
+  }, [searchInput, search, updateParams]);
+
+  const handlePageChange = (nextPage) => {
+    if (nextPage === page) return;
+    updateParams({ page: nextPage === 1 ? undefined : nextPage });
+    rootRef.current?.querySelector("#np-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <div className="news-page" ref={rootRef}>
@@ -113,7 +154,7 @@ const News = () => {
               <div className="np-grid">
                 {articles.map((article) => (
                   <div className="np-cell" key={article.id} data-reveal>
-                    <NewsCard article={article} />
+                    <NewsCard article={article} returnTo={`${location.pathname}${location.search}`} />
                   </div>
                 ))}
               </div>
@@ -125,7 +166,7 @@ const News = () => {
                       key={i}
                       type="button"
                       className={page === i + 1 ? "is-active" : ""}
-                      onClick={() => setPage(i + 1)}
+                      onClick={() => handlePageChange(i + 1)}
                     >
                       {i + 1}
                     </button>

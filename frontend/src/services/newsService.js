@@ -8,7 +8,7 @@ const fetchArticles = (params) =>
 
 const newsService = {
   getPublishedArticles: async (params = {}) => {
-    const { page = 1, limit = 9, search } = params
+    const { page = 1, limit = 8, search } = params
     const query = { page, limit }
     if (search) query.search = search
     return fetchArticles(query)
