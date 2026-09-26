@@ -1481,79 +1481,64 @@ func (h *ScheduleHandler) CopyManualSlotsFromPrevWeek(c *gin.Context) {
 		return
 	}
 
-	tx := h.db.Begin()
-	if tx.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось начать копирование"})
-		return
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			panic(r)
-		}
-	}()
-
 	copiedSlots := 0
-	for _, s := range prevManualSlots {
-		newSlot := models.ScheduleSlot{
-			ScheduleID:       schedule.ID,
-			SlotType:         s.SlotType,
-			LessonKind:       s.LessonKind,
-			AssignmentID:     s.AssignmentID,
-			GroupLessonID:    s.GroupLessonID,
-			StudentID:        s.StudentID,
-			TeacherID:        s.TeacherID,
-			SubjectID:        s.SubjectID,
-			RoomID:           s.RoomID,
-			RoomName:         s.RoomName,
-			Weekday:          s.Weekday,
-			StartTime:        s.StartTime,
-			EndTime:          s.EndTime,
-			Origin:           models.ScheduleSlotOriginManual,
-			Status:           models.ScheduleSlotStatusScheduled,
-			TeacherHoursMode: s.TeacherHoursMode,
+	copyStatus := http.StatusInternalServerError
+	copyMessage := "Не удалось скопировать занятия"
+	if err := h.db.Transaction(func(tx *gorm.DB) error {
+		for _, s := range prevManualSlots {
+			newSlot := models.ScheduleSlot{
+				ScheduleID:       schedule.ID,
+				SlotType:         s.SlotType,
+				LessonKind:       s.LessonKind,
+				AssignmentID:     s.AssignmentID,
+				GroupLessonID:    s.GroupLessonID,
+				StudentID:        s.StudentID,
+				TeacherID:        s.TeacherID,
+				SubjectID:        s.SubjectID,
+				RoomID:           s.RoomID,
+				RoomName:         s.RoomName,
+				Weekday:          s.Weekday,
+				StartTime:        s.StartTime,
+				EndTime:          s.EndTime,
+				Origin:           models.ScheduleSlotOriginManual,
+				Status:           models.ScheduleSlotStatusScheduled,
+				TeacherHoursMode: s.TeacherHoursMode,
+			}
+			if newSlot.SlotType != models.SlotTypeGroup {
+				if err := h.ensureSlotHasNoConflictsWithDB(tx, newSlot, 0); err != nil {
+					copyStatus = http.StatusConflict
+					copyMessage = "Нельзя скопировать занятие: " + err.Error()
+					return err
+				}
+			}
+			if err := tx.Create(&newSlot).Error; err != nil {
+				return err
+			}
+			if newSlot.SlotType == models.SlotTypeGroup && newSlot.GroupLessonID != nil {
+				teacherIDs, err := h.getSlotTeacherIDsWithDB(tx, s)
+				if err != nil {
+					copyMessage = "Не удалось скопировать преподавателей занятия"
+					return err
+				}
+				if err := replaceScheduleSlotTeachers(tx, newSlot.ID, teacherIDs); err != nil {
+					copyMessage = "Не удалось скопировать преподавателей занятия"
+					return err
+				}
+				if err := h.ensureSlotHasNoConflictsWithDB(tx, newSlot, newSlot.ID); err != nil {
+					copyStatus = http.StatusConflict
+					copyMessage = "Нельзя скопировать занятие: " + err.Error()
+					return err
+				}
+				if err := h.populateGroupAttendanceWithDB(tx, newSlot.ID, *newSlot.GroupLessonID); err != nil {
+					copyMessage = "Не удалось скопировать состав группы"
+					return err
+				}
+			}
+			copiedSlots++
 		}
-		if newSlot.SlotType != models.SlotTypeGroup {
-			if err := h.ensureSlotHasNoConflictsWithDB(tx, newSlot, 0); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusConflict, gin.H{"error": "Нельзя скопировать занятие: " + err.Error()})
-				return
-			}
-		}
-		if err := tx.Create(&newSlot).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать занятия"})
-			return
-		}
-		if newSlot.SlotType == models.SlotTypeGroup && newSlot.GroupLessonID != nil {
-			teacherIDs, err := h.getSlotTeacherIDsWithDB(tx, s)
-			if err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать преподавателей занятия"})
-				return
-			}
-			if err := replaceScheduleSlotTeachers(tx, newSlot.ID, teacherIDs); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать преподавателей занятия"})
-				return
-			}
-			// The copied slot is already in the transaction. Exclude it from the
-			// comparison; otherwise its own teacher list is reported as a conflict.
-			if err := h.ensureSlotHasNoConflictsWithDB(tx, newSlot, newSlot.ID); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusConflict, gin.H{"error": "Нельзя скопировать занятие: " + err.Error()})
-				return
-			}
-			if err := h.populateGroupAttendanceWithDB(tx, newSlot.ID, *newSlot.GroupLessonID); err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать состав группы"})
-				return
-			}
-		}
-		copiedSlots++
-	}
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось скопировать занятия"})
+		return nil
+	}); err != nil {
+		c.JSON(copyStatus, gin.H{"error": copyMessage})
 		return
 	}
 	logging.Event("schedule.manual_slots.copy_completed", map[string]any{
